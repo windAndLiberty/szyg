@@ -1,0 +1,38 @@
+[
+  {
+    "id": "a1",
+    "title": "🎉 系统上线",
+    "content": "智能矩阵运营系统 v1.0 正式上线！提供AI对话、图像生成、视频创作、知识库管理等核心能力。",
+    "level": "success",
+    "is_pinned": true,
+    "created_at": "2024-06-01T00:00:00",
+    "expires_at": ""
+  },
+  {
+    "id": "a2",
+    "title": "📢 新功能：AI智能体广场",
+    "content": "12个面向中小企业的AI智能体已上线，覆盖招聘、营销、销售、法律、财务等场景，欢迎体验！",
+    "level": "info",
+    "is_pinned": false,
+    "created_at": "2024-06-04T00:00:00",
+    "expires_at": ""
+  },
+  {
+    "id": "a3",
+    "title": "🔧 工具市场更新",
+    "content": "新增AI工具聚合导航平台，精选24个热门AI工具，涵盖LLM、绘图、视频、编程等分类。",
+    "level": "info",
+    "is_pinned": false,
+    "created_at": "2024-06-03T00:00:00",
+    "expires_at": ""
+  },
+  {
+    "id": "2548edc0",
+    "title": "Test",
+    "content": "Testing",
+    "level": "info",
+    "is_pinned": false,
+    "created_at": "2026-06-04T16:34:10.845005",
+    "expires_at": "2026-06-11T16:34:10.845035"
+  }
+]

@@ -1,0 +1,257 @@
+/* ===================================================================
+   szyg Theme System
+   Dark  ←─💡─→  Light (professional blue, trustworthy)
+   Toggle: html.dark class, persisted in localStorage
+   =================================================================== */
+
+/* ── Light Theme (default) — Professional Blue / Trustworthy ── */
+:root {
+  /* Core */
+  --header-bg: #ffffff;
+  --header-text: #1e293b;
+  --header-border: #f0f0f0;
+  --header-menu-active: rgba(37, 99, 235, 0.06);
+  --bg-main: #ffffff;
+  --card-bg: #ffffff;
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --text-tertiary: #94a3b8;
+  --border-color: #e2e8f0;
+  --border-light: #f1f5f9;
+  /* Accent — trust blue */
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-light: rgba(37, 99, 235, 0.08);
+  --accent-glow: rgba(37, 99, 235, 0.2);
+  /* Surfaces */
+  --footer-bg: #ffffff;
+  --footer-text: #94a3b8;
+  --input-bg: #ffffff;
+  --input-border: #cbd5e1;
+  --input-focus: #2563eb;
+  --hover-bg: #f1f5f9;
+  --selected-bg: rgba(37, 99, 235, 0.06);
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.08);
+}
+
+/* ── Dark Theme — Sleek, low-contrast, neon accents ── */
+html.dark {
+  --header-bg: #0a0a0a;
+  --header-text: #e2e8f0;
+  --header-border: #1e1e1e;
+  --header-menu-active: rgba(37, 99, 235, 0.12);
+  --bg-main: #0d0d0d;
+  --card-bg: #171717;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+  --border-color: #262626;
+  --border-light: #1f1f1f;
+  --accent: #3b82f6;
+  --accent-hover: #60a5fa;
+  --accent-light: rgba(59, 130, 246, 0.1);
+  --accent-glow: rgba(59, 130, 246, 0.15);
+  --footer-bg: #0a0a0a;
+  --footer-text: #525252;
+  --input-bg: #1f1f1f;
+  --input-border: #333333;
+  --input-focus: #3b82f6;
+  --hover-bg: #1f1f1f;
+  --selected-bg: rgba(59, 130, 246, 0.08);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+/* ── Base ── */
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--bg-main);
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+#app { width: 100%; max-width: 100%; margin: 0; min-height: 100vh; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-hover); }
+
+/* ── Smooth transitions ── */
+.el-card, .el-table, .el-dialog, .el-drawer,
+.el-input__wrapper, .el-textarea__inner, .el-select .el-input__wrapper,
+.el-button--default, .el-tag, .el-alert,
+.el-header, .el-footer, .el-main {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Element Plus Dark Overrides
+   ═══════════════════════════════════════════════════════════ */
+
+/* Cards */
+html.dark .el-card {
+  background: var(--card-bg);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+html.dark .el-card__header {
+  border-bottom-color: var(--border-color);
+}
+
+/* Tables */
+html.dark .el-table {
+  --el-table-bg-color: var(--card-bg);
+  --el-table-tr-bg-color: var(--card-bg);
+  --el-table-header-bg-color: #1f1f1f;
+  --el-table-row-hover-bg-color: #222;
+  --el-table-border-color: var(--border-color);
+  --el-table-text-color: var(--text-primary);
+  --el-table-header-text-color: var(--text-secondary);
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+html.dark .el-table th.el-table__cell { background: #1f1f1f; }
+html.dark .el-table--striped .el-table__body tr.el-table__row--striped td { background: #1c1c1c; }
+
+/* Inputs */
+html.dark .el-input__wrapper {
+  background: var(--input-bg);
+  box-shadow: 0 0 0 1px var(--input-border) inset;
+}
+html.dark .el-input__wrapper:hover { box-shadow: 0 0 0 1px #444 inset; }
+html.dark .el-input.is-focus .el-input__wrapper { box-shadow: 0 0 0 1px var(--input-focus) inset; }
+html.dark .el-input__inner { color: var(--text-primary); }
+html.dark .el-input__inner::placeholder { color: #525252; }
+html.dark .el-textarea__inner {
+  background: var(--input-bg);
+  color: var(--text-primary);
+  border-color: var(--input-border);
+}
+html.dark .el-textarea__inner:focus { border-color: var(--input-focus); }
+
+/* Select / Dropdown */
+html.dark .el-select .el-input__wrapper { background: var(--input-bg); }
+html.dark .el-select-dropdown { background: var(--card-bg); border-color: var(--border-color); }
+html.dark .el-select-dropdown__item { color: var(--text-primary); }
+html.dark .el-select-dropdown__item.hover,
+html.dark .el-select-dropdown__item:hover { background: var(--hover-bg); }
+html.dark .el-select-dropdown__item.selected { color: var(--accent); }
+
+/* Dialogs / Drawers */
+html.dark .el-dialog { background: var(--card-bg); }
+html.dark .el-dialog__header { border-bottom: 1px solid var(--border-color); }
+html.dark .el-dialog__title { color: var(--text-primary); }
+html.dark .el-drawer { background: var(--card-bg); }
+
+/* Menu */
+html.dark .el-menu { background: transparent; border-color: var(--border-color); }
+html.dark .el-menu--horizontal > .el-menu-item {
+  color: var(--header-text) !important;
+  background: transparent !important;
+}
+html.dark .el-menu--horizontal > .el-menu-item.is-active {
+  color: var(--accent) !important;
+  border-bottom-color: var(--accent) !important;
+}
+html.dark .el-menu--horizontal > .el-menu-item:hover {
+  background: var(--header-menu-active) !important;
+}
+
+/* Tabs */
+html.dark .el-tabs__item { color: var(--text-secondary); }
+html.dark .el-tabs__item.is-active { color: var(--accent); }
+html.dark .el-tabs__nav-wrap::after { background: var(--border-color); }
+
+/* Pagination */
+html.dark .el-pagination button,
+html.dark .el-pager li {
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+html.dark .el-pager li.is-active { background: var(--accent); }
+
+/* Tags */
+html.dark .el-tag--default { background: #262626; border-color: var(--border-color); color: var(--text-secondary); }
+html.dark .el-tag--primary { background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.3); }
+
+/* Forms */
+html.dark .el-form-item__label { color: var(--text-primary); }
+html.dark .el-checkbox__label { color: var(--text-primary); }
+html.dark .el-radio__label { color: var(--text-primary); }
+
+/* Popover / Tooltip */
+html.dark .el-popper.is-light { background: var(--card-bg); border-color: var(--border-color); color: var(--text-primary); }
+html.dark .el-dropdown-menu { background: var(--card-bg); border-color: var(--border-color); }
+html.dark .el-dropdown-menu__item { color: var(--text-primary); }
+html.dark .el-dropdown-menu__item:hover { background: var(--hover-bg); }
+html.dark .el-dropdown-menu__item--divided { border-top-color: var(--border-color); }
+
+/* Misc */
+html.dark .el-divider__text { background: var(--card-bg); color: var(--text-secondary); }
+html.dark .el-empty__description p { color: var(--text-secondary); }
+html.dark .el-statistic__content { color: var(--text-primary); }
+html.dark .el-timeline-item__node { background: var(--border-color); }
+html.dark .el-loading-mask { background: rgba(0,0,0,0.6); }
+html.dark .el-avatar { --el-avatar-bg-color: #333; }
+
+/* ═══════════════════════════════════════════════════════════
+   Page-level dark overrides (namespaced to avoid conflicts)
+   ═══════════════════════════════════════════════════════════ */
+
+/* Cards: tool-card, agent-card, hub-tool-card */
+html.dark .tool-card,
+html.dark .agent-card,
+html.dark .hub-tool-card {
+  background: var(--card-bg) !important;
+  border-color: var(--border-color) !important;
+}
+html.dark .tool-card:hover,
+html.dark .agent-card:hover,
+html.dark .hub-tool-card:hover {
+  border-color: var(--accent) !important;
+  box-shadow: 0 4px 20px var(--accent-glow);
+}
+
+/* Stat chips */
+html.dark .stat-chip { background: var(--card-bg); }
+
+/* Prompt / code boxes */
+html.dark .prompt-box,
+html.dark .chat-messages {
+  background: #141414;
+  border-color: var(--border-color);
+}
+html.dark .msg.assistant .msg-content {
+  background: #222;
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+html.dark .streaming .msg-content {
+  background: #222;
+  border-color: var(--border-color);
+}
+
+/* Typography helpers */
+html.dark .subtitle,
+html.dark .result-count,
+html.dark .version,
+html.dark .usage,
+html.dark .chip-label,
+html.dark .form-hint,
+html.dark .stat-title,
+html.dark .tool-desc,
+html.dark .tier-desc,
+html.dark .agent-desc {
+  color: var(--text-secondary);
+}
+html.dark .page-header h1,
+html.dark .page-header h2,
+html.dark .hub-header h2 { color: var(--text-primary); }
+
+/* Hover states */
+html.dark .tool-mini:hover { background: var(--hover-bg); }
+html.dark .disclaimer-content { color: var(--text-primary); }

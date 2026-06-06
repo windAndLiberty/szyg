@@ -1,0 +1,83 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.venv/
+.venv_old/
+*.whl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# szyg — data (user-generated, not tracked)
+data/publisher.json
+data/publish_queue.json
+data/publish_log.json
+data/scheduler_jobs.json
+data/scheduler_history.json
+data/auth.db
+data/install.json
+data/state.json
+data/*.db
+data/*.lock
+data/video_cuts/
+data/video_cuts_result/
+data/workspace/
+data/sessions/
+
+# szyg — runtime artifacts
+server/server.log
+server/server_err.log
+*.log
+debug2.log
+
+# szyg — temp / test
+_tmp/
+_test_output/
+temp_*
+*.tmp
+test_output.*
+
+# Node / frontend
+web/node_modules/
+web/dist/
+node_modules/
+
+# Electron
+electron/node_modules/
+electron/out/
+
+# Hermes runtime
+.hermes/
+.claude/
+
+# Build output
+build/dist/
+build/*.exe
+
+# Secrets (must never be committed)
+*.key
+*.pem
+*.pfx
+.env
+.env.local
+config.local.yaml
+
+# ComfyUI junction (external)
+ComfyUI/
+
+# Large binary data (Ollama, models, etc.)
+*.gguf
+*.safetensors
+*.bin
