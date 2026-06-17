@@ -1,0 +1,29 @@
+# ⚠️ 临时测试配置 — 包含真实 API Key
+# 生产环境必须删除此文件，改用环境变量注入
+#
+# 用法:
+#   1. 确保 MODELSCOPE_API_KEY 已设置
+#   2. python -c "from yuling.config.settings import YuLingSettings; ..."
+
+models:
+  backends:
+    - name: "modelscope"
+      backend_type: "litellm"
+      base_url: "https://api-inference.modelscope.cn/v1"
+      api_key: "${MODELSCOPE_API_KEY}"
+      default_model: "deepseek-ai/DeepSeek-V4-Flash"
+      available_models:
+        - "deepseek-ai/DeepSeek-V4-Flash"
+        - "deepseek-ai/DeepSeek-V4-Pro"
+        - "deepseek-ai/DeepSeek-V3.2"
+        - "deepseek-ai/DeepSeek-R1-0528"
+        - "stepfun-ai/Step-3.7-Flash"
+      priority: 1
+      timeout: 120
+      max_tokens: 4096
+      enable_streaming: true
+
+  default_backend: "modelscope"
+  fallback_enabled: true
+  fallback_order: ["ollama"]
+  request_timeout: 120

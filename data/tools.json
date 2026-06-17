@@ -1,0 +1,89 @@
+[
+  {
+    "id": "1",
+    "soft_code": "ai_chat",
+    "title": "AI 智能对话",
+    "desc": "多模型AI对话助手，支持OpenRouter/ModelScope/Ollama",
+    "icon": "ChatDotRound",
+    "version": "1.0",
+    "category": "ai",
+    "is_yun": true,
+    "windows_canshu": "'/chat',1200,800,true"
+  },
+  {
+    "id": "2",
+    "soft_code": "ai_image",
+    "title": "AI 图像生成",
+    "desc": "基于ComfyUI和ModelScope的文生图工具",
+    "icon": "Picture",
+    "version": "1.0",
+    "category": "ai",
+    "is_yun": true,
+    "windows_canshu": "'/image',1200,800,true"
+  },
+  {
+    "id": "3",
+    "soft_code": "ai_video",
+    "title": "AI 视频创作",
+    "desc": "LLM脚本+语音合成+视频合成的全流程视频制作",
+    "icon": "VideoCamera",
+    "version": "1.0",
+    "category": "ai",
+    "is_yun": true,
+    "windows_canshu": "'/video',1200,800,true"
+  },
+  {
+    "id": "4",
+    "soft_code": "knowledge_base",
+    "title": "知识库管理",
+    "desc": "文档导入、分块、FTS5全文检索的RAG知识库",
+    "icon": "Document",
+    "version": "1.0",
+    "category": "tools",
+    "is_yun": true,
+    "windows_canshu": "'/knowledge',1100,700,true"
+  },
+  {
+    "id": "5",
+    "soft_code": "sop_workflow",
+    "title": "SOP 工作流",
+    "desc": "可视化SOP定义与自动化执行引擎",
+    "icon": "SetUp",
+    "version": "1.0",
+    "category": "tools",
+    "is_yun": true,
+    "windows_canshu": "'/sop',1100,700,true"
+  },
+  {
+    "id": "6",
+    "soft_code": "ffmpeg_tools",
+    "title": "视频处理工具",
+    "desc": "FFmpeg批量剪辑、转码、合并、提取音频",
+    "icon": "Film",
+    "version": "1.0",
+    "category": "media",
+    "is_yun": false
+  },
+  {
+    "id": "7",
+    "soft_code": "whisper_stt",
+    "title": "语音转文字",
+    "desc": "Whisper语音识别，支持多语言和单词级时间戳",
+    "icon": "Microphone",
+    "version": "1.0",
+    "category": "media",
+    "is_yun": true,
+    "windows_canshu": "'/stt',900,600,true"
+  },
+  {
+    "id": "8",
+    "soft_code": "oem_manager",
+    "title": "OEM 品牌管理",
+    "desc": "自定义Logo、版权、主题皮肤的品牌管理系统",
+    "icon": "Brush",
+    "version": "1.0",
+    "category": "admin",
+    "is_yun": true,
+    "windows_canshu": "'/oem',1100,700,true"
+  }
+]

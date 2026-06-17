@@ -1,0 +1,26 @@
+[
+  {
+    "id": "d4fe7bc4",
+    "job_id": "3dcbcde1",
+    "job_name": "热点话题紧急发布",
+    "status": "success",
+    "started_at": "2026-06-04T17:21:03.369576",
+    "finished_at": "2026-06-04T17:21:03.370675",
+    "duration_ms": 0,
+    "retry_count": 0,
+    "result": "No content_id specified",
+    "error": ""
+  },
+  {
+    "id": "7cbc28a7",
+    "job_id": "3dcbcde1",
+    "job_name": "热点话题紧急发布",
+    "status": "success",
+    "started_at": "2026-06-05T10:06:17.157779",
+    "finished_at": "2026-06-05T10:06:17.162612",
+    "duration_ms": 0,
+    "retry_count": 0,
+    "result": "No content_id specified",
+    "error": ""
+  }
+]

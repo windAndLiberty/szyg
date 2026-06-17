@@ -1,0 +1,42 @@
+{
+  "name": "szyg",
+  "version": "1.0.0",
+  "description": "szyg 智能矩阵运营系统",
+  "main": "main.js",
+  "scripts": {
+    "start": "pnpm electron . --no-sandbox",
+    "build": "pnpm electron-builder --win portable"
+  },
+  "build": {
+    "appId": "com.szyg.app",
+    "productName": "szyg",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "../server/**/*",
+      "../data/**/*",
+      "../config.yaml"
+    ],
+    "extraResources": [
+      {
+        "from": "../server",
+        "to": "server"
+      },
+      {
+        "from": "../data",
+        "to": "data"
+      }
+    ],
+    "win": {
+      "target": "portable",
+      "icon": null
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.0.0"
+  }
+}

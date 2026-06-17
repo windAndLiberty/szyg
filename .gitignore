@@ -1,0 +1,32 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+
+# Node
+node_modules/
+.next/
+.swc/
+
+# Data
+data/*.db
+data/comfyui_output/
+data/output/
+
+# Env
+.env
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+electron/node_modules/
+electron/dist/

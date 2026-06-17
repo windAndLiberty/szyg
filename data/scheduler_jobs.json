@@ -1,0 +1,137 @@
+[
+  {
+    "id": "a9380ffb",
+    "name": "每日早安海报发布",
+    "description": "每天早上8点自动发布早安问候图文",
+    "trigger_type": "cron",
+    "trigger_config": {
+      "cron": "0 8 * * *"
+    },
+    "action": "publish_content",
+    "action_config": {
+      "content_id": "",
+      "platform": "all"
+    },
+    "priority": 8,
+    "status": "active",
+    "max_retries": 3,
+    "retry_delay_seconds": 60,
+    "tags": [
+      "daily",
+      "social"
+    ],
+    "created_by": "admin",
+    "created_at": "2026-06-04T17:21:03.315910",
+    "updated_at": "2026-06-04T17:21:03.315945",
+    "last_run_at": "",
+    "next_run_at": ""
+  },
+  {
+    "id": "9ae15af5",
+    "name": "AI内容批量生成",
+    "description": "每隔2小时自动用AI生成3条营销文案草稿",
+    "trigger_type": "interval",
+    "trigger_config": {
+      "minutes": 120
+    },
+    "action": "generate_content",
+    "action_config": {
+      "topic": "中小企业数字化转型",
+      "agent_id": "copywriter",
+      "content_type": "post"
+    },
+    "priority": 6,
+    "status": "active",
+    "max_retries": 3,
+    "retry_delay_seconds": 60,
+    "tags": [
+      "ai",
+      "content"
+    ],
+    "created_by": "admin",
+    "created_at": "2026-06-04T17:21:03.316031",
+    "updated_at": "2026-06-04T17:21:03.316040",
+    "last_run_at": "",
+    "next_run_at": ""
+  },
+  {
+    "id": "414d422f",
+    "name": "周报自动生成",
+    "description": "每周五17:00自动生成本周内容发布周报",
+    "trigger_type": "cron",
+    "trigger_config": {
+      "cron": "0 17 * * 5"
+    },
+    "action": "run_workflow",
+    "action_config": {
+      "sop_name": "视频创作SOP",
+      "params": {
+        "topic": "本周热点回顾"
+      }
+    },
+    "priority": 7,
+    "status": "active",
+    "max_retries": 3,
+    "retry_delay_seconds": 60,
+    "tags": [
+      "weekly",
+      "report"
+    ],
+    "created_by": "admin",
+    "created_at": "2026-06-04T17:21:03.316074",
+    "updated_at": "2026-06-04T17:21:03.316081",
+    "last_run_at": "",
+    "next_run_at": ""
+  },
+  {
+    "id": "3dcbcde1",
+    "name": "热点话题紧急发布",
+    "description": "检测到热搜话题时手动触发紧急内容发布",
+    "trigger_type": "manual",
+    "trigger_config": {},
+    "action": "publish_content",
+    "action_config": {
+      "content_id": "",
+      "platform": "all"
+    },
+    "priority": 10,
+    "status": "active",
+    "max_retries": 3,
+    "retry_delay_seconds": 60,
+    "tags": [
+      "urgent",
+      "social"
+    ],
+    "created_by": "admin",
+    "created_at": "2026-06-04T17:21:03.316104",
+    "updated_at": "2026-06-05T10:06:17.162205",
+    "last_run_at": "2026-06-05T10:06:17.161069",
+    "next_run_at": ""
+  },
+  {
+    "id": "bc8c1b7b",
+    "name": "平台数据同步",
+    "description": "每小时同步一次各平台发布数据",
+    "trigger_type": "interval",
+    "trigger_config": {
+      "minutes": 60
+    },
+    "action": "custom",
+    "action_config": {
+      "command": "sync_platform_stats"
+    },
+    "priority": 3,
+    "status": "active",
+    "max_retries": 3,
+    "retry_delay_seconds": 60,
+    "tags": [
+      "sync",
+      "data"
+    ],
+    "created_by": "admin",
+    "created_at": "2026-06-04T17:21:03.316136",
+    "updated_at": "2026-06-04T17:21:03.316143",
+    "last_run_at": "",
+    "next_run_at": ""
+  }
+]

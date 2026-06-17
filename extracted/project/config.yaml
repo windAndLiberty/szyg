@@ -1,0 +1,168 @@
+# ╔══════════════════════════════════════════════════════════════╗
+# ║           「域灵」数字员工系统 — 主配置文件                   ║
+# ╚══════════════════════════════════════════════════════════════╝
+#
+# 环境变量加载: ${VAR_NAME} 或 ${VAR_NAME:default_value}
+# 优先级: 环境变量 > 此文件 > 代码默认值
+#
+# ⚠️  生产环境: 删除此文件中的真实 key，仅保留 ${VAR} 引用
+
+# =============================================================================
+# LLM 后端
+# =============================================================================
+llm:
+  # 默认使用的 LLM 后端: openrouter | modelscope | ollama | litellm
+  default_backend: openrouter
+
+  # ------------------------------------------------------------------
+  # OpenRouter — 聚合 API 网关，支持 openrouter/free 免费自动路由
+  # 获取 key: https://openrouter.ai/keys
+  openrouter:
+    enabled: true
+    api_key: "${OPENROUTER_API_KEY}"           # 免费模型: openrouter/free
+    base_url: "https://openrouter.ai/api/v1"
+    default_model: "openrouter/free"           # 自动路由到可用免费模型
+    timeout: 60                                # 请求超时(秒)
+    max_retries: 3                             # 429限流重试次数
+
+  # ------------------------------------------------------------------
+  # ModelScope — 阿里云模型推理平台 (OpenAI 兼容)
+  # 获取 key: https://modelscope.cn  → 个人中心 → API Key
+  modelscope:
+    enabled: true
+    api_key: "${MODELSCOPE_API_KEY}"
+    base_url: "https://api-inference.modelscope.cn/v1"
+    default_model: "deepseek-ai/DeepSeek-V4-Flash"
+    timeout: 120
+    max_retries: 3
+
+  # ------------------------------------------------------------------
+  # Ollama — 本地 LLM (免费, 需安装 ollama)
+  # 安装: curl -fsSL https://ollama.ai/install.sh | sh
+  ollama:
+    enabled: true
+    base_url: "http://localhost:11434"
+    default_model: "qwen3:0.6B"               # 本地模型，按需修改
+    timeout: 120                               # 冷启动可能较慢
+
+  # ------------------------------------------------------------------
+  # LiteLLM — 自托管 LLM 网关 (OpenAI 兼容)
+  liteLLM:
+    enabled: false
+    api_key: "${LITELLM_API_KEY:-}"
+    base_url: "http://localhost:4000"
+    default_model: "gpt-4"
+    timeout: 60
+
+  # LLM 通用设置
+  fallback_enabled: true                      # 主后端失败时自动降级
+  fallback_order: ["ollama"]                  # 降级顺序
+
+# =============================================================================
+# 图像生成
+# =============================================================================
+image:
+  # 默认图像生成后端: comfyui | modelscope
+  # ComfyUI 优先（本地免费无限），ModelScope 自动降级
+  default_backend: comfyui
+
+  # ------------------------------------------------------------------
+  # ComfyUI — 本地 SD 2.1 (免费，GTX 1650 4GB)
+  comfyui:
+    enabled: true
+    api_url: "http://localhost:8188"
+    output_dir: "./data/comfyui_output"
+    checkpoint: "v2-1_768-ema-pruned.safetensors"
+    steps: 15
+    timeout: 300
+
+  # ------------------------------------------------------------------
+  # ModelScope — Z-Image-Turbo (云端降级)
+  modelscope:
+    enabled: true
+    api_key: "${MODELSCOPE_API_KEY}"
+    model: "Tongyi-MAI/Z-Image-Turbo"
+    timeout: 120
+
+# =============================================================================
+# 语音 (TTS)
+# =============================================================================
+tts:
+  # 默认 TTS 后端: edge_tts (免费, 无需 key)
+  backend: edge_tts
+
+  # ------------------------------------------------------------------
+  # edge-tts — 微软免费 TTS (无需 API key)
+  # 中文语音: zh-CN-XiaoxiaoNeural (女声) / zh-CN-YunxiNeural (男声)
+  edge_tts:
+    voice: "zh-CN-XiaoxiaoNeural"             # 默认中文女声
+    rate: "+0%"                                # 语速: -50% ~ +100%
+    pitch: "+0Hz"                              # 音调
+
+# =============================================================================
+# 视频处理
+# =============================================================================
+video:
+  ffmpeg_path: "ffmpeg"                       # ffmpeg 二进制路径
+  ffprobe_path: "ffprobe"                     # ffprobe 路径
+  default_video_codec: "libx264"              # 视频编码
+  default_audio_codec: "aac"                  # 音频编码
+  threads: 4                                  # 编码线程数
+  output_dir: "./data/output"                 # 输出目录
+  templates_dir: "./data/ffmpeg_templates"    # 模板目录
+
+# =============================================================================
+# 知识库 & Memory
+# =============================================================================
+knowledge:
+  db_path: "./data/knowledge.db"              # 知识库 SQLite 路径
+  chunk_size: 500                             # 文档分块大小(字符)
+  chunk_overlap: 50                           # 块间重叠
+
+memory:
+  db_path: "./data/memory.db"                 # 记忆库 SQLite 路径
+  enable_fts: true                            # 启用全文检索
+  embedding_dim: 768                          # 向量维度(预留)
+  similarity_threshold: 0.75                  # 相似度阈值
+  max_history_per_session: 20                 # 每会话最大历史
+  auto_summarize_after: 10                    # 自动摘要阈值
+
+# =============================================================================
+# SOP 工作流
+# =============================================================================
+sop:
+  db_path: "./data/sop.db"                    # SOP 存储路径
+  auto_load: true                             # 启动时自动加载已保存 SOP
+
+# =============================================================================
+# API 服务
+# =============================================================================
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+  reload: false                               # 开发模式热重载(生产关)
+  cors_origins: ["*"]                         # CORS 允许来源
+  api_key: "${YULING_API_KEY:-}"              # API 访问密钥(空=不校验)
+  request_timeout: 120
+  enable_docs: true                           # Swagger /docs
+
+# =============================================================================
+# Wechaty 微信
+# =============================================================================
+wechaty:
+  enabled: false                              # 开发阶段默认关闭
+  name: "域灵助手"
+  puppet: "wechaty-puppet-wechat"            # 或 wechaty-puppet-padlocal
+  token: "${WECHATY_TOKEN:-}"                # Puppet token
+  endpoint: "${WECHATY_ENDPOINT:-}"          # PadLocal endpoint
+  auto_accept_friend: false                   # 自动通过好友
+  allowed_groups: []                          # 允许的群(空=全部)
+  cooldown_seconds: 1                         # 消息冷却
+
+# =============================================================================
+# 日志 & 调试
+# =============================================================================
+debug: false                                   # 调试模式
+log_level: "INFO"                              # DEBUG | INFO | WARNING | ERROR
+data_dir: "./data"                             # 数据根目录

@@ -1,0 +1,71 @@
+"""szyg 数字员工系统 - 数据模型包"""
+
+from szyg.models.common import (
+    AllBackendsFailedError,
+    ConfigError,
+    DuplicateSkillError,
+    ErrorResponse,
+    IntegrationError,
+    MCPError,
+    MemoryError,
+    ServerNotFoundError,
+    SkillNotFoundError,
+    SzygError,
+    ToolTimeoutError,
+    ValidationError,
+)
+from szyg.models.integration import (
+    BatchResult,
+    ChatResponse,
+    CompletionResponse,
+    GenerationResult,
+    GenerateResponse,
+    TranscriptionResult,
+)
+from szyg.models.memory import MemoryEntry, MemorySearchResult
+from szyg.models.mcp import MCPServerConfig, Tool, ToolResult
+from szyg.models.model import BackendInfo, ChatMessage, ModelResponse, StreamingChunk
+from szyg.models.skill import Skill, SkillParameter, SkillResult
+from szyg.models.task import TaskPlan, TaskStep
+
+__all__ = [
+    # common
+    "SzygError",
+    "ServerNotFoundError",
+    "MCPError",
+    "ToolTimeoutError",
+    "IntegrationError",
+    "ValidationError",
+    "ConfigError",
+    "MemoryError",
+    "SkillNotFoundError",
+    "DuplicateSkillError",
+    "AllBackendsFailedError",
+    "ErrorResponse",
+    # mcp
+    "MCPServerConfig",
+    "Tool",
+    "ToolResult",
+    # integration
+    "TranscriptionResult",
+    "GenerationResult",
+    "BatchResult",
+    "ChatResponse",
+    "GenerateResponse",
+    "CompletionResponse",
+    # memory
+    "MemoryEntry",
+    "MemorySearchResult",
+    # model
+    "ChatMessage",
+    "ModelResponse",
+    "StreamingChunk",
+    "BackendInfo",
+    # skill
+    "Skill",
+    "SkillParameter",
+    "SkillResult",
+    # task
+    "TaskPlan",
+    "TaskStep",
+]
