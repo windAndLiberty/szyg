@@ -1,0 +1,50 @@
+[
+  {
+    "id": 1,
+    "name": "张女士",
+    "platform": "douyin",
+    "lastMessage": "这个产品有优惠吗？",
+    "lastTime": "10:30",
+    "unread": 2
+  },
+  {
+    "id": 2,
+    "name": "李先生",
+    "platform": "xhs",
+    "lastMessage": "好的，我再考虑一下",
+    "lastTime": "09:15",
+    "unread": 0
+  },
+  {
+    "id": 3,
+    "name": "王小姐",
+    "platform": "bilibili",
+    "lastMessage": "代理政策怎么定的？",
+    "lastTime": "11:00",
+    "unread": 1
+  },
+  {
+    "id": 4,
+    "name": "陈先生",
+    "platform": "kuaishou",
+    "lastMessage": "谢谢！",
+    "lastTime": "昨天",
+    "unread": 0
+  },
+  {
+    "id": 5,
+    "name": "刘女士",
+    "platform": "douyin",
+    "lastMessage": "能再便宜点吗？",
+    "lastTime": "昨天",
+    "unread": 3
+  },
+  {
+    "id": 6,
+    "name": "赵先生",
+    "platform": "wechat",
+    "lastMessage": "已收到，很满意",
+    "lastTime": "前天",
+    "unread": 0
+  }
+]

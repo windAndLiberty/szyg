@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "taskName": "早间数据报表",
+    "execTime": "2026-06-28 08:00",
+    "result": "success",
+    "log": "报表生成成功，已发送邮件"
+  },
+  {
+    "id": 2,
+    "taskName": "平台健康检查",
+    "execTime": "2026-06-28 14:00",
+    "result": "success",
+    "log": "所有平台正常，响应时间 < 200ms"
+  },
+  {
+    "id": 3,
+    "taskName": "定时发布内容",
+    "execTime": "2026-06-28 14:00",
+    "result": "success",
+    "log": "抖音内容已发布，ID: 8823"
+  },
+  {
+    "id": 4,
+    "taskName": "竞品数据抓取",
+    "execTime": "2026-06-28 12:00",
+    "result": "failed",
+    "log": "连接超时，目标站反爬"
+  }
+]

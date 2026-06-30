@@ -1,0 +1,74 @@
+[
+  {
+    "id": 1,
+    "name": "制作抖音短视频 #1",
+    "assignee": "内容专员",
+    "status": "ready",
+    "priority": "high",
+    "progress": 0,
+    "deadline": "2026-06-29",
+    "reviewStatus": null,
+    "reviewComment": "",
+    "reviewTime": ""
+  },
+  {
+    "id": 2,
+    "name": "撰写小红书文案",
+    "assignee": "内容专员",
+    "status": "ready",
+    "priority": "medium",
+    "progress": 0,
+    "deadline": "2026-06-29",
+    "reviewStatus": null,
+    "reviewComment": "",
+    "reviewTime": ""
+  },
+  {
+    "id": 3,
+    "name": "自动回复私信处理",
+    "assignee": "获客专员",
+    "status": "running",
+    "priority": "high",
+    "progress": 65,
+    "deadline": "2026-06-29",
+    "reviewStatus": null,
+    "reviewComment": "",
+    "reviewTime": ""
+  },
+  {
+    "id": 4,
+    "name": "朋友圈内容发布",
+    "assignee": "运营专员",
+    "status": "running",
+    "priority": "medium",
+    "progress": 30,
+    "deadline": "2026-06-29",
+    "reviewStatus": null,
+    "reviewComment": "",
+    "reviewTime": ""
+  },
+  {
+    "id": 5,
+    "name": "客户跟进电话",
+    "assignee": "转化专员",
+    "status": "blocked",
+    "priority": "high",
+    "progress": 20,
+    "deadline": "2026-06-29",
+    "reviewStatus": null,
+    "reviewComment": "",
+    "reviewTime": ""
+  },
+  {
+    "id": 6,
+    "name": "晨间数据报表生成",
+    "assignee": "运营专员",
+    "status": "done",
+    "priority": "low",
+    "progress": 100,
+    "deadline": "2026-06-29",
+    "reviewStatus": null,
+    "reviewComment": "",
+    "reviewTime": ""
+  }
+]

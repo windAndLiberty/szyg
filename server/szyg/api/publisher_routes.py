@@ -99,7 +99,7 @@ async def publish_content(content_id: str, platform: str = ""):
 # AI Generate
 @router.post("/ai-generate", response_model=Content)
 async def ai_generate(topic: str, agent_id: str = "copywriter", content_type: str = "post"):
-    return get_publisher().ai_generate(topic, agent_id, content_type)
+    return await get_publisher().ai_generate(topic, agent_id, content_type)
 
 
 # Calendar
@@ -190,3 +190,121 @@ async def platform_logout(platform: str):
         return {"ok": True, "message": f"{platform} 登录态已清除"}
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+# ── Materials (素材库) ───────────────────────────────────────
+
+import json
+from pathlib import Path
+from szyg.data_path import DATA_DIR
+
+_MATERIALS_FILE = DATA_DIR / "materials.json"
+
+
+def _load_materials() -> list:
+    if _MATERIALS_FILE.exists():
+        return json.loads(_MATERIALS_FILE.read_text(encoding="utf-8"))
+    return []
+
+
+def _save_materials(data: list):
+    _MATERIALS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _MATERIALS_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+@router.get("/materials")
+async def list_materials(mtype: str = "", platform: str = ""):
+    items = _load_materials()
+    if mtype:
+        items = [m for m in items if m.get("type") == mtype]
+    if platform and platform != "all":
+        items = [m for m in items if m.get("platform") in (platform, "all")]
+    return {"materials": items, "total": len(items)}
+
+
+@router.post("/materials")
+async def create_material(body: dict):
+    items = _load_materials()
+    import uuid
+    item = {
+        "id": str(uuid.uuid4())[:8],
+        "name": body.get("name", ""),
+        "type": body.get("type", "document"),
+        "tags": body.get("tags", []),
+        "platform": body.get("platform", "all"),
+        "url": body.get("url", ""),
+        "created_at": __import__("datetime").datetime.now().isoformat(),
+    }
+    items.append(item)
+    _save_materials(items)
+    return item
+
+
+@router.delete("/materials/{material_id}")
+async def delete_material(material_id: str):
+    items = _load_materials()
+    items = [m for m in items if m.get("id") != material_id]
+    _save_materials(items)
+    return {"ok": True}
+
+
+# ── Content Assets & Copy Library ────────────────────────────
+
+_CONTENT_ASSETS_FILE = DATA_DIR / "content_assets.json"
+_COPY_LIBRARY_FILE = DATA_DIR / "copy_library.json"
+
+
+def _load_json_file(path: Path) -> list:
+    if path.exists():
+        return json.loads(path.read_text(encoding="utf-8"))
+    return []
+
+
+def _save_json_file(path: Path, data: list):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+@router.get("/content-assets")
+async def list_content_assets():
+    items = _load_json_file(_CONTENT_ASSETS_FILE)
+    return {"items": items, "total": len(items)}
+
+
+@router.post("/content-assets")
+async def create_content_asset(body: dict):
+    items = _load_json_file(_CONTENT_ASSETS_FILE)
+    import uuid
+    item = {
+        "id": str(uuid.uuid4())[:8],
+        "name": body.get("name", ""),
+        "type": body.get("type", "content"),
+        "platform": body.get("platform", "all"),
+        "status": body.get("status", "draft"),
+        "created_at": __import__("datetime").datetime.now().isoformat(),
+    }
+    items.append(item)
+    _save_json_file(_CONTENT_ASSETS_FILE, items)
+    return item
+
+
+@router.get("/copy-library")
+async def list_copy_library():
+    items = _load_json_file(_COPY_LIBRARY_FILE)
+    return {"items": items, "total": len(items)}
+
+
+@router.post("/copy-library")
+async def create_copy_entry(body: dict):
+    items = _load_json_file(_COPY_LIBRARY_FILE)
+    import uuid
+    item = {
+        "id": str(uuid.uuid4())[:8],
+        "title": body.get("title", ""),
+        "content": body.get("content", ""),
+        "tags": body.get("tags", []),
+        "created_at": __import__("datetime").datetime.now().isoformat(),
+    }
+    items.append(item)
+    _save_json_file(_COPY_LIBRARY_FILE, items)
+    return item

@@ -23,11 +23,16 @@
     "extraResources": [
       {
         "from": "../server",
-        "to": "server"
+        "to": "server",
+        "filter": ["**/*"]
       },
       {
         "from": "../data",
         "to": "data"
+      },
+      {
+        "from": "../server/szyg/storage/chromium",
+        "to": "server/szyg/storage/chromium"
       }
     ],
     "win": {

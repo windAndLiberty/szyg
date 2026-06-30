@@ -81,6 +81,10 @@ class HermesBrain:
                     "command": "python3",
                     "args": ["server/szyg/mcp_servers/video_mcp.py"],
                 },
+                "web_tools": {
+                    "command": "python3",
+                    "args": ["server/szyg/mcp_servers/web_tools_mcp.py"],
+                },
             },
             "agent": {
                 "name": "szyg",

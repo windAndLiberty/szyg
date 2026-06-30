@@ -86,10 +86,123 @@ def get_launch_config(headless: bool = False) -> dict:
             "--no-sandbox",
             "--disable-gpu",
             "--disable-dev-shm-usage",
+            "--no-proxy-server",
             "--window-size=1536,864",
             "--window-position=0,0",
         ],
     }
+
+
+def get_launch_config_native(headless: bool = False) -> dict:
+    """
+    返回 Playwright 原生捆绑 Chromium 的 browser.launch() 配置。
+
+    使用 Playwright 自带的 ms-playwright 缓存中的 Chromium，
+    而非系统安装的 Chrome。保证版本锁定与协议合规。
+    """
+    return {
+        "headless": headless,
+        # 不指定 channel — Playwright 自动定位 ms-playwright 中的捆绑 Chromium
+        "args": [
+            "--disable-blink-features=AutomationControlled",
+            "--no-sandbox",
+            "--disable-infobars",
+            "--disable-features=IsolateOrigins,site-per-process",
+            "--disable-gpu",
+            "--disable-dev-shm-usage",
+            "--window-size=1536,864",
+            "--window-position=0,0",
+        ],
+    }
+
+
+def get_persistent_context_config(
+    user_data_dir: str,
+    executable_path: str | None = None,
+) -> dict:
+    """
+    返回 persistent context 的启动配置。
+    用于 launch_persistent_context() 以实现自动 Cookie/Storage 持久化。
+
+    Args:
+        user_data_dir: 用户数据目录路径
+        executable_path: Chromium 可执行文件路径。
+                        若为 None，Playwright 自动从 ms-playwright 缓存中定位。
+                        若指定，则使用打包捆绑的 Chromium（零依赖分发）。
+    """
+    stealth_context = get_stealth_context_config()
+    config = {
+        "user_data_dir": user_data_dir,
+        "headless": False,
+        "viewport": stealth_context["viewport"],
+        "device_scale_factor": stealth_context.get("device_scale_factor", 1),
+        "user_agent": stealth_context["user_agent"],
+        "locale": stealth_context["locale"],
+        "timezone_id": stealth_context["timezone_id"],
+        "geolocation": stealth_context.get("geolocation"),
+        "permissions": stealth_context.get("permissions", []),
+        "color_scheme": stealth_context.get("color_scheme", "light"),
+        "extra_http_headers": stealth_context.get("extra_http_headers", {}),
+        "args": [
+            "--disable-blink-features=AutomationControlled",
+            "--no-sandbox",
+            "--disable-infobars",
+            "--disable-features=IsolateOrigins,site-per-process",
+            "--disable-gpu",
+            "--disable-dev-shm-usage",
+            "--window-size=1536,864",
+            "--window-position=0,0",
+        ],
+    }
+    if executable_path:
+        config["executable_path"] = executable_path
+    return config
+
+
+# ── Captcha / Slider detection ────────────────────────────────
+
+SLIDER_SELECTORS = [
+    'div[class*="captcha"]',
+    'div[class*="CAPTCHA"]',
+    'div[class*="verify"]',
+    'div[class*="slider"]',
+    'div[class*="Slider"]',
+    'canvas[class*="captcha"]',
+    'iframe[src*="captcha"]',
+    'div[data-e2e="captcha"]',
+    'div[class*="secsdk"]',
+    'div[id*="captcha"]',
+    '.captcha_verify',
+]
+
+
+async def detect_slider(page) -> bool:
+    """检测页面上是否出现滑块验证码。"""
+    for sel in SLIDER_SELECTORS:
+        try:
+            el = await page.query_selector(sel)
+            if el and await el.is_visible():
+                return True
+        except Exception:
+            continue
+    return False
+
+
+async def warm_up_navigation(page) -> None:
+    """
+    预热浏览器 — 先访问正常网站建立合法 cookie/会话痕迹，
+    再导航到目标平台。降低风控概率。
+    """
+    warmup_urls = [
+        "https://www.baidu.com",
+        "about:blank",
+    ]
+    for url in warmup_urls:
+        try:
+            await page.goto(url, wait_until="domcontentloaded", timeout=10000)
+            await asyncio.sleep(random.uniform(0.3, 1.0))
+        except Exception:
+            pass
 
 
 # ── Stealth 注入 ────────────────────────────────────────────
@@ -278,6 +391,54 @@ _BUILTIN_STEALTH = r"""
     Object.defineProperty(navigator, 'platform', {
         get: () => 'Win32',
     });
+
+    // 9. Canvas fingerprint noise — add subtle noise to toDataURL/toBlob
+    (function() {
+        const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+        HTMLCanvasElement.prototype.toDataURL = function(type, quality) {
+            const ctx = this.getContext('2d');
+            if (ctx) {
+                try {
+                    const imageData = ctx.getImageData(0, 0, 1, 1);
+                    imageData.data[0] = Math.max(0, Math.min(255, imageData.data[0] + (Math.random() - 0.5) * 0.2));
+                    ctx.putImageData(imageData, 0, 0);
+                } catch(e) {}
+            }
+            return originalToDataURL.apply(this, [type, quality]);
+        };
+    })();
+
+    // 10. WebGL fingerprint noise
+    (function() {
+        const origGetParameter = WebGLRenderingContext.prototype.getParameter;
+        WebGLRenderingContext.prototype.getParameter = function(pname) {
+            if (pname === 37445) {  // UNMASKED_VENDOR_WEBGL
+                return 'Google Inc. (Intel)';
+            }
+            if (pname === 37446) {  // UNMASKED_RENDERER_WEBGL
+                return 'ANGLE (Intel, Intel(R) UHD Graphics 630, Direct3D11 vs_5_0 ps_5_0)';
+            }
+            return origGetParameter.call(this, pname);
+        };
+        if (typeof WebGL2RenderingContext !== 'undefined') {
+            const origGetParameter2 = WebGL2RenderingContext.prototype.getParameter;
+            WebGL2RenderingContext.prototype.getParameter = function(pname) {
+                if (pname === 37445) return 'Google Inc. (Intel)';
+                if (pname === 37446) return 'ANGLE (Intel, Intel(R) UHD Graphics 630, Direct3D11 vs_5_0 ps_5_0)';
+                return origGetParameter2.call(this, pname);
+            };
+        }
+    })();
+
+    // 11. Override requestAnimationFrame timing to avoid precise timing detection
+    (function() {
+        const origRAF = window.requestAnimationFrame;
+        let noise = 0;
+        window.requestAnimationFrame = function(callback) {
+            noise += (Math.random() - 0.5) * 0.5;
+            return origRAF.call(window, callback);
+        };
+    })();
 
     console.log('[stealth] injected');
 })();

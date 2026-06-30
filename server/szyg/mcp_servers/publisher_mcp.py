@@ -57,8 +57,8 @@ def pub_publish(content_id: str, platform: str = ""):
     return {"published": len(result), "platforms": [r["platform"] for r in result]}
 
 @server.tool("pub_ai_generate", "Use AI agent to generate content draft")
-def pub_ai_generate(topic: str, agent_id: str = "copywriter", content_type: str = "post"):
-    c = pub.ai_generate(topic, agent_id, content_type)
+async def pub_ai_generate(topic: str, agent_id: str = "copywriter", content_type: str = "post"):
+    c = await pub.ai_generate(topic, agent_id, content_type)
     return {"id": c.id, "title": c.title, "body_preview": c.body[:200]}
 
 @server.tool("pub_stats", "Get publishing statistics")

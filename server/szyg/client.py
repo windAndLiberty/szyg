@@ -23,24 +23,34 @@ class LocalAI:
 
     @staticmethod
     def is_ollama_running() -> bool:
-        import socket
+        import socket, logging
+        _log = logging.getLogger("szyg.client")
         s = socket.socket()
         try:
+            s.settimeout(2)
             s.connect(("localhost", 11434))
             s.close()
             return True
-        except:
+        except (ConnectionRefusedError, OSError, TimeoutError):
+            return False
+        except Exception:
+            _log.exception("Unexpected error checking Ollama health")
             return False
 
     @staticmethod
     def is_comfyui_running() -> bool:
-        import socket
+        import socket, logging
+        _log = logging.getLogger("szyg.client")
         s = socket.socket()
         try:
+            s.settimeout(2)
             s.connect(("localhost", 8188))
             s.close()
             return True
-        except:
+        except (ConnectionRefusedError, OSError, TimeoutError):
+            return False
+        except Exception:
+            _log.exception("Unexpected error checking ComfyUI health")
             return False
 
     @staticmethod

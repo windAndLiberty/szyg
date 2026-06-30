@@ -23,24 +23,34 @@ class LocalAI:
 
     @staticmethod
     def is_ollama_running() -> bool:
-        import socket
+        import socket, logging
+        _log = logging.getLogger("szyg.client")
         s = socket.socket()
         try:
+            s.settimeout(2)
             s.connect(("localhost", 11434))
             s.close()
             return True
-        except:
+        except (ConnectionRefusedError, OSError, TimeoutError):
+            return False
+        except Exception:
+            _log.exception("Unexpected error checking Ollama health")
             return False
 
     @staticmethod
     def is_comfyui_running() -> bool:
-        import socket
+        import socket, logging
+        _log = logging.getLogger("szyg.client")
         s = socket.socket()
         try:
+            s.settimeout(2)
             s.connect(("localhost", 8188))
             s.close()
             return True
-        except:
+        except (ConnectionRefusedError, OSError, TimeoutError):
+            return False
+        except Exception:
+            _log.exception("Unexpected error checking ComfyUI health")
             return False
 
     @staticmethod
@@ -90,7 +100,7 @@ class LocalAI:
             "7": {"class_type": "CLIPTextEncode", "inputs": {
                 "text": negative or "ugly, blurry, low quality", "clip": ["4", 1]}},
             "8": {"class_type": "VAEDecode", "inputs": {
-                "samples": ["3", 0], "vae": ["4", 2"]}},
+                "samples": ["3", 0], "vae": ["4", 2]}},
             "9": {"class_type": "SaveImage", "inputs": {
                 "filename_prefix": "szyg", "images": ["8", 0]}},
         }
@@ -169,9 +179,14 @@ class ClientStatus:
         ]
         for exe in candidates:
             try:
-                subprocess.run([exe, "-version"], capture_output=True, timeout=5)
+                subprocess.run([exe, "-version"], capture_output=True, timeout=5, check=True)
                 return True
-            except:
+            except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+                continue
+            except Exception:
+                import logging
+                _log = logging.getLogger("szyg.client")
+                _log.debug("ffmpeg check unexpected error for %s", exe, exc_info=True)
                 continue
         return False
 

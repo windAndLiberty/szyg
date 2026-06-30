@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from yuling.agent_core.memory import Memory
-from yuling.models.common import MemoryError
-from yuling.models.memory import MemoryEntry
+from szyg.agent_core.memory import Memory
+from szyg.models.common import MemoryError
+from szyg.models.memory import MemoryEntry
 
 
 class TestMemoryReal:

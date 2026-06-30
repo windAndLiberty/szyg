@@ -55,7 +55,7 @@ def load_config(path: str | Path = "config.yaml") -> dict:
     config_path = Path(path)
     if not config_path.exists():
         # 尝试项目根目录
-        alt = Path(__file__).parent.parent.parent / "config.yaml"
+        alt = Path(__file__).parent.parent.parent.parent / "config.yaml"
         if alt.exists():
             config_path = alt
         else:

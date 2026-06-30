@@ -1,0 +1,27 @@
+{
+  "behavior": {
+    "clickInterval": 3,
+    "mouseRandomness": 60,
+    "browseStay": 15,
+    "intervalJitter": 30
+  },
+  "limits": {
+    "dailyPublish": 10,
+    "dailyComment": 50,
+    "dailyDM": 30,
+    "dailyAddFriend": 20,
+    "smartStagger": true
+  },
+  "nurture": {
+    "timeRange": null,
+    "likeProbability": 50,
+    "commentProbability": 20,
+    "browseCount": 200
+  },
+  "content": {
+    "complianceCheck": true,
+    "sensitiveFilter": true,
+    "sensitiveWords": "",
+    "hardAdDetect": true
+  }
+}

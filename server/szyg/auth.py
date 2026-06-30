@@ -36,6 +36,7 @@ class User(BaseModel):
     id: int
     username: str
     role: str = "user"
+    email: str = ""
     oem_id: str | None = None
     is_active: bool = True
 
@@ -67,11 +68,17 @@ def _init_db():
             username TEXT UNIQUE NOT NULL,
             hashed_password TEXT NOT NULL,
             role TEXT DEFAULT 'user',
+            email TEXT DEFAULT '',
             oem_id TEXT,
             is_active INTEGER DEFAULT 1,
             created_at TEXT DEFAULT (datetime('now'))
         )
     """)
+    # Migration: add email column if missing
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
     conn.close()
 
@@ -102,7 +109,7 @@ def get_user_by_username(username: str) -> UserInDB | None:
 
 def get_user_by_id(user_id: int) -> User | None:
     conn = _get_conn()
-    row = conn.execute("SELECT id, username, role, oem_id, is_active FROM users WHERE id = ?", (user_id,)).fetchone()
+    row = conn.execute("SELECT id, username, role, email, oem_id, is_active FROM users WHERE id = ?", (user_id,)).fetchone()
     conn.close()
     if row:
         return User(**dict(row))
@@ -136,24 +143,62 @@ def get_current_user(token_str: str) -> User | None:
 
 def list_users() -> list[User]:
     conn = _get_conn()
-    rows = conn.execute("SELECT id, username, role, oem_id, is_active FROM users ORDER BY id").fetchall()
+    rows = conn.execute("SELECT id, username, role, email, oem_id, is_active FROM users ORDER BY id").fetchall()
     conn.close()
     return [User(**dict(r)) for r in rows]
 
-def create_user(username: str, password: str, role: str = "user", oem_id: str | None = None) -> User | None:
+def create_user(username: str, password: str, role: str = "user", email: str = "", oem_id: str | None = None) -> User | None:
     conn = _get_conn()
     try:
         conn.execute(
-            "INSERT INTO users (username, hashed_password, role, oem_id) VALUES (?, ?, ?, ?)",
-            (username, _hash_pw(password), role, oem_id),
+            "INSERT INTO users (username, hashed_password, role, email, oem_id) VALUES (?, ?, ?, ?, ?)",
+            (username, _hash_pw(password), role, email, oem_id),
         )
         conn.commit()
-        row = conn.execute("SELECT id, username, role, oem_id, is_active FROM users WHERE username = ?", (username,)).fetchone()
+        row = conn.execute("SELECT id, username, role, email, oem_id, is_active FROM users WHERE username = ?", (username,)).fetchone()
         conn.close()
         return User(**dict(row))
     except sqlite3.IntegrityError:
         conn.close()
         return None
+
+def update_user(user_id: int, email: str | None = None, role: str | None = None) -> User | None:
+    conn = _get_conn()
+    fields = []
+    vals = []
+    if email is not None:
+        fields.append("email = ?")
+        vals.append(email)
+    if role is not None:
+        fields.append("role = ?")
+        vals.append(role)
+    if fields:
+        vals.append(user_id)
+        conn.execute(f"UPDATE users SET {', '.join(fields)} WHERE id = ?", vals)
+        conn.commit()
+    row = conn.execute("SELECT id, username, role, email, oem_id, is_active FROM users WHERE id = ?", (user_id,)).fetchone()
+    conn.close()
+    return User(**dict(row)) if row else None
+
+def delete_user(user_id: int) -> bool:
+    conn = _get_conn()
+    cur = conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+    return cur.rowcount > 0
+
+def toggle_user_active(user_id: int) -> User | None:
+    conn = _get_conn()
+    row = conn.execute("SELECT is_active FROM users WHERE id = ?", (user_id,)).fetchone()
+    if not row:
+        conn.close()
+        return None
+    new_val = 0 if row["is_active"] else 1
+    conn.execute("UPDATE users SET is_active = ? WHERE id = ?", (new_val, user_id))
+    conn.commit()
+    row = conn.execute("SELECT id, username, role, email, oem_id, is_active FROM users WHERE id = ?", (user_id,)).fetchone()
+    conn.close()
+    return User(**dict(row)) if row else None
 
 # Initialize on import
 _init_db()

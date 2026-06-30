@@ -1,0 +1,72 @@
+[
+  {
+    "id": 1,
+    "name": "张女士",
+    "platform": "douyin",
+    "grade": "A",
+    "status": "new",
+    "lastContact": "2026-06-29 09:30",
+    "followCount": 0,
+    "note": "咨询护肤品，意向强烈"
+  },
+  {
+    "id": 2,
+    "name": "李先生",
+    "platform": "xhs",
+    "grade": "B",
+    "status": "contacting",
+    "lastContact": "2026-06-27 16:00",
+    "followCount": 2,
+    "note": "已发产品资料，等待回复"
+  },
+  {
+    "id": 3,
+    "name": "王小姐",
+    "platform": "bilibili",
+    "grade": "A",
+    "status": "new",
+    "lastContact": "2026-06-29 10:15",
+    "followCount": 0,
+    "note": "询问代理合作，预算充足"
+  },
+  {
+    "id": 4,
+    "name": "陈先生",
+    "platform": "kuaishou",
+    "grade": "C",
+    "status": "pending",
+    "lastContact": "2026-06-26 14:20",
+    "followCount": 1,
+    "note": "简单咨询价格，未明确意向"
+  },
+  {
+    "id": 5,
+    "name": "刘女士",
+    "platform": "douyin",
+    "grade": "B",
+    "status": "contacting",
+    "lastContact": "2026-06-27 11:30",
+    "followCount": 3,
+    "note": "对比多家产品，需进一步沟通"
+  },
+  {
+    "id": 6,
+    "name": "赵先生",
+    "platform": "wechat",
+    "grade": "A",
+    "status": "won",
+    "lastContact": "2026-06-25 18:00",
+    "followCount": 5,
+    "note": "已成交，购买护肤套装"
+  },
+  {
+    "id": 7,
+    "name": "孙女士",
+    "platform": "xhs",
+    "grade": "D",
+    "status": "lost",
+    "lastContact": "2026-06-24 09:00",
+    "followCount": 1,
+    "note": "价格敏感，已流失"
+  }
+]

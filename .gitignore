@@ -73,6 +73,7 @@ build/*.exe
 .env
 .env.local
 config.local.yaml
+secrets.yaml
 
 # ComfyUI junction (external)
 ComfyUI/
@@ -81,3 +82,15 @@ ComfyUI/
 *.gguf
 *.safetensors
 *.bin
+nul
+
+# Bundled Chromium — kept out of git, injected at build time
+server/szyg/storage/chromium/
+server/szyg/storage/profiles/
+data/chrome_profile/
+plan.md
+external/
+data/models/
+data/volcengine_output/
+server/szyg/fonts/
+web/test-results/

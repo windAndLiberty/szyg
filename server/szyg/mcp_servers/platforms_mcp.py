@@ -226,9 +226,136 @@ def platform_health():
 
     try:
         loop = asyncio.get_running_loop()
-        return {"error": "请在同步上下文外调用"}
+        # Running inside async context — delegate to thread
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as pool:
+            return pool.submit(asyncio.run, _check_all()).result()
     except RuntimeError:
+        # No running loop — safe to use asyncio.run()
         return asyncio.run(_check_all())
+
+
+# ── social-auto-upload 集成工具 ────────────────────────────
+
+@server.tool("sau_list_platforms", "列出 social-auto-upload 支持的所有平台及登录状态")
+def sau_list_platforms():
+    """返回 sau 支持的平台列表: douyin/xhs/kuaishou/tencent/youtube"""
+    from szyg.integrations.social_auto_upload_adapter import get_sau_adapter
+    adapter = get_sau_adapter()
+    return adapter.list_platforms()
+
+
+@server.tool("sau_upload_video", "通过 social-auto-upload 上传视频到指定平台")
+def sau_upload_video(platform: str, file_path: str, title: str,
+                     desc: str = "", tags: str = "",
+                     thumbnail_path: str = "", schedule: str = "",
+                     headless: bool = True):
+    """
+    使用 social-auto-upload 上传视频。
+
+    Args:
+        platform: 目标平台 (douyin/xhs/kuaishou/tencent/youtube)
+        file_path: 视频文件本地绝对路径
+        title: 视频标题
+        desc: 视频描述
+        tags: 逗号分隔的标签
+        thumbnail_path: 封面图路径 (可选)
+        schedule: 定时发布时间 "YYYY-MM-DD HH:MM" (可选, 空则立即发布)
+        headless: 是否无头模式
+    """
+    import asyncio
+    from datetime import datetime
+    from szyg.integrations.social_auto_upload_adapter import get_sau_adapter
+
+    adapter = get_sau_adapter()
+    tag_list = [t.strip() for t in tags.split(",")] if tags else []
+    sched = datetime.strptime(schedule, "%Y-%m-%d %H:%M") if schedule else None
+
+    async def _upload():
+        return await adapter.upload_video(
+            platform=platform,
+            file_path=file_path,
+            title=title,
+            desc=desc,
+            tags=tag_list,
+            thumbnail_path=thumbnail_path or None,
+            schedule=sched,
+            headless=headless,
+        )
+    return asyncio.run(_upload())
+
+
+@server.tool("sau_upload_note", "通过 social-auto-upload 上传图文到指定平台")
+def sau_upload_note(platform: str, image_paths: str, title: str,
+                    note: str = "", tags: str = "",
+                    schedule: str = "", headless: bool = True):
+    """
+    使用 social-auto-upload 上传图文笔记。
+
+    Args:
+        platform: 目标平台 (douyin/xhs/kuaishou/tencent)
+        image_paths: 逗号分隔的图片文件本地路径
+        title: 图文标题
+        note: 图文正文
+        tags: 逗号分隔的标签
+        schedule: 定时发布时间 "YYYY-MM-DD HH:MM" (可选)
+        headless: 是否无头模式
+    """
+    import asyncio
+    from datetime import datetime
+    from szyg.integrations.social_auto_upload_adapter import get_sau_adapter
+
+    adapter = get_sau_adapter()
+    img_list = [p.strip() for p in image_paths.split(",")] if image_paths else []
+    tag_list = [t.strip() for t in tags.split(",")] if tags else []
+    sched = datetime.strptime(schedule, "%Y-%m-%d %H:%M") if schedule else None
+
+    async def _upload():
+        return await adapter.upload_note(
+            platform=platform,
+            image_paths=img_list,
+            title=title,
+            note=note,
+            tags=tag_list,
+            schedule=sched,
+            headless=headless,
+        )
+    return asyncio.run(_upload())
+
+
+@server.tool("sau_check_login", "检查 social-auto-upload 平台登录状态")
+def sau_check_login(platform: str):
+    """
+    检查指定平台的 cookie 是否有效。
+
+    Args:
+        platform: 平台名 (douyin/xhs/kuaishou/tencent/youtube)
+    """
+    import asyncio
+    from szyg.integrations.social_auto_upload_adapter import get_sau_adapter
+
+    adapter = get_sau_adapter()
+    async def _check():
+        return await adapter.check_login(platform)
+    return asyncio.run(_check())
+
+
+@server.tool("sau_login", "触发 social-auto-upload 平台扫码登录")
+def sau_login(platform: str, headless: bool = False):
+    """
+    打开浏览器等待用户扫码登录。
+
+    Args:
+        platform: 平台名 (douyin/xhs/kuaishou/tencent/youtube)
+        headless: 是否无头模式 (登录通常需要有头)
+    """
+    import asyncio
+    from szyg.integrations.social_auto_upload_adapter import get_sau_adapter
+
+    adapter = get_sau_adapter()
+    async def _login():
+        return await adapter.login(platform, headless=headless)
+    return asyncio.run(_login())
 
 
 if __name__ == "__main__":

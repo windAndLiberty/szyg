@@ -1,0 +1,74 @@
+[
+  {
+    "id": "content",
+    "name": "内容专员",
+    "emoji": "📝",
+    "color": "#00d4ff",
+    "status": "running",
+    "tasksToday": 8,
+    "completed": 12,
+    "progress": 75,
+    "recent": "刚完成：小红书文案发布",
+    "skills": [
+      "文案生成",
+      "AIGC图像",
+      "视频脚本",
+      "多平台适配"
+    ],
+    "route": "/content/production"
+  },
+  {
+    "id": "acquisition",
+    "name": "获客专员",
+    "emoji": "🎯",
+    "color": "#a855f7",
+    "status": "running",
+    "tasksToday": 5,
+    "completed": 8,
+    "progress": 60,
+    "recent": "刚完成：抖音关键词搜索",
+    "skills": [
+      "搜索截流",
+      "评论生成",
+      "DeAI处理",
+      "线索评分"
+    ],
+    "route": "/marketing/intercept"
+  },
+  {
+    "id": "conversion",
+    "name": "转化专员",
+    "emoji": "💰",
+    "color": "#22c55e",
+    "status": "idle",
+    "tasksToday": 3,
+    "completed": 3,
+    "progress": 30,
+    "recent": "刚完成：客户跟进记录",
+    "skills": [
+      "线索管理",
+      "SOP执行",
+      "微信桥接",
+      "知识库检索"
+    ],
+    "route": "/marketing/conversion"
+  },
+  {
+    "id": "ops",
+    "name": "运营专员",
+    "emoji": "🚀",
+    "color": "#fbbf24",
+    "status": "running",
+    "tasksToday": 6,
+    "completed": 5,
+    "progress": 45,
+    "recent": "刚完成：定时任务调度",
+    "skills": [
+      "调度引擎",
+      "A/B测试",
+      "数据报告",
+      "审计日志"
+    ],
+    "route": "/workflow/scheduler"
+  }
+]

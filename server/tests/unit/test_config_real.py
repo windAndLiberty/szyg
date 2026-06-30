@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from yuling.config.settings import (
+from szyg.config.settings import (
     AgentConfig,
     APIConfig,
     ComfyUIConfig,

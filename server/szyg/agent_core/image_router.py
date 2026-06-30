@@ -5,14 +5,14 @@
   用户输入 ("画一只赛博朋克风格的猫咪")
     → LLM 意图识别: 提取主体/风格
     → Prompt 增强: 中文→英文 + 构图/光照/画质
-    → 后端路由: ComfyUI(SD 2.1本地) > ModelScope(Z-Image-Turbo云端) > 降级
+    → 后端路由: ComfyUI(SD 2.1本地) > VolcEngine(Seedream云端) > 降级
 """
 
-from szyg.integrations.modelscope_client import ModelScopeClient
+from szyg.integrations.ollama_client import OllamaClient
 
 
 class ImageRouter:
-    """智能图像生成路由器。ComfyUI 主 + ModelScope 降级。"""
+    """智能图像生成路由器。ComfyUI 主 + VolcEngine Seedream 降级。"""
 
     STYLE_TAGS = {
         "写实": "photorealistic, 8k, highly detailed",
@@ -27,9 +27,9 @@ class ImageRouter:
 
     def __init__(self, config: dict | None = None):
         self.config = config or {}
-        self.llm = ModelScopeClient()
+        self.llm = OllamaClient()
         self._comfyui = None
-        self._modelscope = None
+        self._volcengine = None
 
     @property
     def comfyui(self):
@@ -39,17 +39,17 @@ class ImageRouter:
         return self._comfyui
 
     @property
-    def modelscope(self):
-        if self._modelscope is None:
-            from szyg.integrations.modelscope_image_client import ModelScopeImageClient
-            self._modelscope = ModelScopeImageClient()
-        return self._modelscope
+    def volcengine(self):
+        if self._volcengine is None:
+            from szyg.integrations.volcengine_client import VolcEngineClient
+            self._volcengine = VolcEngineClient()
+        return self._volcengine
 
     async def generate(
         self, user_input: str, style: str | None = None,
         size: str = "768*768", backend: str | None = None,
     ) -> dict:
-        """智能图像生成。LLM增强prompt + ComfyUI优先 + ModelScope降级。"""
+        """智能图像生成。LLM增强prompt + ComfyUI优先 + VolcEngine Seedream降级。"""
         intent = await self._analyze_intent(user_input, style)
         chosen = backend or self._select_backend()
 
@@ -61,12 +61,40 @@ class ImageRouter:
                 )
                 paths = [path]
             except Exception:
-                paths = [await self.modelscope.generate(intent["enhanced_prompt"])]
+                try:
+                    paths = [await self.volcengine.generate_image(intent["enhanced_prompt"])]
+                except Exception:
+                    # Both backends failed — return the enhanced prompt so caller can retry
+                    return {
+                        "backend": "none",
+                        "enhanced_prompt": intent["enhanced_prompt"],
+                        "intent": {
+                            "subject": intent.get("subject", user_input),
+                            "style": intent.get("style", ""),
+                            "negative": intent.get("negative", ""),
+                        },
+                        "paths": [],
+                        "error": "All image backends failed (ComfyUI + VolcEngine)",
+                    }
 
-        elif chosen == "modelscope":
-            paths = [await self.modelscope.generate(intent["enhanced_prompt"])]
+        elif chosen == "volcengine":
+            paths = [await self.volcengine.generate_image(intent["enhanced_prompt"])]
         else:
-            paths = [await self.modelscope.generate(intent["enhanced_prompt"])]
+            # Default: try VolcEngine as final fallback
+            try:
+                paths = [await self.volcengine.generate_image(intent["enhanced_prompt"])]
+            except Exception:
+                return {
+                    "backend": "none",
+                    "enhanced_prompt": intent["enhanced_prompt"],
+                    "intent": {
+                        "subject": intent.get("subject", user_input),
+                        "style": intent.get("style", ""),
+                        "negative": intent.get("negative", ""),
+                    },
+                    "paths": [],
+                    "error": "No image backend available",
+                }
 
         return {
             "backend": chosen,
@@ -106,7 +134,7 @@ class ImageRouter:
     "negative": "否定提示词(不想出现的内容，英文)"
 }}
 
-只返回 JSON。"""}], max_tokens=500)
+只返回 JSON。"""}])
 
             content = resp["message"]["content"]
             import json
@@ -122,13 +150,15 @@ class ImageRouter:
             return direct_result
 
     def _select_backend(self) -> str:
+        """Select best available image backend: ComfyUI > VolcEngine."""
         try:
             import httpx
             r = httpx.get("http://localhost:8188/object_info", timeout=3, trust_env=False)
-            if r.status_code == 200: return "comfyui"
+            if r.status_code == 200:
+                return "comfyui"
         except Exception:
             pass
-        return "modelscope"
+        return "volcengine"
 
     async def list_styles(self) -> list[str]:
         return list(self.STYLE_TAGS.keys())

@@ -11,6 +11,9 @@ from pydantic import BaseModel, Field
 
 from szyg.data_path import DATA_DIR
 from szyg.tenant import get_tenant_data_file as _tdf
+from szyg.atomic_file import atomic_read, atomic_write
+from szyg.atomic_file import atomic_read_async, atomic_write_async
+
 SCHEDULER_DB = DATA_DIR / "scheduler_jobs.json"
 SCHEDULER_HISTORY = DATA_DIR / "scheduler_history.json"
 
@@ -83,16 +86,31 @@ class JobExecution(BaseModel):
     error: str = ""
 
 
-def _read(path: Path) -> list[dict]:
-    actual = _tdf(path.name) if path.parent == DATA_DIR else path
-    if actual.exists():
-        return json.loads(actual.read_text(encoding='utf-8'))
-    return []
-
-def _write(path: Path, data: list[dict]):
+def _resolve(path: Path) -> Path:
+    """Resolve tenant path and ensure parent dirs exist."""
     actual = _tdf(path.name) if path.parent == DATA_DIR else path
     actual.parent.mkdir(parents=True, exist_ok=True)
-    actual.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return actual
+
+
+def _read(path: Path) -> list[dict]:
+    """Sync read with path resolution. Thread-safe via atomic_file."""
+    return atomic_read(_resolve(path))
+
+
+def _write(path: Path, data: list[dict]) -> None:
+    """Sync atomic write with path resolution. Thread-safe via atomic_file."""
+    atomic_write(_resolve(path), data)
+
+
+async def _read_async(path: Path) -> list[dict]:
+    """Non-blocking read — runs file I/O in thread pool."""
+    return await atomic_read_async(_resolve(path))
+
+
+async def _write_async(path: Path, data: list[dict]) -> None:
+    """Non-blocking write — runs file I/O in thread pool."""
+    await atomic_write_async(_resolve(path), data)
 
 
 def _cron_matches(cron: str, dt: datetime) -> bool:
@@ -141,11 +159,20 @@ def _next_cron_run(cron: str, from_dt: datetime | None = None) -> str | None:
 class Scheduler:
     """Smart scheduling engine with background polling loop"""
 
+    # Thresholds
+    MAX_CONSECUTIVE_TICK_FAILURES = 5   # warn after N whole-tick failures
+    MAX_PER_JOB_FAILURES = 3            # auto-pause job after N consecutive fails
+
     def __init__(self):
         self._handlers: dict[str, Callable] = {}
         self._running = False
         self._loop_task: asyncio.Task | None = None
         self._tick_interval: int = 60  # 每60秒检查一次到期任务
+
+        # Health tracking
+        self._consecutive_tick_failures: int = 0
+        self._last_tick_success: str = ""  # ISO timestamp
+        self._per_job_failures: dict[str, int] = {}  # job_id → consecutive failures
 
     # ── Background Loop ──────────────────────────────────
 
@@ -174,34 +201,121 @@ class Scheduler:
         logging.getLogger(__name__).info("调度器后台循环已停止")
 
     async def _run_loop(self) -> None:
-        """后台循环：每隔 tick_interval 检查一次到期任务"""
+        """后台循环：每隔 tick_interval 检查一次到期任务。
+
+        Tracks consecutive whole-tick failures.  After the threshold is
+        exceeded, emits a warning so operators can investigate before the
+        scheduler silently goes deaf.
+        """
         import logging
         log = logging.getLogger(__name__)
         while self._running:
             try:
                 await asyncio.sleep(self._tick_interval)
                 await self._tick()
+                self._consecutive_tick_failures = 0
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                log.error(f"调度器 tick 异常: {e}")
+                self._consecutive_tick_failures += 1
+                n = self._consecutive_tick_failures
+                if n >= self.MAX_CONSECUTIVE_TICK_FAILURES:
+                    log.error(
+                        "调度器 tick 连续失败 %d 次 (阈值=%d) — 调度器可能已失效! "
+                        "last error: %s",
+                        n, self.MAX_CONSECUTIVE_TICK_FAILURES, e,
+                    )
+                else:
+                    log.error(
+                        "调度器 tick 异常 [consecutive=%d/%d]: %s",
+                        n, self.MAX_CONSECUTIVE_TICK_FAILURES, e,
+                    )
 
     async def _tick(self) -> None:
-        """执行所有到期的 ACTIVE 任务"""
+        """Execute every due ACTIVE job with per-job timeout and failure tracking.
+
+        Per-job failure counting:
+          - One success resets the counter.
+          - ``MAX_PER_JOB_FAILURES`` consecutive failures → auto-pause the job
+            so it doesn't silently retry forever.
+        """
         import logging
         log = logging.getLogger(__name__)
         now = datetime.now()
+        self._last_tick_success = now.isoformat()
+
+        JOB_TIMEOUTS = {
+            "publish_content": 120,
+            "generate_content": 60,
+            "run_workflow": 300,
+            "platform_login_check": 30,
+            "platform_health_check": 30,
+            "execute_tool": 60,
+            "custom": 60,
+        }
 
         for job in self.list_jobs(status=JobStatus.ACTIVE.value):
             if not job.next_run_at:
                 continue
             try:
                 next_run = datetime.fromisoformat(job.next_run_at)
-                if next_run <= now:
-                    log.info(f"触发到期任务: {job.name} ({job.id})")
-                    await self._async_dispatch(job)
-            except (ValueError, OSError):
+            except (ValueError, TypeError):
+                log.warning("[scheduler] invalid next_run_at for %s: %r — skipping",
+                            job.name, job.next_run_at)
                 continue
+
+            if next_run > now:
+                continue
+
+            timeout = JOB_TIMEOUTS.get(job.action.value, 60)
+            log.info("[scheduler] triggering: %s (timeout=%ds)", job.name, timeout)
+
+            try:
+                await asyncio.wait_for(
+                    self._async_dispatch(job),
+                    timeout=timeout,
+                )
+                # Success → reset failure counter
+                self._per_job_failures.pop(job.id, None)
+
+            except asyncio.TimeoutError:
+                self._record_job_failure(log, job,
+                    f"TIMEOUT after {timeout}s — marked FAILED")
+                self.update_job(job.id, status=JobStatus.FAILED.value)
+
+            except Exception as e:
+                self._record_job_failure(log, job, f"{type(e).__name__}: {e}")
+
+    def _record_job_failure(self, log, job: ScheduleJob, detail: str) -> None:
+        """Increment per-job failure counter; auto-pause at threshold."""
+        prev = self._per_job_failures.get(job.id, 0)
+        current = prev + 1
+        self._per_job_failures[job.id] = current
+
+        if current >= self.MAX_PER_JOB_FAILURES:
+            log.error(
+                "[scheduler] %s failed %d consecutive times — auto-pausing.  %s",
+                job.name, current, detail,
+            )
+            self.update_job(job.id, status=JobStatus.PAUSED.value)
+            self._per_job_failures.pop(job.id, None)
+        else:
+            log.error(
+                "[scheduler] %s failed [%d/%d consecutive]: %s",
+                job.name, current, self.MAX_PER_JOB_FAILURES, detail,
+            )
+
+    async def health_check(self) -> dict:
+        """Return scheduler health status for external monitoring."""
+        return {
+            "running": self._running,
+            "consecutive_tick_failures": self._consecutive_tick_failures,
+            "last_tick_success": self._last_tick_success,
+            "per_job_failures": dict(self._per_job_failures),
+            "active_jobs": len(self.list_jobs(status=JobStatus.ACTIVE.value)),
+            "paused_jobs": len(self.list_jobs(status=JobStatus.PAUSED.value)),
+            "failed_jobs": len(self.list_jobs(status=JobStatus.FAILED.value)),
+        }
 
     async def _async_dispatch(self, job: ScheduleJob) -> JobExecution:
         """
@@ -239,7 +353,7 @@ class Scheduler:
                 topic = config.get("topic", "AI生成内容")
                 agent_id = config.get("agent_id", "copywriter")
                 content_type = config.get("content_type", "post")
-                c = pub.ai_generate(topic, agent_id, content_type)
+                c = await pub.ai_generate(topic, agent_id, content_type)
                 execution.result = f"Generated content {c.id}: {c.title}"
 
             elif action == JobAction.RUN_WORKFLOW:
@@ -303,10 +417,10 @@ class Scheduler:
 
         execution.finished_at = datetime.now().isoformat()
 
-        # 保存历史
-        history = _read(SCHEDULER_HISTORY)
+        # 保存历史 (non-blocking I/O)
+        history = await _read_async(SCHEDULER_HISTORY)
         history.append(execution.model_dump())
-        _write(SCHEDULER_HISTORY, history)
+        await _write_async(SCHEDULER_HISTORY, history)
 
         # 更新下次运行时间
         if job.trigger_type == TriggerType.CRON and job.trigger_config.get("cron"):
@@ -435,12 +549,13 @@ class Scheduler:
             return "No content_id specified"
 
         elif action == JobAction.GENERATE_CONTENT:
+            import asyncio as _asyncio
             from szyg.publisher import get_publisher
             pub = get_publisher()
             topic = config.get("topic", "AI生成内容")
             agent_id = config.get("agent_id", "copywriter")
             content_type = config.get("content_type", "post")
-            c = pub.ai_generate(topic, agent_id, content_type)
+            c = _asyncio.run(pub.ai_generate(topic, agent_id, content_type))
             return f"Generated content {c.id}: {c.title}"
 
         elif action == JobAction.RUN_WORKFLOW:

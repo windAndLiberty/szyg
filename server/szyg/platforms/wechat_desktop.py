@@ -153,7 +153,7 @@ class WeChatDesktopAdapter(BasePlatformAdapter):
             # Fallback: 尝试查找窗口
             return self._find_wechat_window() is not None
         except Exception:
-            pass
+            logger.debug(f"Non-critical operation skipped in {self.platform_name} adapter")
         return False
 
     def _start_wechat(self) -> bool:
@@ -193,8 +193,8 @@ class WeChatDesktopAdapter(BasePlatformAdapter):
                             account_name=title.replace("微信", "").strip(),
                             message="微信已登录",
                         )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"UIA operation failed in {self.platform_name}: {e}")
                 return LoginStatus(is_logged_in=True, message="微信正在运行")
 
             return LoginStatus(is_logged_in=False, message="微信未运行")
@@ -229,8 +229,8 @@ class WeChatDesktopAdapter(BasePlatformAdapter):
                         self._wechat_window = window
                         logger.info(f"✓ 微信已登录: {title}")
                         return LoginStatus(is_logged_in=True, message=f"登录成功: {title}")
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"UIA operation failed in {self.platform_name}: {e}")
 
             if i % 30 == 0 and i > 0:
                 logger.info(f"  等待扫码中… ({i}s / {timeout}s)")
@@ -321,8 +321,8 @@ class WeChatDesktopAdapter(BasePlatformAdapter):
                     if moments_btn.Exists():
                         moments_btn.Click()
                         await asyncio.sleep(2)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"UIA operation failed in {self.platform_name}: {e}")
 
             # ── 点击"相机" → 发表图文 ──────────────────────
             camera_btn = wechat.ButtonControl(

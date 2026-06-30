@@ -13,9 +13,9 @@ import os
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from yuling.agent_core.model_router import ModelRouter
-from yuling.integrations.openrouter_client import OpenRouterClient
-from yuling.api.app import create_app
+from szyg.agent_core.model_router import ModelRouter
+from szyg.integrations.openrouter_client import OpenRouterClient
+from szyg.api.app import create_app
 
 pytestmark = pytest.mark.real_service
 

@@ -6,12 +6,12 @@
 
 import pytest
 
-from yuling.integrations.whisper_client import WhisperClient
-from yuling.integrations.comfyui_client import ComfyUIClient
-from yuling.integrations.ffmpeg_client import FFmpegClient
-from yuling.integrations.ollama_client import OllamaClient
-from yuling.integrations.litellm_client import LiteLLMClient
-from yuling.integrations.base_client import BaseClient
+from szyg.integrations.whisper_client import WhisperClient
+from szyg.integrations.comfyui_client import ComfyUIClient
+from szyg.integrations.ffmpeg_client import FFmpegClient
+from szyg.integrations.ollama_client import OllamaClient
+from szyg.integrations.litellm_client import LiteLLMClient
+from szyg.integrations.base_client import BaseClient
 
 
 class TestBaseClient:
@@ -65,8 +65,8 @@ class TestComfyUIClientInit:
     def test_default_init(self):
         client = ComfyUIClient()
         assert client.api_url == "http://localhost:8188"
-        assert str(client.output_dir) == "data/comfyui_output"
-        assert client.checkpoint == "v2-1_768-ema-pruned.safetensors"
+        assert str(client.output_dir).replace("\\", "/") == "data/comfyui_output"
+        assert client.checkpoint == "sd21.safetensors"
         assert client.timeout == 300
 
     def test_custom_init(self, tmp_path):

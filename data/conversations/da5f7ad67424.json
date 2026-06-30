@@ -1,0 +1,40 @@
+{
+  "id": "da5f7ad67424",
+  "title": "现在打开抖音搜索超级员工相关",
+  "messages": [
+    {
+      "role": "assistant",
+      "content": "你好！我是超级员工，可以用一句话指挥我完成任何营销任务。试试输入\"搜索抖音上关于AI培训的视频\"吧。",
+      "type": "text",
+      "timestamp": 1782734593989.0
+    },
+    {
+      "role": "user",
+      "content": "现在打开抖音搜索超级员工相关",
+      "type": "text",
+      "timestamp": 1782734619912.0
+    },
+    {
+      "role": "assistant",
+      "content": "（已处理）",
+      "type": "text",
+      "timestamp": 1782734723263.0
+    },
+    {
+      "role": "user",
+      "content": "现在打开抖音搜索超级员工相关",
+      "type": "text",
+      "timestamp": 1782735830056.0
+    },
+    {
+      "role": "assistant",
+      "content": "在抖音搜索「超级员工」关键词，未查询到相关视频内容。\n你可以尝试调整关键词重新搜索，或者也可以指定小红书/B站/快手等其他平台我帮你搜索~",
+      "type": "text",
+      "timestamp": 1782735855544.0
+    }
+  ],
+  "agent_id": "",
+  "model": "doubao-seed-2-0-pro-260215",
+  "created_at": "2026-06-29T12:05:23.284077+00:00",
+  "updated_at": "2026-06-29T12:24:15.548764+00:00"
+}

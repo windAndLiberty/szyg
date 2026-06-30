@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "title": "夏日护肤文案模板",
+    "content": "夏天到了，护肤也要换季啦！",
+    "platforms": [
+      "xhs",
+      "douyin"
+    ],
+    "tags": [
+      "护肤",
+      "夏日"
+    ],
+    "createdAt": "2026-06-25",
+    "useCount": 12
+  },
+  {
+    "id": 2,
+    "title": "新品发布文案",
+    "content": "倒计时3天！新品即将上市！",
+    "platforms": [
+      "xhs",
+      "weibo"
+    ],
+    "tags": [
+      "新品",
+      "预热"
+    ],
+    "createdAt": "2026-06-24",
+    "useCount": 8
+  }
+]

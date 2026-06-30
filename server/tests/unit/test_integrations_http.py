@@ -8,10 +8,10 @@ import pytest
 import respx
 from httpx import Response
 
-from yuling.integrations.base_client import BaseClient
-from yuling.integrations.ollama_client import OllamaClient
-from yuling.integrations.litellm_client import LiteLLMClient
-from yuling.models.common import IntegrationError
+from szyg.integrations.base_client import BaseClient
+from szyg.integrations.ollama_client import OllamaClient
+from szyg.integrations.litellm_client import LiteLLMClient
+from szyg.models.common import IntegrationError
 
 
 class TestBaseClientHttp:
@@ -149,7 +149,7 @@ class TestWhisperClientReal:
 
     @pytest.fixture
     def client(self):
-        from yuling.integrations.whisper_client import WhisperClient
+        from szyg.integrations.whisper_client import WhisperClient
         return WhisperClient(api_url="http://localhost:9000", timeout=10.0)
 
     async def test_transcribe_success(self, client, tmp_path):

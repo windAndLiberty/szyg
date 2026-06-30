@@ -1,0 +1,66 @@
+[
+  {
+    "id": 1,
+    "username": "admin",
+    "role": "admin",
+    "email": "admin@example.com",
+    "lastLogin": "2026-06-29 10:00",
+    "status": "active"
+  },
+  {
+    "id": 2,
+    "username": "content_manager",
+    "role": "user",
+    "email": "content@example.com",
+    "lastLogin": "2026-06-29 16:30",
+    "status": "active"
+  },
+  {
+    "id": 3,
+    "username": "data_analyst",
+    "role": "user",
+    "email": "data@example.com",
+    "lastLogin": "2026-06-29 09:15",
+    "status": "active"
+  },
+  {
+    "id": 4,
+    "username": "designer_li",
+    "role": "user",
+    "email": "design@example.com",
+    "lastLogin": "2026-06-29 14:20",
+    "status": "disabled"
+  },
+  {
+    "id": 5,
+    "username": "ops_wang",
+    "role": "user",
+    "email": "ops@example.com",
+    "lastLogin": "2026-06-29 11:45",
+    "status": "active"
+  },
+  {
+    "id": 6,
+    "username": "marketing_zhao",
+    "role": "user",
+    "email": "marketing@example.com",
+    "lastLogin": "2026-06-29 17:00",
+    "status": "active"
+  },
+  {
+    "id": 7,
+    "username": "developer_chen",
+    "role": "admin",
+    "email": "dev@example.com",
+    "lastLogin": "2026-06-29 08:30",
+    "status": "active"
+  },
+  {
+    "id": 8,
+    "username": "intern_sun",
+    "role": "user",
+    "email": "intern@example.com",
+    "lastLogin": "2026-06-29 15:10",
+    "status": "disabled"
+  }
+]

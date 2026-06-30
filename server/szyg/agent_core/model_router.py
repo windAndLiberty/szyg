@@ -8,7 +8,6 @@ from typing import Any, AsyncGenerator
 
 from szyg.integrations.litellm_client import LiteLLMClient
 from szyg.integrations.ollama_client import OllamaClient
-from szyg.integrations.modelscope_client import ModelScopeClient
 from szyg.integrations.openrouter_client import OpenRouterClient
 from szyg.models.common import AllBackendsFailedError
 from szyg.models.model import ModelResponse, StreamingChunk
@@ -32,19 +31,30 @@ class ModelRouter:
         self._setup_backends()
 
     def _setup_backends(self) -> None:
-        """根据配置初始化后端。"""
+        """根据配置初始化后端。优先级: VolcEngine > Ollama > LiteLLM > OpenRouter"""
         if self.config is None:
-            # 自动检测可用后端：OpenRouter > ModelScope > Ollama > LiteLLM
+            # ── VolcEngine (火山引擎方舟) — 优先 ──
+            try:
+                from szyg.integrations.volcengine_client import VolcEngineClient
+                vc = VolcEngineClient()
+                if vc.api_key:
+                    self._backends["volcengine"] = vc
+                    import logging
+                    _log = logging.getLogger(__name__)
+                    _log.info("ModelRouter: VolcEngine backend registered (primary)")
+            except Exception:
+                pass
+
+            # ── Other cloud backends ──
             try:
                 import os
                 or_key = os.environ.get("OPENROUTER_API_KEY")
-                ms_key = os.environ.get("MODELSCOPE_API_KEY")
             except Exception:
-                or_key = ms_key = None
+                or_key = None
             if or_key:
                 self._backends["openrouter"] = OpenRouterClient(api_key=or_key)
-            if ms_key:
-                self._backends["modelscope"] = ModelScopeClient(api_key=ms_key)
+
+            # ── Local backends (fallback) ──
             self._backends["ollama"] = OllamaClient()
             self._backends["litellm"] = LiteLLMClient()
         else:
@@ -54,12 +64,6 @@ class ModelRouter:
                     backend_type = getattr(backend, "backend_type", "")
                     if backend_type == "openrouter":
                         self._backends[backend.name] = OpenRouterClient(
-                            api_key=backend.api_key,
-                            base_url=backend.base_url,
-                            default_model=backend.default_model,
-                        )
-                    elif backend_type == "modelscope":
-                        self._backends[backend.name] = ModelScopeClient(
                             api_key=backend.api_key,
                             base_url=backend.base_url,
                             default_model=backend.default_model,
@@ -187,6 +191,8 @@ class ModelRouter:
         Returns:
             模型名称列表
         """
+        import logging
+        _log = logging.getLogger(__name__)
         models: list[str] = []
         for name, backend in self._backends.items():
             try:
@@ -199,6 +205,7 @@ class ModelRouter:
                 else:
                     models.append(backend.default_model)
             except Exception:
+                _log.warning("Failed to list models from backend %s, using default", name)
                 models.append(backend.default_model)
         return models
 

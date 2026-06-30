@@ -11,25 +11,8 @@
 # LLM 后端
 # =============================================================================
 llm:
-  # 默认使用的 LLM 后端: modelscope | ollama
-  default_backend: ollama
-
-  # ------------------------------------------------------------------
-  # OpenRouter — 聚合 API 网关（已停用，改用 ModelScope）
-  openrouter:
-    enabled: false
-
-  # ------------------------------------------------------------------
-  # ModelScope — 阿里云模型推理平台 (OpenAI 兼容)
-  # 获取 key: https://modelscope.cn  → 个人中心 → API Key
-  # 国内顶级模型: DeepSeek-V4, Qwen3, Yi-Lightning 等
-  modelscope:
-    enabled: true
-    api_key: "ms-0874e6bf-bc78-4424-91ce-0dcee72a8016"
-    base_url: "https://api-inference.modelscope.cn/v1"
-    default_model: "deepseek-ai/DeepSeek-V4-Flash"
-    timeout: 120
-    max_retries: 3
+  # 默认使用的 LLM 后端: volcengine | ollama
+  default_backend: volcengine
 
   # ------------------------------------------------------------------
   # Ollama — 本地 LLM (免费, 需安装 ollama)
@@ -49,6 +32,55 @@ llm:
     default_model: "gpt-4"
     timeout: 60
 
+  # ------------------------------------------------------------------
+  # 火山引擎方舟 — 统一多模态AIGC API (OpenAI兼容)
+  # 获取 key: https://console.volcengine.com/ark → 推理接入点
+  # 一个API Key调用: LLM / 图像 / 视频 / 语音 / 向量嵌入
+  volcengine:
+    enabled: true
+    api_key: "ark-149c9bff-2284-4193-a61f-8885dbb19ad5-d18be"
+    base_url: "https://ark.cn-beijing.volces.com/api/v3"
+    timeout: 120
+    max_retries: 3
+    output_dir: "./data/volcengine_output"
+
+    # 推理接入点ID (在火山方舟控制台创建)
+    endpoints:
+      # ═══════════════════════════════════════════════════════════════
+      # 文本模型 — 火山方舟免费额度支持直接用模型ID调用 (无需endpoint)
+      # 以下模型实测可用 (2026-06-22):
+      #   doubao-seed-2-0-pro-260215   (旗舰)
+      #   doubao-seed-2-0-lite-260428  (高性价比)
+      #   doubao-seed-2-0-mini-260428  (轻量)
+      #   doubao-seed-1-6-251015       (稳定版)
+      #   doubao-seed-1-6-flash-250828 (极速 Flash)
+      #   doubao-1-5-pro-32k-250115    (经典 Pro 32K)
+      #   doubao-1-5-lite-32k-250115   (经典 Lite 32K)
+      #   deepseek-v4-flash-260425     (DeepSeek V4 Flash 推理)
+      #   doubao-seed-2-0-code-preview-260215 (代码专用)
+      # 不可用: deepseek-r1/v3 系列, kimi-k2 系列, qwen/glm 开源系列
+      # ═══════════════════════════════════════════════════════════════
+      doubao-pro-128k: "doubao-seed-2-0-pro-260215"
+      doubao-lite: "doubao-seed-2-0-lite-260428"
+      deepseek-r1: "deepseek-v4-flash-260425"
+      deepseek-v3: "deepseek-v4-flash-260425"
+      # Smart Router 兜底 (自动路由, 但会覆盖模型选择, 暂时禁用)
+      # default-text: "ep-20260609154149-9bkrb"
+      # 图像模型 — doubao-seedream 文生图接入点 (实测可用)
+      doubao-image: "ep-20260609192748-28bcc"
+      sdxl: ""
+      flux: ""
+      # 视频模型 — doubao-seedance 视频生成接入点 (实测可用)
+      doubao-video: "ep-20260619184527-7b9h2"
+      seaweed: ""
+      # 语音模型 — 需到方舟控制台创建推理接入点
+      # 可用的模型ID: (需创建endpoint后才能用)
+      doubao-tts: ""
+      doubao-voice-clone: ""
+      # 向量模型 — 需到方舟控制台创建推理接入点
+      # 可用模型ID: doubao-embedding-text-240715, doubao-embedding-large-text-240915
+      doubao-embedding: ""
+
   # LLM 通用设置
   fallback_enabled: true                      # 主后端失败时自动降级
   fallback_order: ["ollama"]                  # 降级顺序
@@ -57,8 +89,8 @@ llm:
 # 图像生成
 # =============================================================================
 image:
-  # 默认图像生成后端: comfyui | modelscope
-  # ComfyUI 优先（本地免费无限），ModelScope 自动降级
+  # 默认图像生成后端: comfyui | volcengine
+  # ComfyUI 优先（本地免费无限），VolcEngine Seedream 云端降级
   default_backend: comfyui
 
   # ------------------------------------------------------------------
@@ -70,14 +102,6 @@ image:
     checkpoint: "v2-1_768-ema-pruned.safetensors"
     steps: 15
     timeout: 300
-
-  # ------------------------------------------------------------------
-  # ModelScope — Z-Image-Turbo (云端降级)
-  modelscope:
-    enabled: true
-    api_key: "ms-0874e6bf-bc78-4424-91ce-0dcee72a8016"
-    model: "Tongyi-MAI/Z-Image-Turbo"
-    timeout: 120
 
 # =============================================================================
 # 语音 (TTS)

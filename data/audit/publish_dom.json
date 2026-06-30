@@ -1,0 +1,68 @@
+{
+  "inputs": [
+    {
+      "tag": "INPUT",
+      "type": "file",
+      "placeholder": "",
+      "class": "",
+      "id": "",
+      "name": "",
+      "maxlength": "",
+      "visible": true,
+      "ce": false
+    }
+  ],
+  "buttons": [
+    {
+      "text": "高清发布",
+      "class": "douyin-creator-master-button douyin-creator-master-button-primary douyin-creator-master-button-size-",
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "text": "上传视频",
+      "class": "semi-button semi-button-primary container-drag-btn-k6XmB4 semi-button-with-icon",
+      "disabled": false,
+      "visible": true
+    },
+    {
+      "text": "我知道了",
+      "class": "douyin-creator-pc-master__button douyin-creator-pc-master__button-next shepherd-button ",
+      "disabled": false,
+      "visible": true
+    }
+  ],
+  "fileInputs": [
+    {
+      "accept": "video/x-flv,video/mp4,video/x-m4v,video/*,.flv,.avi,.wmv,.webm,.ts,.mp4,.mpeg4,.mov,.m4v,.mpg,.mkv,.m4",
+      "class": ""
+    }
+  ],
+  "tabs": [
+    {
+      "text": "发布视频发布图文发布全景视频发布文章了解上传规则详情",
+      "class": "tab-container-DjaX1b"
+    },
+    {
+      "text": "发布视频",
+      "class": "tab-item-BcCLTS active-i8Pu0m"
+    },
+    {
+      "text": "发布图文",
+      "class": "tab-item-BcCLTS"
+    },
+    {
+      "text": "发布全景视频",
+      "class": "tab-item-BcCLTS"
+    },
+    {
+      "text": "发布文章",
+      "class": "tab-item-BcCLTS"
+    }
+  ],
+  "richEditors": [],
+  "schedule": [],
+  "bodyText": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n高清发布首页活动管理内容管理作品管理合集管理共创中心原创保护中心互动管理数据中心变现中心创作中心通知1网址抖音抖音创作者中心/*! normalize.css v8.0.0 | MIT License | github.com/necolas/normalize.css */html{line-height:1.15}body{margin:0}h1{font-size:2em;margin:.67em 0}hr{box-sizing:content-box;height:0;overflow:visible}pre{font-family:monospace,monospace;font-size:1em}a{background-color:transparent}abbr[title]{border-bottom:none;text-decoration:underline;-webkit-text-decoration:underline dotted;text-decoration:underline dotted}b,strong{font-weight:bolder}code,kbd,samp{font-family:monospace,monospace;font-size:1em}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}img{border-style:none}button,input,optgroup,select,textarea{font-family:inherit;font-size:10",
+  "title": "抖音创作者中心",
+  "url": "https://creator.douyin.com/creator-micro/content/upload"
+}

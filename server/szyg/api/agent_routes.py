@@ -80,3 +80,29 @@ async def get_agent(agent_id: str):
             _write_agents(agents)
             return AgentInfo(**a)
     raise HTTPException(404, "智能体不存在")
+
+
+@router.post("/create", response_model=AgentInfo)
+async def create_agent(body: dict):
+    agents = _read_agents()
+    new_id = body.get("id") or f"agent_{len(agents) + 1}"
+    if any(a.get("id") == new_id for a in agents):
+        raise HTTPException(400, "智能体ID已存在")
+    agent = {
+        "id": new_id,
+        "name": body.get("name", "未命名技能"),
+        "avatar": body.get("avatar", "🤖"),
+        "description": body.get("description", ""),
+        "system_prompt": body.get("system_prompt", ""),
+        "tier": body.get("tier", "task"),
+        "category": body.get("category", "general"),
+        "model_preference": body.get("model_preference", ""),
+        "temperature": body.get("temperature", 0.7),
+        "tags": body.get("tags", []),
+        "usage_count": 0,
+        "rating": 4.0,
+        "created_by": "user",
+    }
+    agents.append(agent)
+    _write_agents(agents)
+    return AgentInfo(**agent)

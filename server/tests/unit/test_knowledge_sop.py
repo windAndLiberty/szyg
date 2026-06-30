@@ -5,9 +5,9 @@
 import json
 import pytest
 
-from yuling.agent_core.knowledge import KnowledgeBase
-from yuling.agent_core.sop_manager import SOP, SOPStep, SOPManager
-from yuling.agent_core.skill_registry import SkillRegistry
+from szyg.agent_core.knowledge import KnowledgeBase
+from szyg.agent_core.sop_manager import SOP, SOPStep, SOPManager
+from szyg.agent_core.skill_registry import SkillRegistry
 
 
 class TestKnowledgeBase:

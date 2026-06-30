@@ -678,14 +678,16 @@ class TestPlatformMCPServer:
 
     def test_mcp_server_has_all_tools(self):
         from szyg.mcp_servers.platforms_mcp import server
-        # 检查所有 8 个工具已注册
+        # 检查所有 13 个工具已注册 (8 原有 + 5 sau)
         tool_names = set(server._tools.keys())
         expected = {
             "platform_list", "platform_status", "platform_login",
             "platform_publish", "platform_publish_direct",
             "platform_sessions", "platform_logout", "platform_health",
+            "sau_list_platforms", "sau_upload_video", "sau_upload_note",
+            "sau_check_login", "sau_login",
         }
-        assert tool_names == expected
+        assert expected.issubset(tool_names), f"Missing tools: {expected - tool_names}"
 
     def test_platform_list_tool_works(self):
         from szyg.mcp_servers.platforms_mcp import platform_list

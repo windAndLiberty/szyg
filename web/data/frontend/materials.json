@@ -1,0 +1,57 @@
+[
+  {
+    "id": 1,
+    "name": "产品展示模板A.jpg",
+    "type": "image",
+    "tags": [
+      "产品",
+      "展示"
+    ],
+    "platform": "douyin",
+    "createdAt": "2026-06-25"
+  },
+  {
+    "id": 2,
+    "name": "口播视频BGM.mp3",
+    "type": "audio",
+    "tags": [
+      "口播",
+      "BGM"
+    ],
+    "platform": "all",
+    "createdAt": "2026-06-26"
+  },
+  {
+    "id": 3,
+    "name": "夏日活动海报.png",
+    "type": "image",
+    "tags": [
+      "活动",
+      "海报"
+    ],
+    "platform": "xhs",
+    "createdAt": "2026-06-24"
+  },
+  {
+    "id": 4,
+    "name": "品牌宣传片.mp4",
+    "type": "video",
+    "tags": [
+      "品牌",
+      "宣传片"
+    ],
+    "platform": "bilibili",
+    "createdAt": "2026-06-23"
+  },
+  {
+    "id": 5,
+    "name": "直播话术脚本.docx",
+    "type": "document",
+    "tags": [
+      "直播",
+      "话术"
+    ],
+    "platform": "all",
+    "createdAt": "2026-06-27"
+  }
+]

@@ -58,6 +58,7 @@ class SessionManager:
             context: Playwright BrowserContext
         """
         state = await context.storage_state()
+        state["_saved_at"] = datetime.now().isoformat()
         path = self._path(platform)
         path.write_text(
             json.dumps(state, ensure_ascii=False, indent=2),

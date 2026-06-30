@@ -1,0 +1,461 @@
+/* ═══════════════════════════════════════════════════════════════
+   szyg Graceful Theme — Element Plus Component Overrides
+   Daylight (light) + Midnight (dark), no neon
+   All colors referenced via CSS variables from style.css
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Buttons ── */
+.el-button--primary {
+  background: var(--accent) !important;
+  border: none !important;
+  border-radius: var(--radius-sm) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.2px;
+  box-shadow: var(--btn-shadow) !important;
+  transition: all var(--duration-fast) ease !important;
+}
+.el-button--primary:hover {
+  background: var(--accent-hover) !important;
+  box-shadow: var(--accent-glow) !important;
+  transform: translateY(-1px);
+}
+.el-button--primary:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+.el-button--default {
+  background: var(--bg-hover) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-secondary) !important;
+  border-radius: var(--radius-sm) !important;
+  transition: all var(--duration-fast) ease !important;
+}
+.el-button--default:hover {
+  background: var(--accent-soft) !important;
+  border-color: var(--border-active) !important;
+  color: var(--accent) !important;
+}
+
+/* ── Inputs ── */
+.el-input__wrapper {
+  background: var(--input-bg) !important;
+  box-shadow: none !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--radius-sm) !important;
+  transition: all var(--duration-fast) ease !important;
+}
+.el-input__wrapper:hover {
+  border-color: var(--input-border-hover) !important;
+}
+.el-input__wrapper.is-focus {
+  background: var(--bg-page) !important;
+  border-color: var(--accent) !important;
+  box-shadow: none !important;
+}
+.el-input__inner {
+  color: var(--text-primary) !important;
+  font-weight: 500;
+}
+.el-input__inner::placeholder { color: var(--placeholder-color) !important; }
+
+/* ── Textarea ── */
+.el-textarea__inner {
+  background: var(--input-bg) !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--text-primary) !important;
+  transition: all var(--duration-fast) ease !important;
+}
+.el-textarea__inner:focus {
+  background: var(--bg-page) !important;
+  border-color: var(--accent) !important;
+  box-shadow: none !important;
+}
+.el-textarea__inner::placeholder { color: var(--placeholder-color) !important; }
+
+/* ── Cards ── */
+.el-card {
+  background: var(--card-bg) !important;
+  border: none !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-card) !important;
+  transition: all var(--duration-normal) var(--ease-out-expo);
+}
+.el-card:hover {
+  box-shadow: var(--shadow-float) !important;
+}
+.el-card__header {
+  border-bottom: 1px solid var(--border-light) !important;
+  color: var(--text-primary);
+}
+
+/* ── Tags ── */
+.el-tag {
+  border-radius: 6px !important;
+  font-weight: 500;
+  border: 1px solid var(--border-subtle) !important;
+}
+.el-tag--primary {
+  background: var(--accent-soft) !important;
+  border-color: var(--border-active) !important;
+  color: var(--accent) !important;
+}
+.el-tag--success {
+  background: var(--green-500-10) !important;
+  border-color: var(--green-500-20) !important;
+  color: var(--green-700) !important;
+}
+.el-tag--warning {
+  background: var(--amber-400-10) !important;
+  border-color: var(--amber-400-20) !important;
+  color: var(--amber-500) !important;
+}
+.el-tag--danger {
+  background: var(--rose-500-10) !important;
+  border-color: var(--rose-500-20) !important;
+  color: var(--rose-500) !important;
+}
+
+/* ── Menus ── */
+.el-menu {
+  background: transparent !important;
+  border: none !important;
+}
+.el-menu-item {
+  color: var(--text-secondary) !important;
+  border-radius: var(--radius-sm);
+  margin: 2px 6px;
+  transition: all var(--duration-fast) ease;
+}
+.el-menu-item:hover {
+  background: var(--hover-bg) !important;
+  color: var(--text-primary) !important;
+}
+.el-menu-item.is-active {
+  background: var(--accent-soft) !important;
+  color: var(--accent) !important;
+  font-weight: 600;
+}
+
+/* ── Dialog ── */
+.el-dialog {
+  background: var(--card-bg) !important;
+  border: none !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-float) !important;
+}
+.el-dialog__header {
+  border-bottom: 1px solid var(--border-light) !important;
+  padding: 20px 24px !important;
+}
+.el-dialog__title { color: var(--text-primary) !important; font-weight: 600; }
+.el-dialog__body { color: var(--text-secondary) !important; padding: 24px !important; }
+
+/* ── Drawer ── */
+.el-drawer { background: var(--card-bg) !important; }
+
+/* ── Dropdown ── */
+.el-dropdown-menu {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--border-light) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-float) !important;
+}
+.el-dropdown-menu__item {
+  color: var(--text-secondary) !important;
+  transition: all var(--duration-fast) ease;
+}
+.el-dropdown-menu__item:hover {
+  background: var(--hover-bg) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ── Select dropdown ── */
+.el-select .el-input__wrapper { background: var(--input-bg); }
+.el-select-dropdown {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--border-light) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-float) !important;
+}
+.el-select-dropdown__item { color: var(--text-secondary) !important; }
+.el-select-dropdown__item.hover,
+.el-select-dropdown__item:hover { background: var(--hover-bg) !important; }
+.el-select-dropdown__item.selected {
+  color: var(--accent) !important;
+  font-weight: 600;
+}
+
+/* ── Form labels ── */
+.el-form-item__label { color: var(--text-secondary) !important; font-weight: 500; }
+
+/* ── Checkbox / Radio ── */
+.el-checkbox__label { color: var(--text-secondary) !important; }
+.el-radio__label { color: var(--text-secondary) !important; }
+
+/* ── Table ── */
+.el-table {
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: var(--table-header-bg);
+  --el-table-row-hover-bg-color: var(--hover-bg);
+  --el-table-border-color: var(--border-color);
+  --el-table-text-color: var(--text-primary);
+  --el-table-header-text-color: var(--text-secondary);
+  background: transparent;
+  color: var(--text-primary);
+}
+.el-table th.el-table__cell {
+  background: var(--table-header-bg) !important;
+  color: var(--text-secondary) !important;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ── Pagination ── */
+.el-pagination button,
+.el-pager li {
+  background: var(--bg-hover) !important;
+  color: var(--text-secondary) !important;
+  border: 1px solid var(--border-light) !important;
+  border-radius: var(--radius-sm) !important;
+}
+.el-pager li.is-active {
+  background: var(--accent) !important;
+  color: var(--text-inverse) !important;
+  border-color: var(--accent) !important;
+  font-weight: 600;
+}
+
+/* ── Loading ── */
+.el-loading-mask { background: var(--loading-mask-bg) !important; backdrop-filter: blur(4px); }
+
+/* ── Empty state ── */
+.el-empty__description p { color: var(--text-tertiary) !important; }
+
+/* ── Timeline ── */
+.el-timeline-item__node { background: var(--border-color) !important; }
+.el-timeline-item__tail { border-left-color: var(--border-subtle) !important; }
+
+/* ── Alert ── */
+.el-alert { border-radius: var(--radius-md) !important; }
+
+/* ── Tooltip / Popover ── */
+.el-popper.is-light {
+  background: var(--card-bg) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+/* ── Tabs ── */
+.el-tabs__item { color: var(--text-tertiary) !important; }
+.el-tabs__item.is-active { color: var(--accent) !important; }
+.el-tabs__item:hover { color: var(--text-secondary) !important; }
+.el-tabs__active-bar { background: var(--accent) !important; }
+.el-tabs__nav-wrap::after { background: var(--border-color) !important; }
+
+/* ── Divider ── */
+.el-divider__text {
+  background: var(--bg-canvas) !important;
+  color: var(--text-tertiary) !important;
+}
+
+/* ── Switch ── */
+.el-switch.is-checked .el-switch__core {
+  background: var(--accent) !important;
+  border-color: transparent !important;
+}
+
+/* ── Statistic ── */
+.el-statistic__content { color: var(--text-primary) !important; }
+
+/* ── Rate ── */
+.el-rate__icon { font-size: 16px; }
+
+/* ═══════════════════════════════════════════════════════════════
+   Page-level overrides (work across both themes via variables)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Cards: tool-card, agent-card, hub-tool-card */
+.tool-card,
+.agent-card,
+.hub-tool-card {
+  background: var(--card-bg) !important;
+  border: none !important;
+}
+.tool-card:hover,
+.agent-card:hover,
+.hub-tool-card:hover {
+  box-shadow: var(--shadow-float) !important;
+}
+
+/* Stat chips */
+.stat-chip { background: var(--hover-bg); }
+
+/* Prompt / code boxes */
+.prompt-box,
+.chat-messages {
+  background: var(--hover-bg);
+  border-color: var(--border-color);
+}
+.msg.assistant .msg-content {
+  background: var(--card-bg);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+.streaming .msg-content {
+  background: var(--card-bg);
+  border-color: var(--border-color);
+}
+
+/* Typography helpers */
+.subtitle,
+.result-count,
+.version,
+.usage,
+.chip-label,
+.form-hint,
+.stat-title,
+.tool-desc,
+.tier-desc,
+.agent-desc {
+  color: var(--text-secondary);
+}
+.page-header h1,
+.page-header h2,
+.hub-header h2 { color: var(--text-primary); }
+
+/* Hover states */
+.tool-mini:hover { background: var(--hover-bg); }
+.disclaimer-content { color: var(--text-primary); }
+
+/* ═══════════════════════════════════════════════════════════════
+   Dark Mode — Midnight Adjustments (no neon, warm dark)
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Button primary ── */
+html.dark .el-button--primary {
+  background: var(--accent) !important;
+  box-shadow: var(--btn-shadow) !important;
+}
+html.dark .el-button--primary:hover {
+  background: var(--accent-hover) !important;
+  box-shadow: var(--accent-glow) !important;
+}
+
+/* ── Card ── */
+html.dark .el-card {
+  background: var(--card-bg) !important;
+  border: none !important;
+}
+html.dark .el-card:hover {
+  box-shadow: var(--shadow-float) !important;
+}
+
+/* ── Tags ── */
+html.dark .el-tag--primary {
+  background: var(--accent-soft) !important;
+  border-color: var(--border-active) !important;
+  color: var(--accent) !important;
+}
+html.dark .el-tag--default {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-secondary) !important;
+}
+html.dark .el-tag--info { color: var(--text-secondary) !important; }
+html.dark .el-tag.el-tag--plain { color: var(--text-secondary) !important; }
+
+/* ── Menu — top nav ── */
+html.dark .el-menu--horizontal > .el-menu-item {
+  color: var(--header-text) !important;
+  background: transparent !important;
+}
+html.dark .el-menu--horizontal > .el-menu-item.is-active {
+  color: var(--accent) !important;
+  border-bottom-color: var(--accent) !important;
+}
+html.dark .el-menu--horizontal > .el-menu-item:hover {
+  background: var(--header-menu-active) !important;
+}
+
+/* ── Menu — sidebar ── */
+html.dark .el-menu-item:not(.is-active) {
+  color: var(--text-secondary) !important;
+}
+html.dark .el-menu-item.is-active {
+  background: var(--accent-soft) !important;
+  color: var(--accent) !important;
+  font-weight: 600;
+}
+html.dark .el-menu-item:hover {
+  color: var(--text-primary) !important;
+  background: var(--hover-bg) !important;
+}
+
+/* ── Table stripes ── */
+html.dark .el-table--striped .el-table__body tr.el-table__row--striped td {
+  background: var(--table-striped-bg);
+}
+
+/* ── Radio button group ── */
+html.dark .el-radio-button__inner {
+  color: var(--text-secondary);
+  background: var(--input-bg);
+  border-color: var(--border-color);
+}
+html.dark .el-radio-button.is-active .el-radio-button__inner {
+  color: var(--text-inverse);
+  background: var(--accent);
+  font-weight: 600;
+}
+
+/* ── Sidebar section title ── */
+html.dark .sidebar-section-title {
+  color: var(--text-tertiary) !important;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 11px;
+}
+
+/* ── Dark tooltip override ── */
+html.dark .el-tooltip__popper.is-dark {
+  background: var(--card-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+}
+
+/* ── Dialog dark ── */
+html.dark .el-dialog {
+  box-shadow: var(--shadow-float) !important;
+}
+
+/* ── Dropdown dark ── */
+html.dark .el-dropdown-menu {
+  border-color: var(--border-subtle) !important;
+}
+
+/* ── Input focus ── */
+html.dark .el-input__wrapper.is-focus {
+  background: var(--bg-page) !important;
+  border-color: var(--accent) !important;
+  box-shadow: none !important;
+}
+html.dark .el-textarea__inner:focus {
+  background: var(--bg-page) !important;
+  border-color: var(--accent) !important;
+  box-shadow: none !important;
+}
+
+/* ── Tab active ── */
+html.dark .el-tabs__item.is-active {
+  color: var(--accent) !important;
+}
+
+/* ── Pagination active ── */
+html.dark .el-pager li.is-active {
+  background: var(--accent) !important;
+}

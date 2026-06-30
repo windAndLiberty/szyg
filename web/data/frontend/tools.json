@@ -1,0 +1,110 @@
+[
+  {
+    "id": 1,
+    "name": "Docx生成器",
+    "icon": "📄",
+    "description": "从 Markdown 内容生成专业 Word 文档",
+    "status": "running",
+    "calls": 1250,
+    "category": "office"
+  },
+  {
+    "id": 2,
+    "name": "Excel处理器",
+    "icon": "📊",
+    "description": "从 JSON 数据生成 Excel 表格",
+    "status": "running",
+    "calls": 890,
+    "category": "office"
+  },
+  {
+    "id": 3,
+    "name": "PPT生成器",
+    "icon": "📽️",
+    "description": "从 Markdown 大纲自动排版生成 PPT",
+    "status": "stopped",
+    "calls": 320,
+    "category": "office"
+  },
+  {
+    "id": 4,
+    "name": "PDF合并工具",
+    "icon": "📑",
+    "description": "合并多个 PDF 文件",
+    "status": "running",
+    "calls": 560,
+    "category": "office"
+  },
+  {
+    "id": 5,
+    "name": "视频剪辑引擎",
+    "icon": "🎬",
+    "description": "FFmpeg 视频处理流水线",
+    "status": "running",
+    "calls": 2100,
+    "category": "video"
+  },
+  {
+    "id": 6,
+    "name": "图片压缩器",
+    "icon": "🖼️",
+    "description": "智能压缩图片体积",
+    "status": "running",
+    "calls": 780,
+    "category": "image"
+  },
+  {
+    "id": 7,
+    "name": "音频转写器",
+    "icon": "🎙️",
+    "description": "音频转文本",
+    "status": "stopped",
+    "calls": 430,
+    "category": "audio"
+  },
+  {
+    "id": 8,
+    "name": "网页抓取器",
+    "icon": "🕸️",
+    "description": "自动化网页内容抓取",
+    "status": "running",
+    "calls": 1560,
+    "category": "data"
+  },
+  {
+    "id": 9,
+    "name": "翻译引擎",
+    "icon": "🌐",
+    "description": "多语言智能翻译",
+    "status": "running",
+    "calls": 980,
+    "category": "nlp"
+  },
+  {
+    "id": 10,
+    "name": "知识图谱构建器",
+    "icon": "🧠",
+    "description": "从文本中提取实体关系",
+    "status": "not_installed",
+    "calls": 0,
+    "category": "ai"
+  },
+  {
+    "id": 11,
+    "name": "代码审查助手",
+    "icon": "💻",
+    "description": "自动审查代码提交",
+    "status": "not_installed",
+    "calls": 0,
+    "category": "dev"
+  },
+  {
+    "id": 12,
+    "name": "数据可视化器",
+    "icon": "📈",
+    "description": "CSV/JSON 转交互式图表",
+    "status": "stopped",
+    "calls": 210,
+    "category": "data"
+  }
+]

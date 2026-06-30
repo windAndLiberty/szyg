@@ -64,6 +64,14 @@ def create_app() -> FastAPI:
     # AI Brain (nanobot)
     from szyg.api.brain_routes import router as brain_router
 
+    # AI Chat — raw Ollama
+    from szyg.api.chat import router as chat_api_router
+    app.include_router(chat_api_router)
+
+    # Hermes Chat — 超级AI员工 (Ollama + szyg MCP tools)
+    from szyg.api.hermes_chat import router as hermes_chat_router
+    app.include_router(hermes_chat_router)
+
     # Client-side local AI & runtime
     from szyg.api.client_routes import router as client_router
 
@@ -77,6 +85,14 @@ def create_app() -> FastAPI:
     _try_include(app, "szyg.api.routes", prefix="/v1")
     _try_include(app, "szyg.api.frontend_routes")
     _try_include(app, "szyg.api.image_endpoint")
+    _try_include(app, "szyg.api.models_endpoint", prefix="/api")
+
+    # Pipeline — Multi-model AIGC orchestration
+    try:
+        from szyg.api.pipeline_endpoint import router as pipeline_router
+        app.include_router(pipeline_router)
+    except Exception as e:
+        logger.warning(f"Skipped pipeline_endpoint: {e}")
 
     # Video — use direct import to ensure it loads
     try:
@@ -84,6 +100,80 @@ def create_app() -> FastAPI:
         app.include_router(video_router)
     except Exception as e:
         logger.warning(f"Skipped video_endpoint: {e}")
+
+    # Acquisition — 流量引擎 + 客户转化
+    try:
+        from szyg.api.acquisition_routes import router as acquisition_router
+        app.include_router(acquisition_router)
+        from szyg.api.acquisition_routes import _video_router
+        app.include_router(_video_router)
+        logger.info("Acquisition routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped acquisition_routes: {e}")
+
+    # Skills Market — Hermes Skills Hub bridge
+    try:
+        from szyg.api.skills_routes import router as skills_router
+        app.include_router(skills_router)
+        logger.info("Skills market routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped skills_routes: {e}")
+
+    # Infra — Sandbox lifecycle, browser node telemetry
+    try:
+        from szyg.api.infra_routes import router as infra_router
+        app.include_router(infra_router)
+        logger.info("Infra routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped infra_routes: {e}")
+
+    # Memory — Long-term memory CRUD
+    try:
+        from szyg.api.memory_routes import router as memory_router
+        app.include_router(memory_router)
+        logger.info("Memory routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped memory_routes: {e}")
+
+    # Risk Control — Anti-detect configuration
+    try:
+        from szyg.api.risk_control_routes import router as risk_control_router
+        app.include_router(risk_control_router)
+        logger.info("Risk control routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped risk_control_routes: {e}")
+
+    # social-auto-upload — 多平台视频/图文发布
+    try:
+        from szyg.api.sau_routes import router as sau_router
+        app.include_router(sau_router)
+        logger.info("SAU routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped sau_routes: {e}")
+
+    # AI Staff — 员工状态、任务管理、配置持久化
+    try:
+        from szyg.api.staff_routes import router as staff_router
+        app.include_router(staff_router)
+        logger.info("Staff routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped staff_routes: {e}")
+
+    # Conversation persistence — 超级员工对话历史
+    try:
+        from szyg.api.conversation_routes import router as conversation_router
+        app.include_router(conversation_router)
+        logger.info("Conversation routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped conversation_routes: {e}")
+
+    # 统一前端数据 API — 所有页面真实数据持久化
+    try:
+        from szyg.api.data_routes import router as data_router
+        app.include_router(data_router)
+        logger.info("Data routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped data_routes: {e}")
 
     @app.get("/api/health")
     async def health():
@@ -97,6 +187,13 @@ def create_app() -> FastAPI:
             return {"debug": cfg.debug, "log_level": cfg.log_level}
         except Exception:
             return {}
+
+    # Serve generated assets (images, videos, audio from AIGC pipelines)
+    data_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data")
+    volc_output = os.path.join(data_dir, "volcengine_output")
+    if not os.path.isdir(volc_output):
+        os.makedirs(volc_output, exist_ok=True)
+    app.mount("/api/files/volcengine_output", StaticFiles(directory=volc_output), name="volcengine_output")
 
     # Serve built SPA (static files + client-side routing fallback)
     spa_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "web", "dist")

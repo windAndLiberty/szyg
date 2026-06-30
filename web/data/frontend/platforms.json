@@ -1,0 +1,47 @@
+[
+  {
+    "id": "douyin",
+    "name": "抖音",
+    "icon": "🎵",
+    "account": "美妆达人小A",
+    "isLogin": true,
+    "lastActive": "2026-06-28 09:00",
+    "safetyScore": 95
+  },
+  {
+    "id": "xhs",
+    "name": "小红书",
+    "icon": "📕",
+    "account": "护肤种草官",
+    "isLogin": true,
+    "lastActive": "2026-06-28 10:30",
+    "safetyScore": 88
+  },
+  {
+    "id": "bilibili",
+    "name": "B站",
+    "icon": "📺",
+    "account": "成分科普君",
+    "isLogin": true,
+    "lastActive": "2026-06-28 08:45",
+    "safetyScore": 92
+  },
+  {
+    "id": "kuaishou",
+    "name": "快手",
+    "icon": "🎬",
+    "account": "未登录",
+    "isLogin": false,
+    "lastActive": "-",
+    "safetyScore": 0
+  },
+  {
+    "id": "wechat",
+    "name": "视频号",
+    "icon": "💬",
+    "account": "品牌官方号",
+    "isLogin": true,
+    "lastActive": "2026-06-28 11:00",
+    "safetyScore": 90
+  }
+]

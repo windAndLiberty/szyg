@@ -6,10 +6,10 @@
 
 import pytest
 
-from yuling.agent_core.planner import Planner
-from yuling.agent_core.skill_registry import SkillRegistry
-from yuling.models.common import DuplicateSkillError, SkillNotFoundError, ValidationError
-from yuling.models.skill import Skill, SkillParameter, SkillResult
+from szyg.agent_core.planner import Planner
+from szyg.agent_core.skill_registry import SkillRegistry
+from szyg.models.common import DuplicateSkillError, SkillNotFoundError, ValidationError
+from szyg.models.skill import Skill, SkillParameter, SkillResult
 
 
 class TestSkillRegistryReal:

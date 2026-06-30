@@ -1,7 +1,5 @@
-"""AI 视频创作 API — 本地 FFmpeg 视频生成。"""
+"""AI 视频生成 API — 火山引擎 doubao-video 直连。"""
 
-import os
-import subprocess
 import uuid
 from pathlib import Path
 
@@ -11,85 +9,85 @@ from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/video", tags=["video"])
 
-FFMPEG = os.environ.get("FFMPEG_PATH", r"D:\tools\ffmpeg\bin\ffmpeg.exe")
-OUTPUT_DIR = Path(os.environ.get("SZYG_DATA_DIR", "data")) / "video_output"
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+VOLC_OUTPUT = Path("data/volcengine_output")
+VOLC_OUTPUT.mkdir(parents=True, exist_ok=True)
 
 
 class CreateRequest(BaseModel):
-    theme: str
-    duration: int = 10
-    width: int = 1280
-    height: int = 720
-    bg_color: str = "#1a1f25"
-    text_color: str = "white"
-    font_size: int = 48
+    prompt: str
+    duration: int = 5
+    size: str = "720p"          # 720p | 1080p
+    model: str = "doubao-video"
+    image_url: str = ""          # 图生视频 (可选)
 
 
 @router.post("/create")
 async def create_video(req: CreateRequest):
-    """使用 FFmpeg 生成带文字叠加的视频。"""
-    if not req.theme.strip():
-        raise HTTPException(400, "主题不能为空")
-    if req.duration < 3 or req.duration > 120:
-        raise HTTPException(400, "时长需在 3-120 秒之间")
+    """提交 AI 视频生成任务 (文生视频 / 图生视频)。
 
-    output_name = f"video_{uuid.uuid4().hex[:8]}.mp4"
-    output_path = str(OUTPUT_DIR / output_name)
+    火山引擎视频生成是异步任务，返回 task_id，前端轮询 /api/video/task/{task_id}。
+    """
+    if not req.prompt.strip():
+        raise HTTPException(400, "视频描述不能为空")
+    if req.duration not in (5, 10):
+        raise HTTPException(400, "时长仅支持 5 秒或 10 秒")
+    if req.size not in ("720p", "1080p"):
+        raise HTTPException(400, "分辨率仅支持 720p 或 1080p")
 
-    # Build text: join all lines with newlines
-    lines = [l.strip() for l in req.theme.replace("；", ";").replace("。", ";").split(";") if l.strip()]
-    if not lines:
-        lines = [req.theme]
-
-    # Build multi-line drawtext filter
-    total_lines = len(lines)
-    line_height = req.font_size + 16
-    start_y = (req.height - total_lines * line_height) // 2
-
-    draw_filters = []
-    for i, line in enumerate(lines):
-        safe = line.replace(":", "\\:").replace("'", "\\'").replace("%", "\\%")
-        y = start_y + i * line_height
-        draw_filters.append(
-            f"drawtext=text='{safe}':"
-            f"fontsize={req.font_size}:fontcolor={req.text_color}:"
-            f"x=(w-text_w)/2:y={y}:"
-            f"box=1:boxcolor=black@0.5:boxborderw=12"
+    try:
+        from szyg.integrations.volcengine_client import VolcEngineClient
+        client = VolcEngineClient()
+        result = await client.generate_video(
+            prompt=req.prompt.strip(),
+            image_url=req.image_url or None,
+            model=req.model,
+            duration=req.duration,
+            size=req.size,
         )
+        await client.close()
+        return {
+            "ok": True,
+            "task_id": result["task_id"],
+            "status": result["status"],
+            "model": req.model,
+            "prompt": req.prompt.strip(),
+        }
+    except Exception as e:
+        raise HTTPException(500, f"视频生成提交失败: {str(e)[:200]}")
 
-    vf = ",".join(draw_filters)
 
-    bg_hex = req.bg_color.replace("#", "0x")
+@router.get("/task/{task_id}")
+async def video_task_status(task_id: str, model: str = "doubao-video"):
+    """查询 AI 视频生成任务状态。
 
-    cmd = [
-        FFMPEG, "-y",
-        "-f", "lavfi",
-        "-i", f"color=c={bg_hex}:s={req.width}x{req.height}:d={req.duration}:r=25",
-        "-vf", vf,
-        "-c:v", "libx264", "-preset", "ultrafast",
-        "-pix_fmt", "yuv420p",
-        output_path,
-    ]
+    任务完成时自动下载视频到本地，返回可访问的视频 URL。
+    """
+    try:
+        from szyg.integrations.volcengine_client import VolcEngineClient
+        client = VolcEngineClient()
+        result = await client.get_video_task(task_id=task_id, model=model)
 
-    result = subprocess.run(cmd, capture_output=True, timeout=120, text=True)
-    if result.returncode != 0:
-        raise HTTPException(500, f"FFmpeg 渲染失败: {result.stderr[-300:]}")
+        # 如果已完成且有视频URL，下载到本地
+        if result.get("status") == "succeeded" and result.get("video_url"):
+            local_path = await client.download_video(
+                result["video_url"],
+                output_name=f"ai_video_{task_id[:8]}_{uuid.uuid4().hex[:6]}.mp4"
+            )
+            filename = Path(local_path).name
+            result["local_path"] = local_path
+            result["video_url"] = f"/api/files/volcengine_output/{filename}"
+            result["download_url"] = f"/api/video/download/{filename}"
 
-    return {
-        "ok": True,
-        "filename": output_name,
-        "url": f"/api/video/download/{output_name}",
-        "duration": req.duration,
-        "theme": req.theme,
-        "slides": len(lines),
-    }
+        await client.close()
+        return result
+    except Exception as e:
+        raise HTTPException(500, f"查询视频任务失败: {str(e)[:200]}")
 
 
 @router.get("/download/{filename}")
 async def download_video(filename: str):
-    """下载生成的视频文件。"""
-    path = OUTPUT_DIR / filename
+    """下载/播放生成的视频文件。"""
+    path = VOLC_OUTPUT / filename
     if not path.exists():
         raise HTTPException(404, "视频文件不存在")
     return FileResponse(str(path), media_type="video/mp4", filename=filename)

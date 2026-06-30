@@ -1,0 +1,37 @@
+[
+  {
+    "id": 1,
+    "name": "产品手册 v2.3.pdf",
+    "type": "PDF",
+    "uploadTime": "2026-06-20",
+    "status": "indexed"
+  },
+  {
+    "id": 2,
+    "name": "护肤常见问题.docx",
+    "type": "DOCX",
+    "uploadTime": "2026-06-21",
+    "status": "indexed"
+  },
+  {
+    "id": 3,
+    "name": "代理合作政策.pdf",
+    "type": "PDF",
+    "uploadTime": "2026-06-22",
+    "status": "indexed"
+  },
+  {
+    "id": 4,
+    "name": "销售话术库.xlsx",
+    "type": "XLSX",
+    "uploadTime": "2026-06-23",
+    "status": "indexed"
+  },
+  {
+    "id": 5,
+    "name": "新品发布会介绍.pptx",
+    "type": "PPTX",
+    "uploadTime": "2026-06-24",
+    "status": "pending"
+  }
+]

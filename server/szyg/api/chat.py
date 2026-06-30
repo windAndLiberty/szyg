@@ -116,3 +116,43 @@ async def _stream_response(request: ChatCompletionRequest, router):
         yield "data: [DONE]\n\n"
     except Exception as e:
         yield f'data: {{"error": "{str(e)}"}}\n\n'
+
+
+# ── Conversation history ─────────────────────────────────────
+
+from pathlib import Path
+from szyg.data_path import DATA_DIR
+
+_CONVERSATIONS_FILE = DATA_DIR / "conversations.json"
+
+
+def _load_conversations() -> list:
+    if _CONVERSATIONS_FILE.exists():
+        return json.loads(_CONVERSATIONS_FILE.read_text(encoding="utf-8"))
+    return []
+
+
+def _save_conversations(data: list):
+    _CONVERSATIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _CONVERSATIONS_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+@router.get("/conversations", tags=["chat"])
+async def list_conversations():
+    items = _load_conversations()
+    return {"conversations": items, "total": len(items)}
+
+
+@router.post("/conversations", tags=["chat"])
+async def create_conversation(body: dict):
+    import uuid
+    items = _load_conversations()
+    item = {
+        "id": str(uuid.uuid4())[:8],
+        "title": body.get("title", "新对话"),
+        "messages": body.get("messages", []),
+        "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    items.append(item)
+    _save_conversations(items)
+    return item

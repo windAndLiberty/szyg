@@ -9,7 +9,9 @@ Base Platform Adapter — 平台适配器抽象基类
 
 每个平台适配器实现统一的 publish() / check_login() / login() 接口。
 """
+import asyncio
 import logging
+import random
 from abc import ABC, abstractmethod
 from enum import Enum
 from datetime import datetime
@@ -43,6 +45,7 @@ class LoginStatus(BaseModel):
     qr_code_url: str = ""              # 如需扫码登录，base64 图片
     qr_code_expires_at: str = ""       # 二维码过期时间
     message: str = ""                  # 状态描述
+    need_sms: bool = False             # 是否需要短信验证码
 
 
 class PublishRequest(BaseModel):
@@ -178,7 +181,49 @@ class BasePlatformAdapter(ABC):
         """查询已发布内容的状态"""
         ...
 
-    @abstractmethod
+    async def safe_publish(self, request: PublishRequest) -> PublishResult:
+        """
+        安全发布包装器：失败后自动重试一次，并保存审计截图。
+        各平台适配器无需改动，调用方使用 safe_publish 替代 publish 即可。
+        """
+        request = await self.pre_publish(request)
+        last_error = None
+        for attempt in range(2):
+            try:
+                result = await self.publish(request)
+                await self.post_publish(request, result)
+                return result
+            except Exception as e:
+                last_error = e
+                logger.warning(f"[{self.platform_name}] 发布失败 (attempt {attempt + 1}/2): {e}")
+                await self._audit_screenshot(f"publish_failed_attempt_{attempt + 1}")
+                if attempt == 0:
+                    await asyncio.sleep(random.uniform(2, 5))
+        # 两次都失败
+        logger.error(f"[{self.platform_name}] 发布重试后仍失败: {last_error}")
+        return PublishResult(
+            success=False, platform=self.platform.value,
+            error_msg=f"发布失败（已重试1次）: {str(last_error)[:200]}",
+        )
+
+    async def _audit_screenshot(self, suffix: str = "audit") -> None:
+        """保存审计截图到 data/audit/{platform}/ （不依赖外部模块）"""
+        page = getattr(self, '_page', None)
+        if not page:
+            return
+        try:
+            from pathlib import Path
+            from datetime import datetime
+            from szyg.data_path import DATA_DIR
+            audit_dir = DATA_DIR / "audit" / self.platform.value / datetime.now().strftime("%Y-%m-%d")
+            audit_dir.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.now().strftime("%H%M%S_%f")[:-3]
+            path = audit_dir / f"{timestamp}_{suffix}.png"
+            await page.screenshot(path=str(path), full_page=False)
+            logger.info(f"[Audit] 截图已保存: {path}")
+        except Exception as e:
+            logger.debug(f"[Audit] 截图失败: {e}")
+
     async def close(self) -> None:
         """关闭适配器，释放资源"""
         ...

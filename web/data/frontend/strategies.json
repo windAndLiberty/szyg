@@ -1,0 +1,29 @@
+[
+  {
+    "key": "cautious",
+    "name": "谨慎策略",
+    "description": "低频率、长间隔，适合新账号养号期",
+    "enabled": false,
+    "freq": 10,
+    "commentLen": 80,
+    "interval": 300
+  },
+  {
+    "key": "balanced",
+    "name": "均衡策略",
+    "description": "中等频率，适合日常运营",
+    "enabled": true,
+    "freq": 30,
+    "commentLen": 120,
+    "interval": 120
+  },
+  {
+    "key": "aggressive",
+    "name": "快速策略",
+    "description": "高频率短间隔，适合大号冲刺期",
+    "enabled": false,
+    "freq": 60,
+    "commentLen": 200,
+    "interval": 60
+  }
+]

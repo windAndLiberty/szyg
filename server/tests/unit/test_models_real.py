@@ -8,14 +8,14 @@
 import pytest
 from pydantic import ValidationError
 
-from yuling.models.api import (
+from szyg.models.api import (
     ChatCompletionRequest,
     ChatCompletionResponse,
     ModelInfo,
     ModelListResponse,
 )
-from yuling.models.common import ErrorResponse
-from yuling.models.integration import (
+from szyg.models.common import ErrorResponse
+from szyg.models.integration import (
     BatchResult,
     ChatResponse,
     CompletionResponse,
@@ -23,11 +23,11 @@ from yuling.models.integration import (
     GenerationResult,
     TranscriptionResult,
 )
-from yuling.models.mcp import MCPServerConfig, Tool, ToolResult
-from yuling.models.memory import MemoryEntry
-from yuling.models.skill import Skill, SkillParameter, SkillResult
-from yuling.models.task import TaskPlan, TaskStep
-from yuling.models.wechaty import WechatyMessage
+from szyg.models.mcp import MCPServerConfig, Tool, ToolResult
+from szyg.models.memory import MemoryEntry
+from szyg.models.skill import Skill, SkillParameter, SkillResult
+from szyg.models.task import TaskPlan, TaskStep
+from szyg.models.wechaty import WechatyMessage
 
 
 # ============================================================================

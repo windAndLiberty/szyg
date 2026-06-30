@@ -2,14 +2,14 @@
 「域灵」知识库系统 — 文档摄入 + 上下文检索。
 
 在 Memory (SQLite FTS5) 基础上增加:
-    - 文件摄入: txt, md, json
+    - 文件摄入: txt, md, json, pdf, docx
     - 文档分块: 按段落/语义分割
     - RAG 检索: 搜索相关片段作为 LLM 上下文
     - 来源追踪: 每条知识记录来源文件
 
 用法:
     kb = KnowledgeBase()
-    await kb.ingest_file("docs/product_manual.txt")
+    await kb.ingest_file("docs/product_manual.pdf")
     context = kb.query("产品价格是多少", top_k=3)
 """
 
@@ -18,12 +18,52 @@ from typing import Any
 
 from szyg.agent_core.memory import Memory
 
+# ── Format-specific parsers ──────────────────────────────
+
+
+def _parse_pdf(path: Path) -> str:
+    """Extract text from PDF; one newline between pages."""
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        raise ImportError("pypdf 未安装，请运行: uv add pypdf")
+
+    reader = PdfReader(str(path))
+    pages = []
+    for page in reader.pages:
+        text = page.extract_text()
+        if text:
+            pages.append(text.strip())
+    if not pages:
+        raise ValueError(f"PDF 文件中未提取到文本: {path.name}")
+    return "\n\n".join(pages)
+
+
+def _parse_docx(path: Path) -> str:
+    """Extract text from DOCX; one newline between paragraphs."""
+    try:
+        from docx import Document
+    except ImportError:
+        raise ImportError("python-docx 未安装，请运行: uv add python-docx")
+
+    doc = Document(str(path))
+    paragraphs = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+    if not paragraphs:
+        raise ValueError(f"DOCX 文件中未提取到文本: {path.name}")
+    return "\n\n".join(paragraphs)
+
+
+# ── KnowledgeBase ────────────────────────────────────────
+
 
 class KnowledgeBase:
     """知识库管理器 — 文档摄入、分块、检索。"""
 
     CHUNK_SIZE = 500   # 每块最大字符数
     CHUNK_OVERLAP = 50  # 块间重叠
+
+    # File extensions that can be parsed as plain text
+    _TEXT_EXTENSIONS = {".txt", ".md", ".json", ".yaml", ".yml", ".csv", ".log"}
 
     def __init__(self, db_path: str = "./data/knowledge.db"):
         self.memory = Memory(db_path)
@@ -32,7 +72,7 @@ class KnowledgeBase:
     def ingest_file(self, file_path: str, source_name: str = None) -> int:
         """摄入文件到知识库。
 
-        支持 txt, md, json。自动分块并存储到 Memory。
+        支持 txt, md, json, pdf, docx。自动分块并存储到 Memory。
 
         Args:
             file_path: 文件路径
@@ -40,14 +80,35 @@ class KnowledgeBase:
 
         Returns:
             int: 摄入的块数量
+
+        Raises:
+            FileNotFoundError: 文件不存在
+            ValueError: 不支持的文件格式或解析失败
         """
         path = Path(file_path)
         if not path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
 
         source = source_name or path.name
-        content = path.read_text(encoding="utf-8", errors="replace")
-        return self.ingest_text(content, source=source, source_type=path.suffix)
+        suffix = path.suffix.lower()
+
+        # Dispatch by file type
+        if suffix == ".pdf":
+            content = _parse_pdf(path)
+        elif suffix == ".docx":
+            content = _parse_docx(path)
+        elif suffix in self._TEXT_EXTENSIONS:
+            content = path.read_text(encoding="utf-8", errors="replace")
+        else:
+            raise ValueError(
+                f"不支持的文件格式: {suffix}。"
+                f"支持的格式: {', '.join(sorted(self._TEXT_EXTENSIONS | {'.pdf', '.docx'}))}"
+            )
+
+        if not content.strip():
+            raise ValueError(f"文件内容为空或无法解析: {path.name}")
+
+        return self.ingest_text(content, source=source, source_type=suffix)
 
     def ingest_text(
         self, text: str, source: str = "manual", source_type: str = ".txt"

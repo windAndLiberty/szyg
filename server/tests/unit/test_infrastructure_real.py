@@ -4,9 +4,9 @@
 
 import pytest
 
-from yuling.infrastructure.database import get_sqlite_connection
-from yuling.infrastructure.http_client import get_http_client, get_sync_client
-from yuling.infrastructure.logger import configure_logging, get_logger
+from szyg.infrastructure.database import get_sqlite_connection
+from szyg.infrastructure.http_client import get_http_client, get_sync_client
+from szyg.infrastructure.logger import configure_logging, get_logger
 
 
 class TestDatabase:

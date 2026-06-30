@@ -4,9 +4,9 @@
 
 import pytest
 
-from yuling.wechaty.bridge import WechatyBridge
-from yuling.wechaty.pipeline import MessagePipeline
-from yuling.models.wechaty import WechatyMessage
+from szyg.wechaty.bridge import WechatyBridge
+from szyg.wechaty.pipeline import MessagePipeline
+from szyg.models.wechaty import WechatyMessage
 
 
 class TestWechatyBridge:

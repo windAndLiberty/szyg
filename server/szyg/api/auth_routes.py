@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from szyg.auth import (
     authenticate, get_current_user, list_users, create_user,
+    update_user, delete_user, toggle_user_active,
     LoginRequest, Token, User,
 )
 
@@ -48,9 +49,35 @@ async def users(admin: User = Depends(require_admin)):
 @router.post("/users", response_model=User)
 async def add_user(
     username: str, password: str, role: str = "user",
-    oem_id: str | None = None, admin: User = Depends(require_admin),
+    email: str = "", oem_id: str | None = None, admin: User = Depends(require_admin),
 ):
-    user = create_user(username, password, role, oem_id)
+    user = create_user(username, password, role, email, oem_id)
     if not user:
         raise HTTPException(400, "用户名已存在")
+    return user
+
+
+@router.put("/users/{user_id}", response_model=User)
+async def update_user_endpoint(
+    user_id: int, email: str | None = None, role: str | None = None,
+    admin: User = Depends(require_admin),
+):
+    user = update_user(user_id, email=email, role=role)
+    if not user:
+        raise HTTPException(404, "用户不存在")
+    return user
+
+
+@router.delete("/users/{user_id}")
+async def delete_user_endpoint(user_id: int, admin: User = Depends(require_admin)):
+    if delete_user(user_id):
+        return {"ok": True}
+    raise HTTPException(404, "用户不存在")
+
+
+@router.put("/users/{user_id}/toggle", response_model=User)
+async def toggle_user_endpoint(user_id: int, admin: User = Depends(require_admin)):
+    user = toggle_user_active(user_id)
+    if not user:
+        raise HTTPException(404, "用户不存在")
     return user

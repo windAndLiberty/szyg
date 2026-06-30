@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "time": "2026-06-28 10:30:15",
+    "operator": "内容专员",
+    "action": "create",
+    "target": "content",
+    "targetId": "C-001",
+    "result": "success",
+    "detail": "创建内容: 夏日护肤技巧"
+  },
+  {
+    "id": 2,
+    "time": "2026-06-28 10:35:22",
+    "operator": "获客专员",
+    "action": "send",
+    "target": "comment",
+    "targetId": "CM-042",
+    "result": "success",
+    "detail": "发送评论到抖音视频"
+  },
+  {
+    "id": 3,
+    "time": "2026-06-28 10:40:08",
+    "operator": "运营主管",
+    "action": "update",
+    "target": "config",
+    "targetId": "CFG-01",
+    "result": "success",
+    "detail": "修改策略配置：频率限制从30改为40"
+  }
+]

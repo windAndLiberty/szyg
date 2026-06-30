@@ -100,3 +100,31 @@ async def history(job_id: str = "", limit: int = 50):
 @router.get("/stats")
 async def stats():
     return get_scheduler().get_stats()
+
+
+# ── Audit Logs & Chart Data ──────────────────────────────────
+
+import json as _json
+from pathlib import Path as _Path
+from szyg.data_path import DATA_DIR as _DATA_DIR
+
+_AUDIT_FILE = _DATA_DIR / "audit_logs.json"
+_CHART_FILE = _DATA_DIR / "chart_data.json"
+
+
+@router.get("/audit-logs")
+async def audit_logs(search: str = "", limit: int = 50):
+    items = []
+    if _AUDIT_FILE.exists():
+        items = _json.loads(_AUDIT_FILE.read_text(encoding="utf-8"))
+    if search:
+        q = search.lower()
+        items = [l for l in items if q in l.get("detail", "").lower() or q in l.get("operator", "").lower()]
+    return {"logs": items[:limit], "total": len(items)}
+
+
+@router.get("/chart-data")
+async def chart_data():
+    if _CHART_FILE.exists():
+        return {"data": _json.loads(_CHART_FILE.read_text(encoding="utf-8"))}
+    return {"data": []}

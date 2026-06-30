@@ -1,0 +1,42 @@
+[
+  {
+    "id": 1,
+    "title": "夏日护肤小贴士",
+    "type": "video",
+    "platforms": [
+      "douyin",
+      "xhs"
+    ],
+    "createdAt": "2026-06-25",
+    "updatedAt": "2026-06-26",
+    "views": 125000,
+    "likes": 8900,
+    "comments": 450,
+    "shares": 320,
+    "favorites": 180,
+    "description": "分享夏季护肤的5个关键步骤",
+    "content": "夏季护肤最重要的五个步骤：1.清洁要彻底..."
+  },
+  {
+    "id": 2,
+    "title": "新品上市预热文案",
+    "type": "text",
+    "platforms": [
+      "xhs"
+    ],
+    "createdAt": "2026-06-26",
+    "updatedAt": "2026-06-27",
+    "views": 45000,
+    "likes": 3200,
+    "comments": 180,
+    "shares": 95,
+    "favorites": 60,
+    "description": "新品发布倒计时预热文案",
+    "content": "倒计时3天！新品即将上市...",
+    "tags": [
+      "预热",
+      "新品"
+    ],
+    "useCount": 5
+  }
+]

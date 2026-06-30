@@ -1,0 +1,257 @@
+{
+  "version": "1.0",
+  "description": "szyg 超级AI员工 — 业务提示词库。按中小企业的真实营销场景设计，用以测试 Hermes Agent 的各子系统调度能力。",
+  "categories": {
+    "content_creation": "内容创作",
+    "platform_publishing": "平台发布",
+    "private_domain": "私域运营",
+    "public_domain": "公域获客",
+    "marketing_automation": "营销自动化",
+    "data_reporting": "数据分析",
+    "creative_work": "创意工坊",
+    "office_skills": "办公技能",
+    "research": "深度研究"
+  },
+  "prompts": [
+    {
+      "id": "c001",
+      "category": "content_creation",
+      "scenario": "新媒体运营日常",
+      "prompt": "帮我写一篇小红书种草笔记，推荐一款适合夏天用的防晒霜。要加上 emoji 和热门话题标签，语气要亲切像闺蜜聊天，控制在800字以内。写完之后直接发布到小红书。",
+      "test_target": ["pub_create", "pub_submit", "pub_approve", "platform_publish_direct"],
+      "complexity": "medium"
+    },
+    {
+      "id": "c002",
+      "category": "content_creation",
+      "scenario": "B站视频脚本",
+      "prompt": "我要做一个B站科技类视频，主题是'2026年最值得买的5款AI硬件'。帮我写一个完整的视频脚本，包括开场白、每款产品的介绍（ChatGPT耳机、AI眼镜、智能戒指等）、结尾引导关注的话术。时长控制在8分钟。写完后发布到B站。",
+      "test_target": ["pub_ai_generate", "pub_create", "platform_publish"],
+      "complexity": "high"
+    },
+    {
+      "id": "c003",
+      "category": "content_creation",
+      "scenario": "抖音短视频文案",
+      "prompt": "帮我生成5条抖音口播文案，主题是'职场新人必知的3个Excel技巧'。每条文案需要用强钩子开头，中间讲干货，结尾引导点赞关注。每条不超过150字，要有节奏感。全部审核通过后定时明天早上8点发布。",
+      "test_target": ["pub_ai_generate", "pub_schedule", "sched_create"],
+      "complexity": "high"
+    },
+    {
+      "id": "c004",
+      "category": "content_creation",
+      "scenario": "公众号长文",
+      "prompt": "写一篇微信公众号长文，主题是'中小企业如何用AI降本增效'，包含3个真实案例、具体数据和可操作建议。文章要有吸引人的标题、小标题分段、金句加粗。3000字左右。写好后提交审核。",
+      "test_target": ["pub_ai_generate", "pub_submit"],
+      "complexity": "medium"
+    },
+    {
+      "id": "c005",
+      "category": "content_creation",
+      "scenario": "SEO文章批量生成",
+      "prompt": "帮我围绕'数字化转型'这个话题，生成5个不同角度的文章大纲，每个大纲包含标题、3个小标题和核心观点。要覆盖不同的搜索意图：教程型、对比型、案例型、趋势分析型、工具推荐型。",
+      "test_target": ["pub_ai_generate", "kb_search"],
+      "complexity": "medium"
+    },
+    {
+      "id": "p001",
+      "category": "platform_publishing",
+      "scenario": "多平台统发",
+      "prompt": "我创建了一篇关于'2026春季穿搭趋势'的内容（ID: 最近创建的），帮我审核通过后同时发布到抖音、小红书和B站三个平台。发布前先检查这三个平台是否已登录。",
+      "test_target": ["pub_list", "pub_approve", "platform_status", "platform_publish"],
+      "complexity": "high"
+    },
+    {
+      "id": "p002",
+      "category": "platform_publishing",
+      "scenario": "平台状态巡检",
+      "prompt": "帮我检查一下所有平台的登录状态，看看哪些平台已经登好了，哪些需要重新扫码。把结果列个表。",
+      "test_target": ["platform_list", "platform_status"],
+      "complexity": "low"
+    },
+    {
+      "id": "p003",
+      "category": "platform_publishing",
+      "scenario": "定时发布安排",
+      "prompt": "我这周有3篇内容要发：周一早上8点发抖音产品介绍，周三中午12点发小红书穿搭笔记，周五晚上8点发B站测评视频。帮我创建定时发布任务，都设为全平台发布。",
+      "test_target": ["pub_create", "pub_schedule", "sched_create"],
+      "complexity": "high"
+    },
+    {
+      "id": "pr001",
+      "category": "private_domain",
+      "scenario": "朋友圈营销",
+      "prompt": "帮我写一条微信朋友圈文案，宣传我们新上线的AI课程。需要有吸引力的开头、课程亮点、限时优惠信息，以及一张配图建议。写好后通过微信桌面端发布。",
+      "test_target": ["platform_status", "platform_publish_direct"],
+      "complexity": "medium"
+    },
+    {
+      "id": "pr002",
+      "category": "private_domain",
+      "scenario": "客户群发消息",
+      "prompt": "明天是我们的会员日，帮我写一段200字以内的群发消息，通知所有微信好友我们的会员专属折扣活动。语气要亲切但不失专业，包含活动时间和参与方式。",
+      "test_target": ["pub_ai_generate", "platform_publish_direct"],
+      "complexity": "low"
+    },
+    {
+      "id": "pu001",
+      "category": "public_domain",
+      "scenario": "竞品内容分析",
+      "prompt": "帮我分析一下抖音上最近关于'智能家居'话题的热门内容有什么特点。然后基于分析结果，帮我创作并发布一条差异化内容的抖音视频文案。",
+      "test_target": ["deep_research", "pub_ai_generate", "platform_publish_direct"],
+      "complexity": "high"
+    },
+    {
+      "id": "pu002",
+      "category": "public_domain",
+      "scenario": "多账号管理",
+      "prompt": "我们现在有抖音、小红书、B站、快手四个平台的账号。帮我列一下每个账号的登录状态，然后对未登录的账号发起扫码登录。",
+      "test_target": ["platform_list", "platform_status", "platform_login"],
+      "complexity": "medium"
+    },
+    {
+      "id": "m001",
+      "category": "marketing_automation",
+      "scenario": "自动化工作流",
+      "prompt": "帮我设置一个自动化流程：每天早上8点自动从知识库里随机选一个话题，用AI生成一篇营销短文，审核通过后自动发布到全平台。这个流程需要跑起来。",
+      "test_target": ["sched_create", "kb_search", "pub_ai_generate", "pub_publish"],
+      "complexity": "high"
+    },
+    {
+      "id": "m002",
+      "category": "marketing_automation",
+      "scenario": "定时健康巡检",
+      "prompt": "帮我创建两个定时任务：一个每小时检查一次所有平台的登录状态，如果发现掉线就提醒我；另一个每天下午6点统计当天的内容发布情况并生成简报。",
+      "test_target": ["sched_create", "platform_health_check", "pub_stats"],
+      "complexity": "medium"
+    },
+    {
+      "id": "m003",
+      "category": "marketing_automation",
+      "scenario": "营销日历规划",
+      "prompt": "下个月是双十一，帮我规划一个完整的双十一营销内容日历。从11月1日到11日，每天需要发什么内容、在哪些平台发、什么时间发。要有预热期、爆发期、返场期的节奏设计。最终创建成定时任务。",
+      "test_target": ["pub_calendar", "pub_create", "pub_schedule", "sched_create"],
+      "complexity": "high"
+    },
+    {
+      "id": "d001",
+      "category": "data_reporting",
+      "scenario": "每周数据周报",
+      "prompt": "帮我生成本周的内容发布周报。需要包含：各平台发布数量、审核通过率、最受欢迎的内容TOP3、各平台数据对比。做成一个Excel表格。",
+      "test_target": ["pub_stats", "pub_logs", "skill_xlsx_create"],
+      "complexity": "medium"
+    },
+    {
+      "id": "d002",
+      "category": "data_reporting",
+      "scenario": "月度汇报PPT",
+      "prompt": "帮我做一个本月营销工作总结PPT。包含：本月发布内容概览、平台数据、热门内容分析、下月计划。用金字塔结构，每页不超过5个要点。",
+      "test_target": ["pub_stats", "pub_logs", "skill_pptx_create"],
+      "complexity": "medium"
+    },
+    {
+      "id": "d003",
+      "category": "data_reporting",
+      "scenario": "内容审计",
+      "prompt": "帮我列出所有处于'待审核'状态的内容，按创建时间排序。对每一条给出简短的审核建议（通过/修改/驳回），然后批量处理。",
+      "test_target": ["pub_list", "pub_approve", "pub_reject"],
+      "complexity": "medium"
+    },
+    {
+      "id": "cr001",
+      "category": "creative_work",
+      "scenario": "AI海报设计",
+      "prompt": "帮我设计一张双十一促销海报。主题色是红色和金色，需要有'11.11'、'全场5折起'、品牌Logo位置。参考小红书热门海报风格。先给我看设计预览，然后生成最终图片。",
+      "test_target": ["canvas_design", "image_generate"],
+      "complexity": "medium"
+    },
+    {
+      "id": "cr002",
+      "category": "creative_work",
+      "scenario": "短视频批量生产",
+      "prompt": "我有一个产品介绍的视频素材（2分钟），帮我用视频引擎裁剪出3个15秒的精华片段，每个片段加上不同的标题字幕。标题分别是：'颠覆你的想象'、'性价比之王'、'限时抢购'。用模板渲染输出。",
+      "test_target": ["video_templates", "video_cut", "video_add_title", "video_render"],
+      "complexity": "high"
+    },
+    {
+      "id": "cr003",
+      "category": "creative_work",
+      "scenario": "音乐+视频混剪",
+      "prompt": "帮我把这段产品展示视频配上背景音乐，视频原声保留30%音量作为背景音，加上开头标题字幕'2026新品发布'，输出1080p。",
+      "test_target": ["video_mix_audio", "video_add_title"],
+      "complexity": "medium"
+    },
+    {
+      "id": "o001",
+      "category": "office_skills",
+      "scenario": "合同生成",
+      "prompt": "帮我起草一份自媒体内容代运营合同。甲方是我们公司，乙方是内容创作者。包含服务范围、交付标准、付款方式、违约责任等条款。生成Word文档。",
+      "test_target": ["skill_docx_create"],
+      "complexity": "medium"
+    },
+    {
+      "id": "o002",
+      "category": "office_skills",
+      "scenario": "数据报表",
+      "prompt": "帮我生成一份本月各平台发布数据对比表。行是平台（抖音/小红书/B站/快手/微信），列是发布数、点赞数、评论数、分享数。数据填一些示例值。输出Excel文件。",
+      "test_target": ["pub_stats", "skill_xlsx_create"],
+      "complexity": "low"
+    },
+    {
+      "id": "o003",
+      "category": "office_skills",
+      "scenario": "企划书",
+      "prompt": "帮我写一份'2026年第三季度内容营销企划书'，做成PPT。包含：上季度回顾、市场趋势、本季度目标、内容策略、执行计划、预算估算。每页有标题和3-5个要点。",
+      "test_target": ["skill_pptx_create"],
+      "complexity": "high"
+    },
+    {
+      "id": "r001",
+      "category": "research",
+      "scenario": "行业调研",
+      "prompt": "帮我做一个深度研究：2026年中国短视频行业的AI应用趋势。需要包括：市场规模数据、头部平台（抖音/快手/B站/视频号）的AI功能对比、典型案例、未来预测。最后输出一份结构化报告。",
+      "test_target": ["deep_research", "kb_ingest"],
+      "complexity": "high"
+    },
+    {
+      "id": "r002",
+      "category": "research",
+      "scenario": "竞品分析",
+      "prompt": "帮我研究一下我们行业的TOP3竞品最近一个月在社交媒体上发了什么内容。分析他们的内容策略、发布频率、互动率。然后对比我们自己的数据，给出改进建议。",
+      "test_target": ["deep_research", "pub_stats", "pub_logs"],
+      "complexity": "high"
+    },
+    {
+      "id": "r003",
+      "category": "research",
+      "scenario": "热点追踪",
+      "prompt": "帮我搜索一下今天有哪些和'AI营销'相关的热点新闻。然后基于最热的话题，帮我快速生成一篇蹭热点的短文，发布到全平台。这个要快，半小时内完成。",
+      "test_target": ["tech_news_search", "pub_ai_generate", "platform_publish_direct"],
+      "complexity": "high"
+    },
+    {
+      "id": "e001",
+      "category": "stress_test",
+      "scenario": "全栈压力测试",
+      "prompt": "帮我做以下事情：1. 检查所有平台的登录状态；2. 生成5条不同主题的AI营销文案；3. 把其中的3条审核通过并定时明天发布；4. 把剩下的2条发到微信朋友圈；5. 最后生成本周的工作报告。这是一个完整的营销日流程。",
+      "test_target": ["platform_health", "pub_ai_generate", "pub_approve", "pub_schedule", "platform_publish_direct", "skill_docx_create"],
+      "complexity": "max"
+    },
+    {
+      "id": "e002",
+      "category": "stress_test",
+      "scenario": "多渠道并发",
+      "prompt": "帮我同时启动以下任务：发布一篇小红书笔记、在微信朋友圈发一条促销信息、在B站上传一个视频脚本草稿、生成本月数据报表Excel、检查所有平台健康状态。这些任务互不依赖，可以并行处理。",
+      "test_target": ["platform_publish_direct", "skill_xlsx_create", "platform_health"],
+      "complexity": "max"
+    }
+  ],
+  "usage": "将 prompts 数组中的任意一条 prompt 发送给 szyg 的 Hermes Agent，观察其能否正确识别意图并调度相应的 MCP 工具完成任务。",
+  "evaluation_criteria": [
+    "意图识别是否准确",
+    "工具调度是否正确",
+    "多步骤任务的执行顺序是否合理",
+    "错误处理是否得当（如平台未登录时的提示）",
+    "最终输出是否满足 prompt 中的业务需求"
+  ]
+}
