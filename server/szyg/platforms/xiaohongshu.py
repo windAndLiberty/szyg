@@ -65,8 +65,8 @@ class XiaohongshuAdapter(BasePlatformAdapter):
         if self._context:
             try:
                 await self._pool.invalidate_context("xhs")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to invalidate xhs context: %s", e)
         self._context = await self._pool.get_context("xhs", storage_state=storage_state)
         self._page = await self._context.new_page()
         from szyg.platforms.anti_detect import inject_stealth
@@ -76,8 +76,8 @@ class XiaohongshuAdapter(BasePlatformAdapter):
         if self._context:
             try:
                 await self._pool.invalidate_context("xhs")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to invalidate xhs context on close: %s", e)
         self._context = None
         self._page = None
 

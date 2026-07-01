@@ -548,8 +548,8 @@ async def batch_send(
     try:
         from szyg.integrations.acquisition_adapters import get_acquisition_adapter
         acq_adapter = get_acquisition_adapter(platform)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("AcquisitionAdapter unavailable for %s: %s", platform, e)
 
     for comment_data in comments:
         text = comment_data.get("text", comment_data.get("comment_text", ""))

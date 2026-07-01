@@ -311,12 +311,12 @@ class PlaywrightAcquisitionAdapter(BaseAcquisitionAdapter):
                 p = platform_map.get(self.platform)
                 if p:
                     self._session.save(p, await self._context.storage_state())
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to save session state for %s: %s", self.platform, e)
             try:
                 await self._pool.return_context(self.platform)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to return browser context for %s: %s", self.platform, e)
         self._page = None
         self._context = None
 

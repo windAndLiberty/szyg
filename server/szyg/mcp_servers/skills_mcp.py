@@ -14,7 +14,7 @@ Architecture:
   - _*_style helpers: reusable professional formatting per format
   - Each @server.tool is standalone — callable independently by Hermes agent
 """
-import sys, os, json, subprocess, tempfile, shutil, datetime
+import sys, os, json, logging, subprocess, tempfile, shutil, datetime
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Optional
@@ -692,8 +692,8 @@ def _add_text_to_slide(slide, texts):
             if kind == 'h2':
                 p.font.size = Pt(18)
                 p.font.bold = True
-    except Exception:
-        pass
+    except (KeyError, IndexError) as e:
+        logging.getLogger(__name__).debug("Failed to add text to slide: %s", e)
 
 
 # ═══════════════════════════════════════════════════════════════

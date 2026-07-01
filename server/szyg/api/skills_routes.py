@@ -4,12 +4,15 @@
 """
 
 import json
+import logging
 import os
 import sys
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
+
+logger = logging.getLogger(__name__)
 
 # hermes CLI root → tools/, agent/, etc.
 _HERMES_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -115,10 +118,11 @@ async def market_detail(identifier: str):
                         lines = skill_md.split("\n")[:80]
                         result["skill_md_preview"] = "\n".join(lines)
                         result["skill_md_full_lines"] = len(skill_md.split("\n"))
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Failed to fetch SKILL.md for %s: %s", identifier, e)
                 return result
-        except Exception:
+        except Exception as e:
+            logger.debug("Source %s failed for %s: %s", type(src).__name__, identifier, e)
             continue
     raise HTTPException(404, f"技能不存在: {identifier}")
 

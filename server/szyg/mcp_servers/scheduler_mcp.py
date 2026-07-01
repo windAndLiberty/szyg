@@ -33,7 +33,7 @@ def sched_create(name: str, trigger_type: str = "manual", action: str = "custom"
     elif trigger == TriggerType.INTERVAL and interval_minutes: tconf["minutes"] = interval_minutes
     elif trigger == TriggerType.ONCE and at_time: tconf["at"] = at_time
     try: aconf = _json.loads(action_config_json) if action_config_json else {}
-    except: aconf = {}
+    except (ValueError, TypeError): aconf = {}
     tag_list = [t.strip() for t in tags.split(",")] if tags else []
     j = sched.create_job(name=name, trigger_type=trigger, trigger_config=tconf,
                          action=JobAction(action), action_config=aconf, priority=priority, tags=tag_list)

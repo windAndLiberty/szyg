@@ -23,6 +23,7 @@
 
 import asyncio
 import json
+import logging
 import os
 import time
 import uuid
@@ -35,6 +36,8 @@ from openai import AsyncOpenAI, RateLimitError
 from szyg.integrations.base_llm_client import BaseLLMClient, retry_with_backoff
 from szyg.models.common import IntegrationError
 
+logger = logging.getLogger(__name__)
+
 
 # ── Config helpers (fallback when api_key/endpoints not passed explicitly) ──
 
@@ -46,8 +49,8 @@ def _read_config_key(key: str, default: str = "") -> str:
         if cfg_path.exists():
             cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
             return cfg.get("llm", {}).get("volcengine", {}).get(key, default)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to read volcengine config key %s: %s", key, e)
     return default
 
 
@@ -59,8 +62,8 @@ def _read_config_section(key: str) -> dict:
         if cfg_path.exists():
             cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
             return cfg.get("llm", {}).get("volcengine", {}).get(key, {})
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to read volcengine config section %s: %s", key, e)
     return {}
 
 

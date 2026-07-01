@@ -219,8 +219,8 @@ def get_video_info(input_path: str) -> dict:
             try:
                 parts = dur_str.split(":")
                 info["duration"] = float(parts[0]) * 3600 + float(parts[1]) * 60 + float(parts[2])
-            except Exception:
-                pass
+            except (ValueError, IndexError):
+                logger.debug("Failed to parse duration from: %s", dur_str)
         if "Stream #0:0" in line and "Video" in line:
             for part in line.split(","):
                 part = part.strip()
@@ -229,8 +229,8 @@ def get_video_info(input_path: str) -> dict:
                         w, h = part.split("x")[0], part.split("x")[1].split()[0]
                         info["width"] = int(w)
                         info["height"] = int(h)
-                    except Exception:
-                        pass
+                    except (ValueError, IndexError):
+                        pass  # dimension parsing is best-effort
                 if part in ("h264", "h265", "hevc", "vp8", "vp9", "av1"):
                     info["codec"] = part
     return info

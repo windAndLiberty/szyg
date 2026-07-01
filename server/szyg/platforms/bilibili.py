@@ -55,8 +55,8 @@ class BilibiliAdapter(BasePlatformAdapter):
         if self._context:
             try:
                 await self._pool.invalidate_context("bilibili")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to invalidate bilibili context: %s", e)
         self._context = await self._pool.get_context("bilibili", storage_state=storage_state)
         self._page = await self._context.new_page()
         from szyg.platforms.anti_detect import inject_stealth
@@ -66,8 +66,8 @@ class BilibiliAdapter(BasePlatformAdapter):
         if self._context:
             try:
                 await self._pool.invalidate_context("bilibili")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to invalidate bilibili context on close: %s", e)
         self._context = None
         self._page = None
 
