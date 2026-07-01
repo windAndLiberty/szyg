@@ -32,6 +32,7 @@ from typing import AsyncGenerator
 import httpx
 from openai import AsyncOpenAI, RateLimitError
 
+from szyg.integrations.base_llm_client import BaseLLMClient, retry_with_backoff
 from szyg.models.common import IntegrationError
 
 
@@ -86,7 +87,7 @@ DEFAULT_ENDPOINTS = {
 }
 
 
-class VolcEngineClient:
+class VolcEngineClient(BaseLLMClient):
     """火山引擎方舟平台统一客户端。
 
     使用OpenAI兼容接口，支持:
@@ -112,12 +113,14 @@ class VolcEngineClient:
         max_retries: int = 3,
         output_dir: str = "./data/volcengine_output",
     ):
+        super().__init__(
+            base_url=base_url, default_model="doubao-pro-128k", timeout=timeout,
+        )
         self.api_key = (
             api_key
             or os.environ.get("VOLCENGINE_API_KEY", "")
             or _read_config_key("api_key")
         )
-        self.base_url = base_url.rstrip("/")
         self.endpoints = {
             **DEFAULT_ENDPOINTS,
             **(_read_config_section("endpoints") or {}),
@@ -234,28 +237,19 @@ class VolcEngineClient:
         """指数退避重试，支持熔断器。"""
         if not self._circuit_check():
             raise IntegrationError("VolcEngine circuit breaker is OPEN")
-
-        last_error = None
-        for attempt in range(self.max_retries):
-            try:
-                result = await fn(*args, **kwargs)
-                self._circuit_success()
-                return result
-            except RateLimitError:
-                wait = 2 ** attempt + 1
-                await asyncio.sleep(wait)
-                last_error = "rate limited"
-            except Exception as e:
-                err_str = str(e).lower()
-                if "429" in err_str or "rate" in err_str or "insufficient_quota" in err_str:
-                    wait = 2 ** attempt + 1
-                    await asyncio.sleep(wait)
-                    last_error = e
-                else:
-                    self._circuit_failure()
-                    raise
-        self._circuit_failure()
-        raise IntegrationError(f"VolcEngine request failed after {self.max_retries} retries: {last_error}")
+        try:
+            result = await retry_with_backoff(
+                fn, *args, max_retries=self.max_retries,
+                on_rate_limit="VolcEngine", **kwargs,
+            )
+            self._circuit_success()
+            return result
+        except IntegrationError:
+            self._circuit_failure()
+            raise
+        except Exception:
+            self._circuit_failure()
+            raise
 
     # ═══════════════════════════════════════════════════════════════════════
     # 1. 文本对话 (Chat Completions)
@@ -293,16 +287,9 @@ class VolcEngineClient:
                 raise IntegrationError("VolcEngine returned empty response")
 
             choice = response.choices[0]
-            result = {
-                "message": {
-                    "role": choice.message.role if choice.message else "assistant",
-                    "content": choice.message.content if choice.message else "",
-                },
-                "model": response.model or model,
-                "done": True,
-            }
+            tool_calls = None
             if choice.message and choice.message.tool_calls:
-                result["message"]["tool_calls"] = [
+                tool_calls = [
                     {
                         "id": tc.id,
                         "type": tc.type,
@@ -313,13 +300,20 @@ class VolcEngineClient:
                     }
                     for tc in choice.message.tool_calls
                 ]
+            usage = None
             if response.usage:
-                result["usage"] = {
+                usage = {
                     "prompt_tokens": response.usage.prompt_tokens,
                     "completion_tokens": response.usage.completion_tokens,
                     "total_tokens": response.usage.total_tokens,
                 }
-            return result
+            return self.normalize_chat_response(
+                role=choice.message.role if choice.message else "assistant",
+                content=choice.message.content if choice.message else "",
+                model=response.model or model,
+                usage=usage,
+                tool_calls=tool_calls,
+            )
         except IntegrationError:
             raise
         except Exception as e:
@@ -346,12 +340,8 @@ class VolcEngineClient:
                     delta = chunk.choices[0].delta
                     content = delta.content or ""
                     if content:
-                        yield {
-                            "message": {"role": "assistant", "content": content},
-                            "model": chunk.model or model,
-                            "done": False,
-                        }
-            yield {"message": {"role": "assistant", "content": ""}, "model": model, "done": True}
+                        yield self.normalize_stream_chunk(content, chunk.model or model)
+            yield self.normalize_stream_chunk("", model, done=True)
         except Exception as e:
             raise IntegrationError(f"VolcEngine stream failed: {e}")
 

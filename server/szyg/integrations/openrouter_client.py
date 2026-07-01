@@ -9,16 +9,16 @@ OpenRouter API 客户端 — openrouter/free 自动路由。
     resp = await client.chat(messages=[{"role": "user", "content": "Hello"}])
 """
 
-import asyncio
 import os
 from typing import AsyncGenerator
 
 from openai import AsyncOpenAI
 
+from szyg.integrations.base_llm_client import BaseLLMClient, retry_with_backoff
 from szyg.models.common import IntegrationError
 
 
-class OpenRouterClient:
+class OpenRouterClient(BaseLLMClient):
     """OpenRouter API 客户端。
 
     自动从 OPENROUTER_API_KEY 读取密钥。
@@ -32,10 +32,8 @@ class OpenRouterClient:
         default_model: str = "openrouter/free",
         timeout: float = 60.0,
     ):
+        super().__init__(base_url=base_url, default_model=default_model, timeout=timeout)
         self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY", "")
-        self.base_url = base_url
-        self.default_model = default_model
-        self.timeout = timeout
         self._client = None
 
     @property
@@ -49,41 +47,30 @@ class OpenRouterClient:
             )
         return self._client
 
-    async def _call_with_retry(self, fn, *args, **kwargs):
-        """带限流重试的 API 调用。"""
-        for attempt in range(3):
-            try:
-                return await fn(*args, **kwargs)
-            except Exception as e:
-                err = str(e).lower()
-                if "429" in err or "rate" in err or "limit" in err:
-                    await asyncio.sleep(2 ** attempt + 1)
-                else:
-                    raise
-        raise IntegrationError("OpenRouter rate-limited after 3 retries")
-
     async def chat(
         self, messages: list[dict], model: str | None = None, **kwargs
     ) -> dict:
         """非流式聊天。"""
         target = model or self.default_model
         try:
-            resp = await self._call_with_retry(
+            resp = await retry_with_backoff(
                 self.client.chat.completions.create,
                 model=target,
                 messages=messages,
                 stream=False,
                 max_tokens=4096,
+                on_rate_limit="OpenRouter",
             )
             choice = resp.choices[0] if resp and resp.choices else None
-            return {
-                "message": {
-                    "role": choice.message.role if choice and choice.message else "assistant",
-                    "content": (choice.message.content if choice and choice.message and choice.message.content else ""),
-                },
-                "model": resp.model if resp else target,
-                "done": True,
-            }
+            return self.normalize_chat_response(
+                role=choice.message.role if choice and choice.message else "assistant",
+                content=(
+                    choice.message.content
+                    if choice and choice.message and choice.message.content
+                    else ""
+                ),
+                model=resp.model if resp else target,
+            )
         except IntegrationError:
             raise
         except Exception as e:
@@ -105,12 +92,8 @@ class OpenRouterClient:
                 if chunk.choices and chunk.choices[0].delta:
                     content = chunk.choices[0].delta.content or ""
                     if content:
-                        yield {
-                            "message": {"role": "assistant", "content": content},
-                            "model": chunk.model,
-                            "done": False,
-                        }
-            yield {"message": {"role": "assistant", "content": ""}, "model": target, "done": True}
+                        yield self.normalize_stream_chunk(content, chunk.model, done=False)
+            yield self.normalize_stream_chunk("", target, done=True)
         except Exception as e:
             raise IntegrationError(f"OpenRouter stream failed: {e}")
 

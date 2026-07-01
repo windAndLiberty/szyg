@@ -36,6 +36,55 @@ def _save(name: str, data):
     _path(name).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+# ── Shared CRUD helpers ────────────────────────────────────────────
+
+def _find_item(items: list, item_id, id_field: str = "id"):
+    """在列表中按 id 查找条目，返回 (index, item) 或 (-1, None)。"""
+    for idx, item in enumerate(items):
+        if item.get(id_field) == item_id:
+            return idx, item
+    return -1, None
+
+
+def _update_item(
+    resource: str, default, item_id, updates: dict,
+    id_field: str = "id", not_found: str = "Item not found",
+):
+    """加载 → 查找 → 更新 → 保存，返回 {ok: True} 或 raise 404。"""
+    data = _load(resource, default)
+    _, item = _find_item(data, item_id, id_field)
+    if item is None:
+        raise HTTPException(status_code=404, detail=not_found)
+    item.update(updates)
+    _save(resource, data)
+    return {"ok": True}
+
+
+def _toggle_item(
+    resource: str, default, item_id,
+    field: str = "status", on_value: str = "active", off_value: str = "disabled",
+    id_field: str = "id", not_found: str = "Item not found",
+):
+    """加载 → 查找 → 切换布尔/枚举字段 → 保存。"""
+    data = _load(resource, default)
+    _, item = _find_item(data, item_id, id_field)
+    if item is None:
+        raise HTTPException(status_code=404, detail=not_found)
+    item[field] = off_value if item.get(field) == on_value else on_value
+    _save(resource, data)
+    return {"ok": True, field: item[field]}
+
+
+def _create_item(resource: str, default, new_item: dict, id_field: str = "id"):
+    """加载 → 生成自增 ID → 追加 → 保存。"""
+    data = _load(resource, default)
+    new_id = max([i.get(id_field, 0) for i in data], default=0) + 1
+    new_item[id_field] = new_id
+    data.append(new_item)
+    _save(resource, data)
+    return new_item
+
+
 # ═══════════════════════════════════════════════════════════════════
 # 默认数据
 # ═══════════════════════════════════════════════════════════════════
@@ -385,35 +434,25 @@ async def delete_item(resource: str, item_id: str):
 
 @router.post("/team/create")
 async def team_create(body: dict):
-    team = _load("team", _DEFAULT_TEAM)
-    new_id = max([m.get("id", 0) for m in team], default=0) + 1
-    member = {"id": new_id, "username": body.get("username"), "role": body.get("role", "user"),
-              "email": body.get("email"), "lastLogin": "-", "status": "active"}
-    team.append(member)
-    _save("team", team)
+    member = _create_item("team", _DEFAULT_TEAM, {
+        "username": body.get("username"), "role": body.get("role", "user"),
+        "email": body.get("email"), "lastLogin": "-", "status": "active",
+    })
     return {"ok": True, "member": member}
 
 
 @router.put("/team/{member_id}")
 async def team_update(member_id: int, body: dict):
-    team = _load("team", _DEFAULT_TEAM)
-    for m in team:
-        if m["id"] == member_id:
-            m.update(body)
-            _save("team", team)
-            return {"ok": True}
-    raise HTTPException(status_code=404, detail="Member not found")
+    return _update_item("team", _DEFAULT_TEAM, member_id, body, not_found="Member not found")
 
 
 @router.put("/team/{member_id}/toggle")
 async def team_toggle(member_id: int):
-    team = _load("team", _DEFAULT_TEAM)
-    for m in team:
-        if m["id"] == member_id:
-            m["status"] = "disabled" if m["status"] == "active" else "active"
-            _save("team", team)
-            return {"ok": True, "status": m["status"]}
-    raise HTTPException(status_code=404, detail="Member not found")
+    return _toggle_item(
+        "team", _DEFAULT_TEAM, member_id,
+        field="status", on_value="active", off_value="disabled",
+        not_found="Member not found",
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -423,24 +462,18 @@ async def team_toggle(member_id: int):
 @router.put("/tools/{tool_id}/toggle")
 async def tool_toggle(tool_id: int):
     tools = _load("tools", _DEFAULT_TOOLS)
-    for t in tools:
-        if t["id"] == tool_id:
-            status_order = {"running": "stopped", "stopped": "running", "not_installed": "running"}
-            t["status"] = status_order.get(t["status"], "running")
-            _save("tools", tools)
-            return {"ok": True, "status": t["status"]}
-    raise HTTPException(status_code=404, detail="Tool not found")
+    _, item = _find_item(tools, tool_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Tool not found")
+    status_order = {"running": "stopped", "stopped": "running", "not_installed": "running"}
+    item["status"] = status_order.get(item["status"], "running")
+    _save("tools", tools)
+    return {"ok": True, "status": item["status"]}
 
 
 @router.put("/tools/{tool_id}")
 async def tool_update(tool_id: int, body: dict):
-    tools = _load("tools", _DEFAULT_TOOLS)
-    for t in tools:
-        if t["id"] == tool_id:
-            t.update(body)
-            _save("tools", tools)
-            return {"ok": True}
-    raise HTTPException(status_code=404, detail="Tool not found")
+    return _update_item("tools", _DEFAULT_TOOLS, tool_id, body, not_found="Tool not found")
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -475,24 +508,19 @@ async def skill_uninstall(skill_id: int):
 
 @router.post("/installed_skills/{skill_id}/update")
 async def skill_update_version(skill_id: int):
-    installed = _load("installed_skills", _DEFAULT_INSTALLED_SKILLS)
-    for i in installed:
-        if i["id"] == skill_id:
-            i["hasUpdate"] = False
-            _save("installed_skills", installed)
-            return {"ok": True}
-    raise HTTPException(status_code=404, detail="Installed skill not found")
+    return _update_item(
+        "installed_skills", _DEFAULT_INSTALLED_SKILLS, skill_id,
+        {"hasUpdate": False}, not_found="Installed skill not found",
+    )
 
 
 @router.put("/installed_skills/{skill_id}/toggle")
 async def skill_toggle_status(skill_id: int):
-    installed = _load("installed_skills", _DEFAULT_INSTALLED_SKILLS)
-    for i in installed:
-        if i["id"] == skill_id:
-            i["status"] = "inactive" if i["status"] == "active" else "active"
-            _save("installed_skills", installed)
-            return {"ok": True}
-    raise HTTPException(status_code=404, detail="Installed skill not found")
+    return _toggle_item(
+        "installed_skills", _DEFAULT_INSTALLED_SKILLS, skill_id,
+        field="status", on_value="active", off_value="inactive",
+        not_found="Installed skill not found",
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -501,28 +529,20 @@ async def skill_toggle_status(skill_id: int):
 
 @router.put("/platforms/{platform_id}/login")
 async def platform_login(platform_id: str):
-    platforms = _load("platforms", _DEFAULT_PLATFORMS)
-    for p in platforms:
-        if p["id"] == platform_id:
-            p["isLogin"] = True
-            p["lastActive"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-            p["safetyScore"] = 85
-            _save("platforms", platforms)
-            return {"ok": True}
-    raise HTTPException(status_code=404, detail="Platform not found")
+    return _update_item(
+        "platforms", _DEFAULT_PLATFORMS, platform_id,
+        {"isLogin": True, "lastActive": datetime.now().strftime("%Y-%m-%d %H:%M"), "safetyScore": 85},
+        not_found="Platform not found",
+    )
 
 
 @router.put("/platforms/{platform_id}/logout")
 async def platform_logout(platform_id: str):
-    platforms = _load("platforms", _DEFAULT_PLATFORMS)
-    for p in platforms:
-        if p["id"] == platform_id:
-            p["isLogin"] = False
-            p["lastActive"] = "-"
-            p["safetyScore"] = 0
-            _save("platforms", platforms)
-            return {"ok": True}
-    raise HTTPException(status_code=404, detail="Platform not found")
+    return _update_item(
+        "platforms", _DEFAULT_PLATFORMS, platform_id,
+        {"isLogin": False, "lastActive": "-", "safetyScore": 0},
+        not_found="Platform not found",
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -531,37 +551,22 @@ async def platform_logout(platform_id: str):
 
 @router.post("/contents/create")
 async def content_create(body: ContentCreate):
-    contents = _load("contents", _DEFAULT_CONTENTS)
-    new_id = max([c.get("id", 0) for c in contents], default=0) + 1
-    item = body.model_dump()
-    item["id"] = new_id
-    item["status"] = "draft"
-    item["createdAt"] = _TODAY
-    contents.append(item)
-    _save("contents", contents)
+    item = _create_item("contents", _DEFAULT_CONTENTS, {
+        **body.model_dump(), "status": "draft", "createdAt": _TODAY,
+    })
     return {"ok": True, "content": item}
 
 
 @router.put("/contents/{content_id}")
 async def content_update(content_id: int, body: dict):
-    contents = _load("contents", _DEFAULT_CONTENTS)
-    for c in contents:
-        if c["id"] == content_id:
-            c.update(body)
-            _save("contents", contents)
-            return {"ok": True}
-    raise HTTPException(status_code=404, detail="Content not found")
+    return _update_item("contents", _DEFAULT_CONTENTS, content_id, body, not_found="Content not found")
 
 
 @router.post("/materials/create")
 async def material_create(body: MaterialCreate):
-    materials = _load("materials", _DEFAULT_MATERIALS)
-    new_id = max([m.get("id", 0) for m in materials], default=0) + 1
-    item = body.model_dump()
-    item["id"] = new_id
-    item["createdAt"] = _TODAY
-    materials.append(item)
-    _save("materials", materials)
+    item = _create_item("materials", _DEFAULT_MATERIALS, {
+        **body.model_dump(), "createdAt": _TODAY,
+    })
     return {"ok": True, "material": item}
 
 
@@ -571,32 +576,20 @@ async def material_create(body: MaterialCreate):
 
 @router.put("/leads/{lead_id}")
 async def lead_update(lead_id: int, body: LeadUpdate):
-    leads = _load("leads", _DEFAULT_LEADS)
-    for l in leads:
-        if l["id"] == lead_id:
-            if body.status is not None:
-                l["status"] = body.status
-            if body.grade is not None:
-                l["grade"] = body.grade
-            if body.note is not None:
-                l["note"] = body.note
-            if body.followCount is not None:
-                l["followCount"] = body.followCount
-            _save("leads", leads)
-            return {"ok": True}
-    raise HTTPException(status_code=404, detail="Lead not found")
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    return _update_item("leads", _DEFAULT_LEADS, lead_id, updates, not_found="Lead not found")
 
 
 @router.post("/leads/{lead_id}/follow")
 async def lead_follow(lead_id: int):
     leads = _load("leads", _DEFAULT_LEADS)
-    for l in leads:
-        if l["id"] == lead_id:
-            l["followCount"] = l.get("followCount", 0) + 1
-            l["lastContact"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-            _save("leads", leads)
-            return {"ok": True}
-    raise HTTPException(status_code=404, detail="Lead not found")
+    _, item = _find_item(leads, lead_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    item["followCount"] = item.get("followCount", 0) + 1
+    item["lastContact"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+    _save("leads", leads)
+    return {"ok": True}
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -625,35 +618,22 @@ async def messages_add(customer_id: str, body: MessageCreate):
 
 @router.post("/sops/create")
 async def sop_create(body: SopCreate):
-    sops = _load("sops", _DEFAULT_SOPS)
-    new_id = max([s.get("id", 0) for s in sops], default=0) + 1
-    item = body.model_dump()
-    item["id"] = new_id
-    sops.append(item)
-    _save("sops", sops)
+    item = _create_item("sops", _DEFAULT_SOPS, body.model_dump())
     return {"ok": True, "sop": item}
 
 
 @router.put("/sops/{sop_id}")
 async def sop_update(sop_id: int, body: dict):
-    sops = _load("sops", _DEFAULT_SOPS)
-    for s in sops:
-        if s["id"] == sop_id:
-            s.update(body)
-            _save("sops", sops)
-            return {"ok": True}
-    raise HTTPException(status_code=404, detail="SOP not found")
+    return _update_item("sops", _DEFAULT_SOPS, sop_id, body, not_found="SOP not found")
 
 
 @router.put("/sops/{sop_id}/toggle")
 async def sop_toggle(sop_id: int):
-    sops = _load("sops", _DEFAULT_SOPS)
-    for s in sops:
-        if s["id"] == sop_id:
-            s["enabled"] = not s["enabled"]
-            _save("sops", sops)
-            return {"ok": True}
-    raise HTTPException(status_code=404, detail="SOP not found")
+    return _toggle_item(
+        "sops", _DEFAULT_SOPS, sop_id,
+        field="enabled", on_value=True, off_value=False,
+        not_found="SOP not found",
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -662,23 +642,18 @@ async def sop_toggle(sop_id: int):
 
 @router.post("/knowledge_docs/create")
 async def doc_create(body: DocCreate):
-    docs = _load("knowledge_docs", _DEFAULT_KNOWLEDGE_DOCS)
-    new_id = max([d.get("id", 0) for d in docs], default=0) + 1
-    item = {"id": new_id, "name": body.name, "type": body.type, "uploadTime": _TODAY, "status": "pending"}
-    docs.append(item)
-    _save("knowledge_docs", docs)
+    item = _create_item("knowledge_docs", _DEFAULT_KNOWLEDGE_DOCS, {
+        "name": body.name, "type": body.type, "uploadTime": _TODAY, "status": "pending",
+    })
     return {"ok": True, "doc": item}
 
 
 @router.put("/knowledge_docs/{doc_id}/reindex")
 async def doc_reindex(doc_id: int):
-    docs = _load("knowledge_docs", _DEFAULT_KNOWLEDGE_DOCS)
-    for d in docs:
-        if d["id"] == doc_id:
-            d["status"] = "indexed"
-            _save("knowledge_docs", docs)
-            return {"ok": True}
-    raise HTTPException(status_code=404, detail="Doc not found")
+    return _update_item(
+        "knowledge_docs", _DEFAULT_KNOWLEDGE_DOCS, doc_id,
+        {"status": "indexed"}, not_found="Doc not found",
+    )
 
 
 @router.post("/knowledge_docs/search")
@@ -703,37 +678,26 @@ async def knowledge_search(body: dict):
 
 @router.post("/scheduled_tasks/create")
 async def task_create(body: TaskCreate):
-    tasks = _load("scheduled_tasks", _DEFAULT_SCHEDULED_TASKS)
-    new_id = max([t.get("id", 0) for t in tasks], default=0) + 1
-    item = body.model_dump()
-    item["id"] = new_id
-    item["status"] = "active"
-    item["nextRun"] = f"{_TODAY} 12:00"
-    tasks.append(item)
-    _save("scheduled_tasks", tasks)
+    item = _create_item("scheduled_tasks", _DEFAULT_SCHEDULED_TASKS, {
+        **body.model_dump(), "status": "active", "nextRun": f"{_TODAY} 12:00",
+    })
     return {"ok": True, "task": item}
 
 
 @router.put("/scheduled_tasks/{task_id}")
 async def task_update(task_id: int, body: dict):
-    tasks = _load("scheduled_tasks", _DEFAULT_SCHEDULED_TASKS)
-    for t in tasks:
-        if t["id"] == task_id:
-            t.update(body)
-            _save("scheduled_tasks", tasks)
-            return {"ok": True}
-    raise HTTPException(status_code=404, detail="Task not found")
+    return _update_item(
+        "scheduled_tasks", _DEFAULT_SCHEDULED_TASKS, task_id, body, not_found="Task not found",
+    )
 
 
 @router.put("/scheduled_tasks/{task_id}/toggle")
 async def task_toggle(task_id: int):
-    tasks = _load("scheduled_tasks", _DEFAULT_SCHEDULED_TASKS)
-    for t in tasks:
-        if t["id"] == task_id:
-            t["status"] = "paused" if t["status"] == "active" else "active"
-            _save("scheduled_tasks", tasks)
-            return {"ok": True}
-    raise HTTPException(status_code=404, detail="Task not found")
+    return _toggle_item(
+        "scheduled_tasks", _DEFAULT_SCHEDULED_TASKS, task_id,
+        field="status", on_value="active", off_value="paused",
+        not_found="Task not found",
+    )
 
 
 @router.post("/scheduled_tasks/{task_id}/run")
@@ -758,26 +722,19 @@ async def task_run(task_id: int):
 
 @router.post("/experiments/create")
 async def experiment_create(body: ExperimentCreate):
-    experiments = _load("experiments", _DEFAULT_EXPERIMENTS)
-    new_id = max([e.get("id", 0) for e in experiments], default=0) + 1
-    item = body.model_dump()
-    item["id"] = new_id
-    item["status"] = "running"
-    item["startTime"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-    experiments.append(item)
-    _save("experiments", experiments)
+    item = _create_item("experiments", _DEFAULT_EXPERIMENTS, {
+        **body.model_dump(), "status": "running",
+        "startTime": datetime.now().strftime("%Y-%m-%d %H:%M"),
+    })
     return {"ok": True, "experiment": item}
 
 
 @router.put("/experiments/{experiment_id}/stop")
 async def experiment_stop(experiment_id: int):
-    experiments = _load("experiments", _DEFAULT_EXPERIMENTS)
-    for e in experiments:
-        if e["id"] == experiment_id:
-            e["status"] = "completed"
-            _save("experiments", experiments)
-            return {"ok": True}
-    raise HTTPException(status_code=404, detail="Experiment not found")
+    return _update_item(
+        "experiments", _DEFAULT_EXPERIMENTS, experiment_id,
+        {"status": "completed"}, not_found="Experiment not found",
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -786,20 +743,11 @@ async def experiment_stop(experiment_id: int):
 
 @router.put("/strategies/{strategy_key}")
 async def strategy_update(strategy_key: str, body: StrategyUpdate):
-    strategies = _load("strategies", _DEFAULT_STRATEGIES)
-    for s in strategies:
-        if s["key"] == strategy_key:
-            if body.enabled is not None:
-                s["enabled"] = body.enabled
-            if body.freq is not None:
-                s["freq"] = body.freq
-            if body.commentLen is not None:
-                s["commentLen"] = body.commentLen
-            if body.interval is not None:
-                s["interval"] = body.interval
-            _save("strategies", strategies)
-            return {"ok": True}
-    raise HTTPException(status_code=404, detail="Strategy not found")
+    updates = {k: v for k, v in body.model_dump().items() if v is not None}
+    return _update_item(
+        "strategies", _DEFAULT_STRATEGIES, strategy_key, updates,
+        id_field="key", not_found="Strategy not found",
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -808,13 +756,9 @@ async def strategy_update(strategy_key: str, body: StrategyUpdate):
 
 @router.post("/logs/create")
 async def log_create(body: dict):
-    logs = _load("logs", _DEFAULT_LOGS)
-    new_id = max([l.get("id", 0) for l in logs], default=0) + 1
-    item = body.copy()
-    item["id"] = new_id
-    item["time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    logs.append(item)
-    _save("logs", logs)
+    item = _create_item("logs", _DEFAULT_LOGS, {
+        **body, "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    })
     return {"ok": True, "log": item}
 
 
@@ -823,12 +767,12 @@ async def log_create(body: dict):
 # ═══════════════════════════════════════════════════════════════════
 
 @router.post("/{resource}/create")
-async def create_item(resource: str, body: dict):
+async def create_item_generic(resource: str, body: dict):
     data = _load(resource, [])
     if isinstance(data, dict):
         data = list(data.values())
-    new_id = max([i.get("id", 0) for i in data if isinstance(i, dict)], default=0) + 1
     item = dict(body)
+    new_id = max([i.get("id", 0) for i in data if isinstance(i, dict)], default=0) + 1
     item["id"] = new_id
     data.append(item)
     _save(resource, data)

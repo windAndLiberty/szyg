@@ -135,6 +135,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
+import { getErrorMessage } from '@/api'
+import { useDataLoader } from '@/composables/useDataLoader'
+import { useConfirmAction } from '@/composables/useConfirmAction'
 import {
   Lock,
   Warning,
@@ -149,26 +152,18 @@ import {
 /* ═══════════════════════════════════════════════════════════════════
    API Data
    ═══════════════════════════════════════════════════════════════════ */
-const platforms = ref([])
-
-async function loadPlatforms() {
-  try {
-    const { data } = await axios.get('/api/platforms')
-    const rawPlatforms = data.platforms || []
-    platforms.value = rawPlatforms.map(p => ({
+const { data: platforms } = useDataLoader('/api/platforms', {
+  transform: raw => {
+    const rawPlatforms = raw.platforms || []
+    return rawPlatforms.map(p => ({
       ...p,
       isLogin: p.session?.has_session || false,
       account: p.session?.has_session ? '已登录' : null,
       lastActive: p.session?.last_active || null,
       safetyScore: computeSafetyScore(p.session?.has_session, p.meta?.risk_level),
     }))
-  } catch (e) {
-    ElMessage.error('加载平台数据失败: ' + (e.response?.data?.detail || e.message))
-  }
-}
-
-onMounted(() => {
-  loadPlatforms()
+  },
+  errorPrefix: '加载平台数据',
 })
 
 const platformGradients = {
@@ -292,7 +287,7 @@ async function handleBind(p) {
     p.safetyScore = computeSafetyScore(true, p.meta?.risk_level)
     ElMessage.success(`${p.name} 登录已触发，请在浏览器窗口中完成扫码`)
   } catch (e) {
-    ElMessage.error('绑定失败: ' + (e.response?.data?.detail || e.message))
+    ElMessage.error('绑定失败: ' + getErrorMessage(e))
   }
 }
 
@@ -301,25 +296,15 @@ async function handleScanLogin(p) {
   await handleBind(p)
 }
 
-async function handleUnbind(p) {
-  try {
-    await ElMessageBox.confirm(
-      `确定解绑 ${p.name} 账号「${p.account}」？解绑后将无法发布内容到该平台。`,
-      '确认解绑',
-      { confirmButtonText: '确认解绑', cancelButtonText: '取消', type: 'warning' }
-    )
-    await axios.delete(`/api/platforms/${p.id}/sessions`)
-    p.isLogin = false
-    p.account = null
-    p.lastActive = null
-    p.safetyScore = 0
-    ElMessage.success(`已解绑 ${p.name} 账号`)
-  } catch (e) {
-    if (e !== 'cancel' && e?.message !== 'cancel') {
-      ElMessage.error('解绑失败: ' + (e.response?.data?.detail || e.message))
-    }
-  }
-}
+const { run: handleUnbind } = useConfirmAction({
+  confirm: (p) => `确定解绑 ${p.name} 账号「${p.account}」？解绑后将无法发布内容到该平台。`,
+  confirmTitle: '确认解绑',
+  confirmButton: '确认解绑',
+  action: (p) => axios.delete(`/api/platforms/${p.id}/sessions`),
+  onSuccess: (p) => { p.isLogin = false; p.account = null; p.lastActive = null; p.safetyScore = 0 },
+  successMsg: (p) => `已解绑 ${p.name} 账号`,
+  errorPrefix: '解绑',
+})
 
 async function handleRefresh(p) {
   try {
@@ -327,7 +312,7 @@ async function handleRefresh(p) {
     p.lastActive = new Date().toLocaleString('zh-CN', { hour12: false })
     ElMessage.success(`[${p.name}] Session 已刷新`)
   } catch (e) {
-    ElMessage.error('刷新失败: ' + (e.response?.data?.detail || e.message))
+    ElMessage.error('刷新失败: ' + getErrorMessage(e))
   }
 }
 </script>

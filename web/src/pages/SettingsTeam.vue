@@ -138,30 +138,23 @@
 </template>
 
 <script setup>
-import { ref, computed, reactive, onMounted } from 'vue'
+import { ref, computed, reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import axios from 'axios'
+import { getErrorMessage } from '@/api'
+import { useDataLoader } from '@/composables/useDataLoader'
+import { useConfirmAction } from '@/composables/useConfirmAction'
 
 // ── API Data ──
-const members = ref([])
 const searchQuery = ref('')
 
-async function loadMembers() {
-  try {
-    const { data } = await axios.get('/api/auth/users')
-    const arr = Array.isArray(data) ? data : (data.data || [])
-    members.value = arr.map(u => ({
-      ...u,
-      status: u.is_active ? 'active' : 'inactive',
-    }))
-  } catch (e) {
-    ElMessage.error('加载成员失败: ' + (e.response?.data?.detail || e.message))
-  }
-}
-
-onMounted(() => {
-  loadMembers()
+const { data: members, reload: loadMembers } = useDataLoader('/api/auth/users', {
+  transform: raw => {
+    const arr = Array.isArray(raw) ? raw : (raw.data || [])
+    return arr.map(u => ({ ...u, status: u.is_active ? 'active' : 'inactive' }))
+  },
+  errorPrefix: '加载成员',
 })
 
 const filteredMembers = computed(() => {
@@ -180,27 +173,20 @@ async function toggleStatus(member) {
     member.status = data.is_active ? 'active' : 'inactive'
     ElMessage.success(`${member.username} 已${member.status === 'active' ? '启用' : '禁用'}`)
   } catch (e) {
-    ElMessage.error('操作失败: ' + (e.response?.data?.detail || e.message))
+    ElMessage.error('操作失败: ' + getErrorMessage(e))
   }
 }
 
 // ── Delete ──
-async function deleteMember(member) {
-  try {
-    await ElMessageBox.confirm(
-      `确定要删除成员 ${member.username} 吗？此操作不可撤销。`,
-      '删除确认',
-      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }
-    )
-    await axios.delete(`/api/auth/users/${member.id}`)
-    members.value = members.value.filter(m => m.id !== member.id)
-    ElMessage.success(`${member.username} 已删除`)
-  } catch (e) {
-    if (e !== 'cancel' && e?.message !== 'cancel') {
-      ElMessage.error('删除失败: ' + (e.response?.data?.detail || e.message))
-    }
-  }
-}
+const { run: deleteMember } = useConfirmAction({
+  confirm: (m) => `确定要删除成员 ${m.username} 吗？此操作不可撤销。`,
+  confirmTitle: '删除确认',
+  confirmButton: '删除',
+  action: (m) => axios.delete(`/api/auth/users/${m.id}`),
+  onSuccess: (m) => { members.value = members.value.filter(x => x.id !== m.id) },
+  successMsg: (m) => `${m.username} 已删除`,
+  errorPrefix: '删除',
+})
 
 // ── Invite ──
 const inviteDialogVisible = ref(false)
@@ -234,7 +220,7 @@ function submitInvite() {
       inviteForm.email = ''
       inviteForm.role = 'user'
     } catch (e) {
-      ElMessage.error('邀请失败: ' + (e.response?.data?.detail || e.message))
+      ElMessage.error('邀请失败: ' + getErrorMessage(e))
     }
   })
 }
@@ -263,7 +249,7 @@ async function submitEdit() {
     editDialogVisible.value = false
     ElMessage.success('成员信息已更新')
   } catch (e) {
-    ElMessage.error('更新失败: ' + (e.response?.data?.detail || e.message))
+    ElMessage.error('更新失败: ' + getErrorMessage(e))
   }
 }
 </script>
