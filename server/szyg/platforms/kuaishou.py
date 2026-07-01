@@ -53,8 +53,8 @@ class KuaishouAdapter(BasePlatformAdapter):
         if self._context:
             try:
                 await self._pool.invalidate_context("kuaishou")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to invalidate kuaishou context: %s", e)
         self._context = await self._pool.get_context("kuaishou", storage_state=storage_state)
         self._page = await self._context.new_page()
         from szyg.platforms.anti_detect import inject_stealth
@@ -64,8 +64,8 @@ class KuaishouAdapter(BasePlatformAdapter):
         if self._context:
             try:
                 await self._pool.invalidate_context("kuaishou")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to invalidate kuaishou context on close: %s", e)
         self._context = None
         self._page = None
 

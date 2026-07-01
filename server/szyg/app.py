@@ -6,6 +6,8 @@ from szyg.api.oem_routes import router as oem_router
 from szyg.version import VERSION
 import os, logging
 
+_CORS_ORIGINS_ENV = os.environ.get("SZYG_CORS_ORIGINS", "")
+
 logger = logging.getLogger(__name__)
 
 
@@ -29,9 +31,14 @@ def create_app() -> FastAPI:
         docs_url="/docs",
     )
 
+    cors_origins = (
+        [o.strip() for o in _CORS_ORIGINS_ENV.split(",") if o.strip()]
+        if _CORS_ORIGINS_ENV
+        else ["http://localhost:5173", "http://localhost:8000", "http://127.0.0.1:5173", "http://127.0.0.1:8000"]
+    )
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

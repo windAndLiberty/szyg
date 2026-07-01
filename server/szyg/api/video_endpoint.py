@@ -87,7 +87,11 @@ async def video_task_status(task_id: str, model: str = "doubao-video"):
 @router.get("/download/{filename}")
 async def download_video(filename: str):
     """下载/播放生成的视频文件。"""
-    path = VOLC_OUTPUT / filename
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(400, "非法文件名")
+    path = (VOLC_OUTPUT / filename).resolve()
+    if not str(path).startswith(str(VOLC_OUTPUT.resolve())):
+        raise HTTPException(400, "非法文件路径")
     if not path.exists():
         raise HTTPException(404, "视频文件不存在")
     return FileResponse(str(path), media_type="video/mp4", filename=filename)

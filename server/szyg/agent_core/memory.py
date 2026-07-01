@@ -5,6 +5,7 @@
 """
 
 import json
+import logging
 import sqlite3
 import tempfile
 from pathlib import Path
@@ -12,6 +13,8 @@ from typing import Any
 
 from szyg.models.common import MemoryError
 from szyg.models.memory import MemoryEntry
+
+logger = logging.getLogger(__name__)
 
 
 class Memory:
@@ -100,9 +103,8 @@ class Memory:
             """
             )
             conn.commit()
-        except Exception:
-            # 如果FTS5不支持，跳过FTS相关表
-            pass
+        except Exception as e:
+            logger.info("FTS5 not available, full-text search will use LIKE fallback: %s", e)
 
     def store(self, content: str, metadata: dict | None = None) -> MemoryEntry:
         """存储记忆。
@@ -188,8 +190,8 @@ class Memory:
             """,
                 (query, limit),
             ).fetchall()
-        except sqlite3.Error:
-            pass  # FTS5 不可用
+        except sqlite3.Error as e:
+            logger.debug("FTS5 search failed, falling back to LIKE: %s", e)
 
         # FTS5 无结果时回退到 LIKE（处理 CJK 等无分词语言）
         if not rows:

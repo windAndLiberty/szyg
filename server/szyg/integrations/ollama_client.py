@@ -1,15 +1,15 @@
 """Ollama本地LLM客户端."""
 
 import json
-from typing import AsyncGenerator, Any
+from typing import AsyncGenerator
 
 import httpx
 
-from szyg.models.integration import ChatResponse, GenerateResponse
+from szyg.integrations.base_llm_client import BaseLLMClient
 from szyg.models.common import IntegrationError
 
 
-class OllamaClient:
+class OllamaClient(BaseLLMClient):
     """Ollama本地LLM客户端"""
 
     def __init__(
@@ -18,9 +18,7 @@ class OllamaClient:
         default_model: str = "qwen3:0.6B",
         timeout: float = 120.0,
     ):
-        self.base_url = base_url.rstrip("/")
-        self.default_model = default_model
-        self.timeout = timeout
+        super().__init__(base_url=base_url, default_model=default_model, timeout=timeout)
         self._client: httpx.AsyncClient | None = None
 
     @property
@@ -32,13 +30,10 @@ class OllamaClient:
     async def chat(
         self,
         messages: list[dict],
-        model: str = None,
+        model: str | None = None,
         stream: bool = False,
     ) -> dict:
-        """Ollama聊天API
-
-        Ollama 返回 NDJSON（每行一个 JSON 对象），取最后一行作为最终结果。
-        """
+        """Ollama聊天API — 返回统一格式。"""
         try:
             response = await self.client.post(
                 f"{self.base_url}/api/chat",
@@ -49,7 +44,6 @@ class OllamaClient:
                 },
             )
             response.raise_for_status()
-            # Ollama 返回 NDJSON，解析最后一行
             return self._parse_ndjson(response.text)
         except httpx.HTTPStatusError as e:
             raise IntegrationError(
@@ -61,12 +55,9 @@ class OllamaClient:
             raise IntegrationError(f"Ollama chat failed: {e}")
 
     async def generate(
-        self, prompt: str, model: str = None, stream: bool = False
+        self, prompt: str, model: str | None = None, stream: bool = False
     ) -> dict:
-        """Ollama生成API
-
-        Ollama 返回 NDJSON，取最后一行作为最终结果。
-        """
+        """Ollama生成API"""
         try:
             response = await self.client.post(
                 f"{self.base_url}/api/generate",
@@ -86,7 +77,7 @@ class OllamaClient:
     @staticmethod
     def _parse_ndjson(text: str) -> dict:
         """解析 Ollama NDJSON 响应，取最后一个完整 JSON 对象。"""
-        lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
+        lines = [line.strip() for line in text.strip().split("\n") if line.strip()]
         if not lines:
             raise IntegrationError("Empty response from Ollama")
         return json.loads(lines[-1])
@@ -101,7 +92,7 @@ class OllamaClient:
             raise IntegrationError(f"Failed to list models: {e}")
 
     async def chat_stream(
-        self, messages: list[dict], model: str = None
+        self, messages: list[dict], model: str | None = None
     ) -> AsyncGenerator[dict, None]:
         """流式聊天"""
         try:

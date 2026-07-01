@@ -8,7 +8,11 @@
     → 后端路由: ComfyUI(SD 2.1本地) > VolcEngine(Seedream云端) > 降级
 """
 
+import logging
+
 from szyg.integrations.ollama_client import OllamaClient
+
+logger = logging.getLogger(__name__)
 
 
 class ImageRouter:
@@ -145,8 +149,8 @@ class ImageRouter:
                 return json.loads(content)
             except (json.JSONDecodeError, KeyError):
                 return direct_result
-        except Exception:
-            # LLM unavailable — use raw prompt directly
+        except Exception as e:
+            logger.debug("LLM prompt enhancement unavailable, using raw prompt: %s", e)
             return direct_result
 
     def _select_backend(self) -> str:
@@ -156,8 +160,8 @@ class ImageRouter:
             r = httpx.get("http://localhost:8188/object_info", timeout=3, trust_env=False)
             if r.status_code == 200:
                 return "comfyui"
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("ComfyUI not reachable, using volcengine: %s", e)
         return "volcengine"
 
     async def list_styles(self) -> list[str]:

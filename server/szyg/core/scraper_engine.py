@@ -140,8 +140,8 @@ class ScraperEngine:
         # Inject full stealth on first use
         try:
             await inject_stealth(page)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Stealth injection failed: %s", e)
         return page
 
     async def _dismiss_overlays(self, page: Page) -> None:
@@ -375,8 +375,8 @@ class ScraperEngine:
             comment_elements = []
             try:
                 comment_elements = await page.query_selector_all(container_sel)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to find comment elements with %s: %s", container_sel, e)
 
             for el in comment_elements[:max_comments]:
                 try:

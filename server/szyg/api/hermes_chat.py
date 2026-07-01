@@ -44,8 +44,8 @@ def _load_secret(key: str, default: str = "") -> str:
             for part in key.split("."):
                 cfg = cfg.get(part, {}) if isinstance(cfg, dict) else {}
             return str(cfg) if cfg else default
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to load secret %s: %s", key, e)
     return default
 
 # Fallback LLM config — Ollama local (used when VolcEngine is unavailable)
@@ -61,7 +61,8 @@ def _load_volcengine_config() -> dict:
         from szyg.config.loader import load_config
         cfg = load_config()
         return cfg.get("llm", {}).get("volcengine", {})
-    except Exception:
+    except Exception as e:
+        logger.debug("Failed to load VolcEngine config: %s", e)
         return {}
 
 _volc_cfg = _load_volcengine_config()
@@ -460,8 +461,8 @@ def _build_system_prompt(agent_id: str = "") -> tuple[str, float]:
         try:
             configs = json.loads(configs_file.read_text(encoding="utf-8"))
             config = configs.get(agent_id)
-        except Exception:
-            pass
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning("Failed to load agent config for %s: %s", agent_id, e)
 
     if not config:
         return SYSTEM_PROMPT, 0.7
@@ -1471,7 +1472,7 @@ def _sanitize_args(tool_name: str, args: str) -> dict:
     """
     try:
         parsed = json.loads(args) if isinstance(args, str) else args
-    except Exception:
+    except (json.JSONDecodeError, TypeError, ValueError):
         return {}
     if not isinstance(parsed, dict):
         return {}
@@ -1587,8 +1588,8 @@ async def _stream_llm_response(model: str, messages: list, temperature: float = 
                                 content = d.get("choices", [{}])[0].get("delta", {}).get("content", "")
                                 if content:
                                     yield content
-                            except Exception:
-                                pass
+                            except (json.JSONDecodeError, KeyError, IndexError) as e:
+                                logger.debug("Skipping malformed SSE chunk: %s", e)
 
 
 # ── SSE Streaming endpoint ─────────────────────────────
@@ -1652,8 +1653,8 @@ async def hermes_chat(chat_req: HermesChatRequest, user: User | None = Depends(o
                 rj = json.loads(result)
                 if isinstance(rj, dict) and rj.get("ok") is False:
                     failed_tools.add(tool_name)
-            except Exception:
-                pass
+            except (json.JSONDecodeError, TypeError):
+                pass  # result is not JSON — expected for plain-text tool outputs
             return (tool_name, tool_id, result)
 
         async def _execute_group(resource_key, items):

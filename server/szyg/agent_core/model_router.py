@@ -4,6 +4,7 @@
 多模型后端调度与故障转移，支持 Ollama 和 LiteLLM 后端。
 """
 
+import logging
 from typing import Any, AsyncGenerator
 
 from szyg.integrations.litellm_client import LiteLLMClient
@@ -11,6 +12,8 @@ from szyg.integrations.ollama_client import OllamaClient
 from szyg.integrations.openrouter_client import OpenRouterClient
 from szyg.models.common import AllBackendsFailedError
 from szyg.models.model import ModelResponse, StreamingChunk
+
+logger = logging.getLogger(__name__)
 
 
 class ModelRouter:
@@ -39,18 +42,13 @@ class ModelRouter:
                 vc = VolcEngineClient()
                 if vc.api_key:
                     self._backends["volcengine"] = vc
-                    import logging
-                    _log = logging.getLogger(__name__)
-                    _log.info("ModelRouter: VolcEngine backend registered (primary)")
-            except Exception:
-                pass
+                    logger.info("ModelRouter: VolcEngine backend registered (primary)")
+            except Exception as e:
+                logger.debug("VolcEngine backend not available: %s", e)
 
             # ── Other cloud backends ──
-            try:
-                import os
-                or_key = os.environ.get("OPENROUTER_API_KEY")
-            except Exception:
-                or_key = None
+            import os
+            or_key = os.environ.get("OPENROUTER_API_KEY")
             if or_key:
                 self._backends["openrouter"] = OpenRouterClient(api_key=or_key)
 

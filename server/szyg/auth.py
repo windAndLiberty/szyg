@@ -12,9 +12,17 @@ from jose import JWTError, jwt
 from pydantic import BaseModel
 
 # --- Config ---
-SECRET_KEY = os.environ.get("SZYG_SECRET_KEY", "dev-secret-change-in-production")
+_DEFAULT_SECRET = "dev-secret-change-in-production"
+SECRET_KEY = os.environ.get("SZYG_SECRET_KEY", "")
+if not SECRET_KEY:
+    SECRET_KEY = _DEFAULT_SECRET
+    import logging as _logging
+    _logging.getLogger(__name__).warning(
+        "SZYG_SECRET_KEY not set — using insecure default. "
+        "Set SZYG_SECRET_KEY to a random 32+ char value in production."
+    )
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 day
 DB_PATH = os.environ.get("SZYG_AUTH_DB", "data/auth.db")
 
 # Simple password hashing using PBKDF2-SHA256 (no external bcrypt dependency needed)
@@ -83,13 +91,26 @@ def _init_db():
     conn.close()
 
 def _default_admin():
-    """Create default admin if no users exist"""
+    """Create default admin if no users exist.
+
+    Uses SZYG_ADMIN_PASSWORD env-var if set; otherwise generates a random
+    password and prints it once to stdout so the operator can log in.
+    """
     conn = _get_conn()
     count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
     if count == 0:
+        admin_pw = os.environ.get("SZYG_ADMIN_PASSWORD", "")
+        if not admin_pw:
+            admin_pw = secrets.token_urlsafe(16)
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "No SZYG_ADMIN_PASSWORD set — generated initial admin password: %s  "
+                "Change it immediately or set SZYG_ADMIN_PASSWORD before next restart.",
+                admin_pw,
+            )
         conn.execute(
             "INSERT INTO users (username, hashed_password, role) VALUES (?, ?, ?)",
-            ("admin", _hash_pw("admin123"), "admin"),
+            ("admin", _hash_pw(admin_pw), "admin"),
         )
         conn.commit()
     conn.close()

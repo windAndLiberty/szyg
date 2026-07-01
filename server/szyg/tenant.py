@@ -104,8 +104,8 @@ def resolve_oem_from_request(request) -> str:
             oem_id = claims.get("oem_id", "") or claims.get("tenant", "")
             if oem_id:
                 return oem_id
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Failed to extract tenant from JWT: %s", e)
 
     return DEFAULT_TENANT
 

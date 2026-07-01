@@ -166,8 +166,8 @@ class DouyinAdapter(BasePlatformAdapter):
             try:
                 from pathlib import Path
                 Path(tmp).unlink(missing_ok=True)
-            except Exception:
-                pass
+            except OSError as e:
+                logger.debug("Failed to clean up temp file %s: %s", tmp, e)
         self._tmp_files = []
 
         if self._context:
@@ -176,8 +176,8 @@ class DouyinAdapter(BasePlatformAdapter):
                     await self._pool.invalidate_context("douyin")
                 else:
                     await self._pool.return_context("douyin")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Failed to release browser context: %s", e)
         self._context = None
         self._page = None
 

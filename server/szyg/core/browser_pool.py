@@ -130,8 +130,8 @@ class VersionLockedBrowserPool:
                 self._chromium_exe = exe
                 logger.info(f"BrowserPoolV2: system Chromium → {exe}")
                 return self._chromium_exe
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("System Chromium detection failed: %s", e)
 
         # 3. Let Playwright auto-resolve
         logger.info("BrowserPoolV2: letting Playwright auto-resolve Chromium")
@@ -161,8 +161,8 @@ class VersionLockedBrowserPool:
                     entry["last_used"] = time.time()
                     logger.debug(f"BrowserPoolV2: reuse context for {key}")
                     return ctx
-                except Exception:
-                    logger.info(f"BrowserPoolV2: context {key} dead, recreating")
+                except Exception as e:
+                    logger.info("BrowserPoolV2: context %s dead (%s), recreating", key, e)
                     del self._contexts[key]
 
             # Enforce max contexts
@@ -171,8 +171,8 @@ class VersionLockedBrowserPool:
                 logger.info(f"BrowserPoolV2: evicting {oldest}")
                 try:
                     await self._contexts[oldest]["context"].close()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("BrowserPoolV2: error closing evicted context %s: %s", oldest, e)
                 del self._contexts[oldest]
 
             # Lazy-start playwright
@@ -210,8 +210,8 @@ class VersionLockedBrowserPool:
             await page.add_init_script(
                 "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Failed to inject webdriver override: %s", e)
 
     async def close_context(self, platform: str, account_id: str = "default"):
         """Close and remove a persistent context."""
@@ -220,10 +220,10 @@ class VersionLockedBrowserPool:
             if key in self._contexts:
                 try:
                     await self._contexts[key]["context"].close()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Error closing context %s: %s", key, e)
                 del self._contexts[key]
-                logger.info(f"BrowserPoolV2: closed {key}")
+                logger.info("BrowserPoolV2: closed %s", key)
 
     # ── QR Code Login ────────────────────────────────────
 
@@ -543,10 +543,10 @@ class VersionLockedBrowserPool:
                 for key in to_remove:
                     try:
                         await self._contexts[key]["context"].close()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("Error closing idle context %s: %s", key, e)
                     del self._contexts[key]
-                    logger.info(f"BrowserPoolV2: auto-closed idle {key}")
+                    logger.info("BrowserPoolV2: auto-closed idle %s", key)
                 if to_remove:
                     logger.info(
                         f"BrowserPoolV2: cleaned {len(to_remove)} idle, "
@@ -574,15 +574,15 @@ class VersionLockedBrowserPool:
             for key, entry in list(self._contexts.items()):
                 try:
                     await entry["context"].close()
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("Error closing context %s during stop: %s", key, e)
             self._contexts.clear()
 
         if self._playwright:
             try:
                 await self._playwright.stop()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("Error stopping playwright: %s", e)
             self._playwright = None
         logger.info("BrowserPoolV2: stopped")
 

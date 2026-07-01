@@ -20,12 +20,15 @@ SOP (Standard Operating Procedure) 是用户自定义的工作流模板。
 """
 
 import json
+import logging
 import uuid
 from datetime import datetime
 from typing import Any
 
 from szyg.agent_core.memory import Memory
 from szyg.agent_core.skill_registry import SkillRegistry
+
+logger = logging.getLogger(__name__)
 
 
 class SOPStep:
@@ -152,10 +155,10 @@ class SOPManager:
                     data = json.loads(r.metadata.get("sop_data", "{}"))
                     sop = SOP.from_dict(data)
                     self._sops[sop.name] = sop
-                except (json.JSONDecodeError, KeyError):
-                    pass
-        except Exception:
-            pass  # 首次使用，无已存储 SOP
+                except (json.JSONDecodeError, KeyError) as e:
+                    logger.debug("Skipping malformed SOP entry: %s", e)
+        except Exception as e:
+            logger.debug("No stored SOPs found or load failed: %s", e)
 
     # ── 查询 ──────────────────────────────────────────────────────────────
 

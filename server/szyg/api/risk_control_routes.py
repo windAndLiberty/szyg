@@ -1,11 +1,14 @@
 """Risk control configuration API — exposes anti-detect settings to the frontend."""
 
 import json
+import logging
 import os
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/risk-control", tags=["risk-control"])
 
@@ -51,8 +54,8 @@ def _load_config() -> dict:
         try:
             with open(_CONFIG_PATH, encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:
-            pass
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning("Failed to load risk control config: %s", e)
     return _DEFAULT_CONFIG.copy()
 
 
