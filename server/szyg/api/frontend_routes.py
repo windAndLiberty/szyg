@@ -44,12 +44,26 @@ def get_sop() -> SOPManager:
 # ── 配置 ──────────────────────────────────────────────────────────────────────
 
 
+def _redact_config(obj, _key: str = ""):
+    """Recursively redact values whose key contains 'key', 'secret', 'token', or 'password'."""
+    sensitive = ("api_key", "secret", "token", "password", "credential")
+    if isinstance(obj, dict):
+        return {
+            k: _redact_config(v, k) for k, v in obj.items()
+        }
+    if isinstance(obj, list):
+        return [_redact_config(v, _key) for v in obj]
+    if isinstance(obj, str) and any(s in _key.lower() for s in sensitive) and obj:
+        return "***"
+    return obj
+
+
 @router.get("/config")
 async def get_config():
     """读取当前配置（API key 已脱敏）。"""
     try:
         cfg = load_config()
-        return cfg
+        return _redact_config(cfg)
     except Exception as e:
         raise HTTPException(500, str(e))
 

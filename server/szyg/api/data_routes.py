@@ -19,6 +19,10 @@ _DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _path(name: str) -> Path:
+    import re
+    if not re.match(r'^[a-zA-Z0-9_-]+$', name):
+        from fastapi import HTTPException
+        raise HTTPException(400, f"非法资源名: {name}")
     return _DATA_DIR / f"{name}.json"
 
 

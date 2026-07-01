@@ -201,21 +201,27 @@ const inviteRules = {
   role: [{ required: true, message: '请选择角色', trigger: 'change' }],
 }
 
+function _generatePassword(len = 16) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%'
+  const arr = new Uint8Array(len)
+  crypto.getRandomValues(arr)
+  return Array.from(arr, b => chars[b % chars.length]).join('')
+}
+
 function submitInvite() {
   inviteFormRef.value.validate(async (valid) => {
     if (!valid) return
     try {
-      const { data } = await axios.post('/api/auth/users', null, {
-        params: {
-          username: inviteForm.username,
-          password: 'changeme123',
-          email: inviteForm.email,
-          role: inviteForm.role,
-        }
+      const tempPassword = _generatePassword()
+      const { data } = await axios.post('/api/auth/users', {
+        username: inviteForm.username,
+        password: tempPassword,
+        email: inviteForm.email,
+        role: inviteForm.role,
       })
       members.value.push({ ...data, status: data.is_active ? 'active' : 'inactive' })
       inviteDialogVisible.value = false
-      ElMessage.success('邀请已发送')
+      ElMessage.success(`用户已创建，初始密码: ${tempPassword}（请告知用户尽快修改）`)
       inviteForm.username = ''
       inviteForm.email = ''
       inviteForm.role = 'user'

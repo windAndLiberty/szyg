@@ -36,6 +36,10 @@ class ConversationUpdate(BaseModel):
 
 
 def _conv_path(conv_id: str) -> Path:
+    import re
+    if not re.match(r'^[a-zA-Z0-9_-]+$', conv_id):
+        from fastapi import HTTPException
+        raise HTTPException(400, "非法会话ID")
     return CONV_DIR / f"{conv_id}.json"
 
 
