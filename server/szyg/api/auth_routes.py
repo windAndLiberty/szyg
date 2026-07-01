@@ -1,6 +1,7 @@
 """Auth API routes — login, session, user management"""
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel
 from szyg.auth import (
     authenticate, get_current_user, list_users, create_user,
     update_user, delete_user, toggle_user_active,
@@ -46,12 +47,19 @@ async def users(admin: User = Depends(require_admin)):
     return list_users()
 
 
+class CreateUserRequest(BaseModel):
+    username: str
+    password: str
+    role: str = "user"
+    email: str = ""
+    oem_id: str | None = None
+
+
 @router.post("/users", response_model=User)
 async def add_user(
-    username: str, password: str, role: str = "user",
-    email: str = "", oem_id: str | None = None, admin: User = Depends(require_admin),
+    req: CreateUserRequest, admin: User = Depends(require_admin),
 ):
-    user = create_user(username, password, role, email, oem_id)
+    user = create_user(req.username, req.password, req.role, req.email, req.oem_id)
     if not user:
         raise HTTPException(400, "用户名已存在")
     return user

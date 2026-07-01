@@ -38,7 +38,7 @@ llm:
   # 一个API Key调用: LLM / 图像 / 视频 / 语音 / 向量嵌入
   volcengine:
     enabled: true
-    api_key: "ark-149c9bff-2284-4193-a61f-8885dbb19ad5-d18be"
+    api_key: "${VOLCENGINE_API_KEY:-}"
     base_url: "https://ark.cn-beijing.volces.com/api/v3"
     timeout: 120
     max_retries: 3
@@ -161,7 +161,7 @@ api:
   port: 8000
   workers: 1
   reload: false                               # 开发模式热重载(生产关)
-  cors_origins: ["*"]                         # CORS 允许来源
+  cors_origins: ["http://localhost:5173", "http://localhost:8000"]  # CORS 允许来源 (生产环境替换为真实域名)
   api_key: "${YULING_API_KEY:-}"              # API 访问密钥(空=不校验)
   request_timeout: 120
   enable_docs: true                           # Swagger /docs
