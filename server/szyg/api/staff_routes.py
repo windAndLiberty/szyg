@@ -7,6 +7,7 @@
 """
 
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,6 +15,8 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/staff", tags=["ai-staff"])
 
@@ -180,8 +183,8 @@ def _compute_tasks() -> list[dict]:
                 "source": "scheduler",
             })
             next_id += 1
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to load scheduler jobs for task list: %s", e)
 
     # 2) Merge manual tasks from JSON file (skip ones already covered by scheduler)
     manual_tasks = _load_json(_TASKS_FILE, [])

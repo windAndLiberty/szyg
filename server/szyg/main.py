@@ -46,14 +46,14 @@ def _setup_lifecycle(app: FastAPI) -> None:
         try:
             from szyg.scheduler_engine import get_scheduler
             await get_scheduler().stop()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Error stopping scheduler during shutdown: %s", e)
 
         try:
             from szyg.platforms.registry import get_registry
             await get_registry().close_all()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Error closing platform registry during shutdown: %s", e)
 
         logger.info("szyg closed")
 

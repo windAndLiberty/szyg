@@ -5,6 +5,7 @@
 """
 import asyncio
 import json
+import logging
 import os
 import subprocess
 import threading
@@ -13,6 +14,8 @@ from typing import Any
 
 from szyg.models.common import MCPError, ServerNotFoundError, ToolTimeoutError
 from szyg.models.mcp import MCPServerConfig, ToolResult
+
+logger = logging.getLogger(__name__)
 
 
 class MCPServerManager:
@@ -119,8 +122,8 @@ class MCPServerManager:
             if name in self._processes:
                 try:
                     self._processes[name].terminate()
-                except Exception:
-                    pass
+                except Exception as term_err:
+                    logger.debug("Failed to terminate process for %s: %s", name, term_err)
                 del self._processes[name]
             raise MCPError(f"Failed to start server {name}: {e}")
 
@@ -136,8 +139,8 @@ class MCPServerManager:
             except Exception:
                 try:
                     process.kill()
-                except Exception:
-                    pass
+                except Exception as kill_err:
+                    logger.warning("Failed to kill MCP server %s: %s", name, kill_err)
             del self._processes[name]
         self._running[name] = False
         return True
@@ -212,8 +215,8 @@ class MCPServerManager:
                     stderr_tail = ""
                     try:
                         stderr_tail = process.stderr.read()[-500:]
-                    except Exception:
-                        pass
+                    except Exception as read_err:
+                        logger.debug("Failed to read stderr for %s: %s", server_name, read_err)
                     return ToolResult(
                         success=False,
                         error=f"Server process exited with code {rc}: {stderr_tail[-200:]}",
@@ -247,8 +250,8 @@ class MCPServerManager:
                     stderr_tail = ""
                     try:
                         stderr_tail = process.stderr.read()[-1000:]
-                    except Exception:
-                        pass
+                    except Exception as read_err:
+                        logger.debug("Failed to read stderr for %s: %s", server_name, read_err)
                     return ToolResult(
                         success=False,
                         error=f"Server {server_name} closed stdout (exit={rc}). stderr: {stderr_tail[-300:]}",

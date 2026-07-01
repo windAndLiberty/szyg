@@ -283,8 +283,8 @@ class ConvertEngine:
         try:
             from szyg.integrations.acquisition_adapters import get_acquisition_adapter
             acq_adapter = get_acquisition_adapter(platform)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("AcquisitionAdapter unavailable for %s: %s", platform, e)
 
         for comment in comments:
             text = comment.get("content", comment.get("text", ""))

@@ -2,12 +2,14 @@
 
 Stores conversations as JSON files under data/conversations/.
 """
-import json, os, time, uuid
+import json, logging, os, time, uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
 
@@ -64,8 +66,8 @@ def _list_convs() -> list[dict]:
                 "created_at": data.get("created_at", ""),
                 "updated_at": data.get("updated_at", ""),
             })
-        except Exception:
-            pass
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning("Skipping corrupt conversation file %s: %s", f.name, e)
     return convs
 
 

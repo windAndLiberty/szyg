@@ -466,8 +466,8 @@ class Publisher:
                 resp = await vc.chat(messages=messages, model="doubao-pro-128k", max_tokens=1024)
                 content_body = resp.get("message", {}).get("content", "").strip()
                 await vc.close()
-            except Exception:
-                pass  # fall through to ModelRouter
+            except Exception as e:
+                logger.debug("VolcEngine primary LLM failed, trying fallback: %s", e)
 
             # Fallback: ModelRouter (VolcEngine / Ollama)
             if not content_body or len(content_body) < 10:

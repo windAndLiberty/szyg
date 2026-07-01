@@ -346,8 +346,8 @@ class ListenEngine:
                 for cb in self._new_comment_callbacks:
                     try:
                         cb(comment)
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning("Comment callback failed: %s", e)
 
                 # 如果是线索，创建 LeadRecord
                 if analysis["is_lead"]:
@@ -380,8 +380,8 @@ class ListenEngine:
                     for cb in self._new_lead_callbacks:
                         try:
                             cb(lead)
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.warning("Lead callback failed: %s", e)
 
             # 更新 last_comment_id
             if new_comments:
