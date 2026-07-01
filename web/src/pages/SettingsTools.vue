@@ -134,6 +134,8 @@
 import { ref, computed, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
+import { getErrorMessage } from '@/api'
+import { useConfirmAction } from '@/composables/useConfirmAction'
 
 // ── API Data ──
 const tools = ref([])
@@ -156,7 +158,7 @@ async function loadTools() {
       calls: 0,
     }))
   } catch (e) {
-    ElMessage.error('加载工具失败: ' + (e.response?.data?.detail || e.message))
+    ElMessage.error('加载工具失败: ' + getErrorMessage(e))
   }
 }
 
@@ -206,27 +208,19 @@ async function toggleStatus(tool) {
       ElMessage.success(`${tool.name} 已启动`)
     }
   } catch (e) {
-    ElMessage.error('操作失败: ' + (e.response?.data?.detail || e.message))
+    ElMessage.error('操作失败: ' + getErrorMessage(e))
   }
 }
 
-async function uninstallTool(tool) {
-  try {
-    await ElMessageBox.confirm(
-      `确定要卸载 ${tool.name} 吗？此操作不可撤销。`,
-      '卸载确认',
-      { confirmButtonText: '卸载', cancelButtonText: '取消', type: 'warning' }
-    )
-    await axios.delete(`/api/tools/uninstall/${tool.id}`)
-    tool.status = 'not_installed'
-    tool.calls = 0
-    ElMessage.success(`${tool.name} 已卸载`)
-  } catch (e) {
-    if (e !== 'cancel' && e?.message !== 'cancel') {
-      ElMessage.error('卸载失败: ' + (e.response?.data?.detail || e.message))
-    }
-  }
-}
+const { run: uninstallTool } = useConfirmAction({
+  confirm: (t) => `确定要卸载 ${t.name} 吗？此操作不可撤销。`,
+  confirmTitle: '卸载确认',
+  confirmButton: '卸载',
+  action: (t) => axios.delete(`/api/tools/uninstall/${t.id}`),
+  onSuccess: (t) => { t.status = 'not_installed'; t.calls = 0 },
+  successMsg: (t) => `${t.name} 已卸载`,
+  errorPrefix: '卸载',
+})
 
 // ── Drawer ──
 const drawerVisible = ref(false)

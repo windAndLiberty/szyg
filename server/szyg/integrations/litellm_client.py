@@ -8,8 +8,10 @@ from typing import Any, AsyncGenerator, Optional
 
 import httpx
 
+from szyg.integrations.base_llm_client import BaseLLMClient
 
-class LiteLLMClient:
+
+class LiteLLMClient(BaseLLMClient):
     """LiteLLM API 客户端（OpenAI 兼容格式）。"""
 
     def __init__(
@@ -19,11 +21,9 @@ class LiteLLMClient:
         default_model: str = "gpt-4",
         timeout: float = 60.0,
     ):
-        self.base_url = base_url.rstrip("/")
+        super().__init__(base_url=base_url, default_model=default_model, timeout=timeout)
         self.api_key = api_key
-        self.default_model = default_model
         self.available_models: list[str] = []
-        self.timeout = timeout
         self._client: Optional[httpx.AsyncClient] = None
 
     @property
@@ -43,17 +43,7 @@ class LiteLLMClient:
         stream: bool = False,
         **kwargs: Any,
     ) -> dict:
-        """发送聊天补全请求。
-
-        Args:
-            messages: 消息列表
-            model: 模型名称
-            stream: 是否使用流式响应
-            **kwargs: 其他参数
-
-        Returns:
-            OpenAI 兼容格式的响应字典
-        """
+        """发送聊天补全请求。"""
         payload = {
             "model": model or self.default_model,
             "messages": messages,
@@ -77,15 +67,10 @@ class LiteLLMClient:
         return await self.completion(messages, model=model, stream=stream, **kwargs)
 
     async def list_models(self) -> dict:
-        """获取可用模型列表。
-
-        Returns:
-            OpenAI 兼容格式的模型列表
-        """
+        """获取可用模型列表。"""
         response = await self.client.get(f"{self.base_url}/v1/models")
         response.raise_for_status()
         data = response.json()
-        # 缓存模型列表
         self.available_models = [m.get("id", "") for m in data.get("data", [])]
         return data
 
@@ -95,59 +80,38 @@ class LiteLLMClient:
         model: str | None = None,
         stream: bool = False,
     ) -> dict:
-        """聊天接口（兼容 ModelRouter 统一接口）。
-
-        Returns:
-            dict: {"message": {"role": "assistant", "content": "..."}, "model": "...", "done": True}
-        """
+        """聊天接口（兼容统一接口）。"""
         result = await self.completion(
             messages=messages,
             model=model or self.default_model,
             stream=False,
         )
         choice = result.get("choices", [{}])[0]
-        return {
-            "message": {
-                "role": choice.get("message", {}).get("role", "assistant"),
-                "content": choice.get("message", {}).get("content", ""),
-            },
-            "model": result.get("model", model or self.default_model),
-            "done": True,
-            "usage": result.get("usage", {}),
-        }
+        return self.normalize_chat_response(
+            role=choice.get("message", {}).get("role", "assistant"),
+            content=choice.get("message", {}).get("content", ""),
+            model=result.get("model", model or self.default_model),
+            usage=result.get("usage"),
+        )
 
     async def chat_stream(
         self,
         messages: list[dict],
         model: str | None = None,
-    ):
-        """流式聊天（兼容 ModelRouter 统一接口）。
-
-        注意：LiteLLM 的 HTTP 流式实现需要 SSE 解析，
-        当前简化实现：先获取完整响应再分块返回。
-        """
+    ) -> AsyncGenerator[dict, None]:
+        """流式聊天（兼容统一接口）。"""
+        target = model or self.default_model
         result = await self.completion(
-            messages=messages,
-            model=model or self.default_model,
-            stream=False,
+            messages=messages, model=target, stream=False,
         )
         content = (
             result.get("choices", [{}])[0]
             .get("message", {})
             .get("content", "")
         )
-        # 按字分块模拟流式
         for char in content:
-            yield {
-                "message": {"role": "assistant", "content": char},
-                "model": model or self.default_model,
-                "done": False,
-            }
-        yield {
-            "message": {"role": "assistant", "content": ""},
-            "model": model or self.default_model,
-            "done": True,
-        }
+            yield self.normalize_stream_chunk(char, target, done=False)
+        yield self.normalize_stream_chunk("", target, done=True)
 
     async def close(self) -> None:
         """关闭 HTTP 客户端。"""

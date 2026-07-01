@@ -306,6 +306,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, Upload, Delete, Setting } from '@element-plus/icons-vue'
 import axios from 'axios'
+import { getErrorMessage } from '@/api'
 
 // ═══════════════════════════════════════════════════════════════
 // 状态
@@ -366,7 +367,7 @@ async function loadSkills() {
       hasUpdate: false,
     }))
   } catch (e) {
-    ElMessage.error('加载技能失败: ' + (e.response?.data?.detail || e.message))
+    ElMessage.error('加载技能失败: ' + getErrorMessage(e))
   }
 }
 
@@ -453,7 +454,7 @@ async function installSkill(skill) {
     ElMessage.success(`「${data.skill_name || skill.name}」安装成功`)
     await loadSkills()
   } catch (e) {
-    ElMessage.error('安装失败: ' + (e.response?.data?.detail || e.message))
+    ElMessage.error('安装失败: ' + getErrorMessage(e))
   }
 }
 
@@ -471,7 +472,7 @@ async function uninstallSkill(row) {
     ElMessage.success(`「${row.name}」已卸载`)
     await loadSkills()
   } catch (e) {
-    ElMessage.error('卸载失败: ' + (e.response?.data?.detail || e.message))
+    ElMessage.error('卸载失败: ' + getErrorMessage(e))
   }
 }
 
@@ -479,7 +480,7 @@ async function toggleInstalledStatus(row) {
   try {
     ElMessage.info(`切换「${row.name}」状态 —— 功能开发中`)
   } catch (e) {
-    ElMessage.error('操作失败: ' + (e.response?.data?.detail || e.message))
+    ElMessage.error('操作失败: ' + getErrorMessage(e))
   }
 }
 
@@ -500,7 +501,7 @@ async function submitPublish() {
     publishForm.value = { name: '', description: '', category: '', compatibility: [] }
     await loadSkills()
   } catch (e) {
-    ElMessage.error('提交失败: ' + (e.response?.data?.detail || e.message))
+    ElMessage.error('提交失败: ' + getErrorMessage(e))
   }
 }
 
@@ -529,7 +530,7 @@ async function confirmLocalInstall() {
     localFile.value = null
     await loadSkills()
   } catch (e) {
-    ElMessage.error('安装失败: ' + (e.response?.data?.detail || e.message))
+    ElMessage.error('安装失败: ' + getErrorMessage(e))
   }
 }
 </script>
