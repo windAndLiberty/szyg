@@ -1,120 +1,128 @@
 /* ═══════════════════════════════════════════════════════════════
-   szyg Graceful Theme — Element Plus Component Overrides
-   Daylight (light) + Midnight (dark), no neon
-   All colors referenced via CSS variables from style.css
+   szyg Effie Aesthetic — Element Plus Component Overrides
+   Philosophy: 退让、呼吸、克制、温润、专注
+   All colors via CSS variables from style.css
+   Spec: KnowledgeBase/DESIGN/component-specs.md
    ═══════════════════════════════════════════════════════════════ */
 
 /* ── Buttons ── */
+.el-button {
+  transition: all var(--duration-normal) var(--ease-smooth) !important;
+  font-weight: 500 !important;
+  border-radius: var(--radius-sm) !important;
+}
 .el-button--primary {
   background: var(--accent) !important;
-  border: none !important;
-  border-radius: var(--radius-sm) !important;
-  font-weight: 600 !important;
-  letter-spacing: 0.2px;
+  border: 1px solid var(--accent) !important;
+  color: var(--text-inverse) !important;
   box-shadow: var(--btn-shadow) !important;
-  transition: all var(--duration-fast) ease !important;
 }
 .el-button--primary:hover {
   background: var(--accent-hover) !important;
-  box-shadow: var(--accent-glow) !important;
-  transform: translateY(-1px);
+  border-color: var(--accent-hover) !important;
+  transform: translateY(-0.5px);
 }
 .el-button--primary:active {
-  transform: translateY(0) scale(0.98);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1) !important;
+  transform: scale(0.98);
+  box-shadow: none !important;
 }
-
 .el-button--default {
   background: var(--bg-hover) !important;
   border: 1px solid var(--border-color) !important;
   color: var(--text-secondary) !important;
-  border-radius: var(--radius-sm) !important;
-  transition: all var(--duration-fast) ease !important;
 }
 .el-button--default:hover {
-  background: var(--accent-soft) !important;
-  border-color: var(--border-active) !important;
-  color: var(--accent) !important;
+  background: var(--bg-active) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+  transform: translateY(-0.5px);
+}
+.el-button--default:active {
+  transform: scale(0.98);
 }
 
 /* ── Inputs ── */
 .el-input__wrapper {
   background: var(--input-bg) !important;
   box-shadow: none !important;
-  border: 1px solid transparent !important;
+  border: 1px solid var(--border-color) !important;
   border-radius: var(--radius-sm) !important;
-  transition: all var(--duration-fast) ease !important;
+  transition: all var(--duration-normal) var(--ease-smooth) !important;
 }
 .el-input__wrapper:hover {
-  border-color: var(--input-border-hover) !important;
+  border-color: var(--text-tertiary) !important;
 }
 .el-input__wrapper.is-focus {
-  background: var(--bg-page) !important;
   border-color: var(--accent) !important;
-  box-shadow: none !important;
+  box-shadow: 0 0 0 3px var(--accent-soft) !important;
 }
 .el-input__inner {
   color: var(--text-primary) !important;
-  font-weight: 500;
+  font-weight: 400;
 }
 .el-input__inner::placeholder { color: var(--placeholder-color) !important; }
 
 /* ── Textarea ── */
 .el-textarea__inner {
   background: var(--input-bg) !important;
-  border: 1px solid transparent !important;
+  border: 1px solid var(--border-color) !important;
   border-radius: var(--radius-sm) !important;
   color: var(--text-primary) !important;
   transition: all var(--duration-fast) ease !important;
 }
 .el-textarea__inner:focus {
-  background: var(--bg-page) !important;
   border-color: var(--accent) !important;
-  box-shadow: none !important;
+  box-shadow: 0 0 0 2px var(--accent-soft) !important;
 }
 .el-textarea__inner::placeholder { color: var(--placeholder-color) !important; }
 
 /* ── Cards ── */
 .el-card {
-  background: var(--card-bg) !important;
-  border: none !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-light) !important;
   border-radius: var(--radius-md) !important;
-  box-shadow: var(--shadow-card) !important;
-  transition: all var(--duration-normal) var(--ease-out-expo);
+  box-shadow: var(--shadow-sm) !important;
+  transition: all var(--duration-normal) var(--ease-smooth) !important;
 }
 .el-card:hover {
-  box-shadow: var(--shadow-float) !important;
+  box-shadow: var(--shadow-md) !important;
+  transform: translateY(-1px);
 }
 .el-card__header {
   border-bottom: 1px solid var(--border-light) !important;
   color: var(--text-primary);
+  padding: 16px 24px !important;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 /* ── Tags ── */
 .el-tag {
-  border-radius: 6px !important;
+  border-radius: var(--radius-full) !important;
   font-weight: 500;
-  border: 1px solid var(--border-subtle) !important;
+  padding: 4px 10px !important;
+  border: 1px solid transparent !important;
+  height: 24px;
 }
 .el-tag--primary {
   background: var(--accent-soft) !important;
-  border-color: var(--border-active) !important;
   color: var(--accent) !important;
 }
 .el-tag--success {
-  background: var(--green-500-10) !important;
-  border-color: var(--green-500-20) !important;
-  color: var(--green-700) !important;
+  background: var(--success-soft) !important;
+  color: var(--success) !important;
 }
 .el-tag--warning {
-  background: var(--amber-400-10) !important;
-  border-color: var(--amber-400-20) !important;
-  color: var(--amber-500) !important;
+  background: var(--warning-soft) !important;
+  color: var(--warning) !important;
 }
 .el-tag--danger {
-  background: var(--rose-500-10) !important;
-  border-color: var(--rose-500-20) !important;
-  color: var(--rose-500) !important;
+  background: var(--error-soft) !important;
+  color: var(--error) !important;
+}
+.el-tag--info {
+  background: var(--info-soft) !important;
+  color: var(--info) !important;
 }
 
 /* ── Menus ── */
@@ -125,72 +133,75 @@
 .el-menu-item {
   color: var(--text-secondary) !important;
   border-radius: var(--radius-sm);
-  margin: 2px 6px;
-  transition: all var(--duration-fast) ease;
+  margin: 2px 8px;
+  height: 40px;
+  transition: all var(--duration-fast) var(--ease-smooth);
 }
 .el-menu-item:hover {
-  background: var(--hover-bg) !important;
+  background: var(--bg-hover) !important;
   color: var(--text-primary) !important;
 }
 .el-menu-item.is-active {
   background: var(--accent-soft) !important;
   color: var(--accent) !important;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* ── Dialog ── */
 .el-dialog {
-  background: var(--card-bg) !important;
-  border: none !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-light) !important;
   border-radius: var(--radius-lg) !important;
-  box-shadow: var(--shadow-float) !important;
+  box-shadow: var(--shadow-xl) !important;
 }
 .el-dialog__header {
   border-bottom: 1px solid var(--border-light) !important;
   padding: 20px 24px !important;
 }
-.el-dialog__title { color: var(--text-primary) !important; font-weight: 600; }
+.el-dialog__title { color: var(--text-primary) !important; font-weight: 600; font-size: 16px; }
 .el-dialog__body { color: var(--text-secondary) !important; padding: 24px !important; }
 
 /* ── Drawer ── */
-.el-drawer { background: var(--card-bg) !important; }
+.el-drawer { background: var(--bg-page) !important; }
 
 /* ── Dropdown ── */
 .el-dropdown-menu {
-  background: var(--card-bg) !important;
+  background: var(--bg-card) !important;
   border: 1px solid var(--border-light) !important;
   border-radius: var(--radius-md) !important;
-  box-shadow: var(--shadow-float) !important;
+  box-shadow: var(--shadow-lg) !important;
+  padding: 6px !important;
 }
 .el-dropdown-menu__item {
   color: var(--text-secondary) !important;
-  transition: all var(--duration-fast) ease;
+  transition: all var(--duration-fast) var(--ease-smooth);
+  height: 36px;
+  border-radius: 6px;
 }
 .el-dropdown-menu__item:hover {
-  background: var(--hover-bg) !important;
+  background: var(--bg-hover) !important;
   color: var(--text-primary) !important;
 }
 
-/* ── Select dropdown ── */
-.el-select .el-input__wrapper { background: var(--input-bg); }
+/* ── Select ── */
 .el-select-dropdown {
-  background: var(--card-bg) !important;
+  background: var(--bg-card) !important;
   border: 1px solid var(--border-light) !important;
   border-radius: var(--radius-md) !important;
-  box-shadow: var(--shadow-float) !important;
+  box-shadow: var(--shadow-lg) !important;
+  padding: 6px !important;
 }
-.el-select-dropdown__item { color: var(--text-secondary) !important; }
+.el-select-dropdown__item { color: var(--text-secondary) !important; height: 36px; border-radius: 6px; }
 .el-select-dropdown__item.hover,
-.el-select-dropdown__item:hover { background: var(--hover-bg) !important; }
+.el-select-dropdown__item:hover { background: var(--bg-hover) !important; }
 .el-select-dropdown__item.selected {
   color: var(--accent) !important;
-  font-weight: 600;
+  font-weight: 500;
+  background: var(--accent-soft) !important;
 }
 
-/* ── Form labels ── */
+/* ── Form ── */
 .el-form-item__label { color: var(--text-secondary) !important; font-weight: 500; }
-
-/* ── Checkbox / Radio ── */
 .el-checkbox__label { color: var(--text-secondary) !important; }
 .el-radio__label { color: var(--text-secondary) !important; }
 
@@ -199,8 +210,8 @@
   --el-table-bg-color: transparent;
   --el-table-tr-bg-color: transparent;
   --el-table-header-bg-color: var(--table-header-bg);
-  --el-table-row-hover-bg-color: var(--hover-bg);
-  --el-table-border-color: var(--border-color);
+  --el-table-row-hover-bg-color: var(--bg-hover);
+  --el-table-border-color: var(--border-light);
   --el-table-text-color: var(--text-primary);
   --el-table-header-text-color: var(--text-secondary);
   background: transparent;
@@ -211,8 +222,13 @@
   color: var(--text-secondary) !important;
   font-weight: 600;
   font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-light) !important;
+}
+.el-table td.el-table__cell {
+  border-bottom: 1px solid var(--border-light) !important;
+}
+.el-table--border .el-table__cell {
+  border-right: none !important;
 }
 
 /* ── Pagination ── */
@@ -227,39 +243,59 @@
   background: var(--accent) !important;
   color: var(--text-inverse) !important;
   border-color: var(--accent) !important;
-  font-weight: 600;
 }
 
 /* ── Loading ── */
 .el-loading-mask { background: var(--loading-mask-bg) !important; backdrop-filter: blur(4px); }
 
-/* ── Empty state ── */
+/* ── Empty ── */
 .el-empty__description p { color: var(--text-tertiary) !important; }
-
-/* ── Timeline ── */
-.el-timeline-item__node { background: var(--border-color) !important; }
-.el-timeline-item__tail { border-left-color: var(--border-subtle) !important; }
 
 /* ── Alert ── */
 .el-alert { border-radius: var(--radius-md) !important; }
 
-/* ── Tooltip / Popover ── */
+/* ── Tooltip ── */
 .el-popper.is-light {
   background: var(--card-bg) !important;
   border-color: var(--border-color) !important;
   color: var(--text-primary) !important;
 }
 
+/* ── Progress ── */
+.el-progress--circle .el-progress-circle__track {
+  stroke: var(--border-subtle) !important;
+}
+.el-progress-bar__outer {
+  background: var(--border-subtle) !important;
+  border-radius: 4px !important;
+}
+.el-progress-bar__inner {
+  transition: width 0.6s var(--ease-smooth) !important;
+}
+
 /* ── Tabs ── */
-.el-tabs__item { color: var(--text-tertiary) !important; }
-.el-tabs__item.is-active { color: var(--accent) !important; }
+.el-tabs__item {
+  color: var(--text-tertiary) !important;
+  font-weight: 500;
+  padding: 0 16px !important;
+  height: 40px;
+  transition: color var(--duration-normal) var(--ease-smooth) !important;
+}
+.el-tabs__item.is-active {
+  color: var(--text-primary) !important;
+  font-weight: 600;
+}
 .el-tabs__item:hover { color: var(--text-secondary) !important; }
-.el-tabs__active-bar { background: var(--accent) !important; }
-.el-tabs__nav-wrap::after { background: var(--border-color) !important; }
+.el-tabs__active-bar {
+  background: var(--accent) !important;
+  height: 2px !important;
+  border-radius: 1px;
+}
+.el-tabs__nav-wrap::after { background: var(--border-light) !important; }
 
 /* ── Divider ── */
 .el-divider__text {
-  background: var(--bg-canvas) !important;
+  background: var(--bg-body) !important;
   color: var(--text-tertiary) !important;
 }
 
@@ -272,190 +308,28 @@
 /* ── Statistic ── */
 .el-statistic__content { color: var(--text-primary) !important; }
 
-/* ── Rate ── */
-.el-rate__icon { font-size: 16px; }
-
-/* ═══════════════════════════════════════════════════════════════
-   Page-level overrides (work across both themes via variables)
-   ═══════════════════════════════════════════════════════════════ */
-
-/* Cards: tool-card, agent-card, hub-tool-card */
-.tool-card,
-.agent-card,
-.hub-tool-card {
-  background: var(--card-bg) !important;
-  border: none !important;
-}
-.tool-card:hover,
-.agent-card:hover,
-.hub-tool-card:hover {
-  box-shadow: var(--shadow-float) !important;
-}
-
-/* Stat chips */
-.stat-chip { background: var(--hover-bg); }
-
-/* Prompt / code boxes */
-.prompt-box,
-.chat-messages {
-  background: var(--hover-bg);
-  border-color: var(--border-color);
-}
-.msg.assistant .msg-content {
-  background: var(--card-bg);
-  border-color: var(--border-color);
-  color: var(--text-primary);
-}
-.streaming .msg-content {
-  background: var(--card-bg);
-  border-color: var(--border-color);
-}
-
-/* Typography helpers */
-.subtitle,
-.result-count,
-.version,
-.usage,
-.chip-label,
-.form-hint,
-.stat-title,
-.tool-desc,
-.tier-desc,
-.agent-desc {
-  color: var(--text-secondary);
-}
-.page-header h1,
-.page-header h2,
-.hub-header h2 { color: var(--text-primary); }
-
-/* Hover states */
-.tool-mini:hover { background: var(--hover-bg); }
-.disclaimer-content { color: var(--text-primary); }
-
-/* ═══════════════════════════════════════════════════════════════
-   Dark Mode — Midnight Adjustments (no neon, warm dark)
-   ═══════════════════════════════════════════════════════════════ */
-
-/* ── Button primary ── */
-html.dark .el-button--primary {
-  background: var(--accent) !important;
-  box-shadow: var(--btn-shadow) !important;
-}
-html.dark .el-button--primary:hover {
-  background: var(--accent-hover) !important;
-  box-shadow: var(--accent-glow) !important;
-}
-
-/* ── Card ── */
-html.dark .el-card {
-  background: var(--card-bg) !important;
-  border: none !important;
-}
-html.dark .el-card:hover {
-  box-shadow: var(--shadow-float) !important;
-}
-
-/* ── Tags ── */
-html.dark .el-tag--primary {
-  background: var(--accent-soft) !important;
-  border-color: var(--border-active) !important;
-  color: var(--accent) !important;
-}
-html.dark .el-tag--default {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border-color: var(--border-color) !important;
-  color: var(--text-secondary) !important;
-}
-html.dark .el-tag--info { color: var(--text-secondary) !important; }
-html.dark .el-tag.el-tag--plain { color: var(--text-secondary) !important; }
-
-/* ── Menu — top nav ── */
-html.dark .el-menu--horizontal > .el-menu-item {
-  color: var(--header-text) !important;
+/* ── Collapse (for sidebar groups) ── */
+.el-collapse { border: none !important; }
+.el-collapse-item__header {
   background: transparent !important;
-}
-html.dark .el-menu--horizontal > .el-menu-item.is-active {
-  color: var(--accent) !important;
-  border-bottom-color: var(--accent) !important;
-}
-html.dark .el-menu--horizontal > .el-menu-item:hover {
-  background: var(--header-menu-active) !important;
-}
-
-/* ── Menu — sidebar ── */
-html.dark .el-menu-item:not(.is-active) {
-  color: var(--text-secondary) !important;
-}
-html.dark .el-menu-item.is-active {
-  background: var(--accent-soft) !important;
-  color: var(--accent) !important;
-  font-weight: 600;
-}
-html.dark .el-menu-item:hover {
-  color: var(--text-primary) !important;
-  background: var(--hover-bg) !important;
-}
-
-/* ── Table stripes ── */
-html.dark .el-table--striped .el-table__body tr.el-table__row--striped td {
-  background: var(--table-striped-bg);
-}
-
-/* ── Radio button group ── */
-html.dark .el-radio-button__inner {
-  color: var(--text-secondary);
-  background: var(--input-bg);
-  border-color: var(--border-color);
-}
-html.dark .el-radio-button.is-active .el-radio-button__inner {
-  color: var(--text-inverse);
-  background: var(--accent);
-  font-weight: 600;
-}
-
-/* ── Sidebar section title ── */
-html.dark .sidebar-section-title {
+  border-bottom: none !important;
   color: var(--text-tertiary) !important;
-  text-transform: uppercase;
-  letter-spacing: 1px;
   font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding-left: 12px;
+  height: 36px !important;
+  line-height: 36px !important;
 }
+.el-collapse-item__content { padding-bottom: 0 !important; }
+.el-collapse-item__wrap { border-bottom: none !important; background: transparent !important; }
 
-/* ── Dark tooltip override ── */
-html.dark .el-tooltip__popper.is-dark {
-  background: var(--card-bg);
-  color: var(--text-primary);
-  border: 1px solid var(--border-subtle);
+/* ═══════════════════════════════════════════════════════════════
+   Page-level helpers
+   ═══════════════════════════════════════════════════════════════ */
+.subtitle, .form-hint, .stat-title, .tool-desc, .agent-desc {
+  color: var(--text-secondary);
 }
-
-/* ── Dialog dark ── */
-html.dark .el-dialog {
-  box-shadow: var(--shadow-float) !important;
-}
-
-/* ── Dropdown dark ── */
-html.dark .el-dropdown-menu {
-  border-color: var(--border-subtle) !important;
-}
-
-/* ── Input focus ── */
-html.dark .el-input__wrapper.is-focus {
-  background: var(--bg-page) !important;
-  border-color: var(--accent) !important;
-  box-shadow: none !important;
-}
-html.dark .el-textarea__inner:focus {
-  background: var(--bg-page) !important;
-  border-color: var(--accent) !important;
-  box-shadow: none !important;
-}
-
-/* ── Tab active ── */
-html.dark .el-tabs__item.is-active {
-  color: var(--accent) !important;
-}
-
-/* ── Pagination active ── */
-html.dark .el-pager li.is-active {
-  background: var(--accent) !important;
-}
+.page-header h1, .page-header h2 { color: var(--text-primary); }
+.disclaimer-content { color: var(--text-primary); }

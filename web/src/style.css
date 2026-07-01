@@ -1,308 +1,288 @@
 /* ===================================================================
-   szyg Theme System v3 — Graceful Daylight
-   Light  →  Daylight (米白 + 靛蓝)
-   Dark   →  Midnight (炭黑 + 暖灰, no neon)
-   Toggle: html.dark class, persisted in localStorage
+   szyg Theme System v5 — Effie Aesthetic Design System
+   设计哲学：退让、呼吸、克制、温润、专注
+   主题：Light / Dark (可切换，持久化 localStorage)
+   切换：html[data-theme="dark"]
+   规范来源：KnowledgeBase/DESIGN/design-system.md
    =================================================================== */
 
 /* ═══════════════════════════════════════════════════════════════════
-   Light Theme — Daylight
-   灵感：Effie 式浅色纸张美学，低饱和、大留白、柔和克制
+   Theme: Effie Light (default)
+   灵感：Effie 浅色纸张美学 — 无主色调，跟随系统，低存在感
    ═══════════════════════════════════════════════════════════════════ */
-:root {
-  /* ── Background Layers ── */
-  --bg-body:       #f7f5f2;
-  --bg-page:       #ffffff;
-  --bg-card:       #ffffff;
-  --bg-hover:      rgba(0, 0, 0, 0.03);
-  --bg-active:     rgba(79, 70, 229, 0.06);
-  --bg-overlay:    rgba(255, 255, 255, 0.95);
+:root,
+html[data-theme="light"] {
+  /* ── Background Layers — warm paper ── */
+  --bg-body:       #F9F8F6;
+  --bg-page:       #FFFFFF;
+  --bg-card:       #FEFDFB;
+  --bg-hover:      rgba(31, 31, 34, 0.04);
+  --bg-active:     rgba(31, 31, 34, 0.07);
+  --bg-selected:   rgba(110, 123, 255, 0.08);
+  --bg-overlay:    rgba(255, 255, 255, 0.92);
 
-  /* ── Legacy bg aliases ── */
-  --bg-canvas:     var(--bg-body);
-  --bg-surface:    var(--bg-page);
-  --bg-elevated:   var(--bg-card);
-  --bg-main:       var(--bg-body);
+  /* ── Accent — soft indigo-purple ── */
+  --accent:            #6E7BFF;
+  --accent-hover:      #5A68E5;
+  --accent-soft:       rgba(110, 123, 255, 0.12);
+  --accent-glow:       rgba(110, 123, 255, 0.22);
+  --accent-gradient:   linear-gradient(135deg, #6E7BFF, #8C9AFF);
+  --btn-shadow:        0 2px 8px var(--accent-glow);
 
-  /* ── Brand Colors ── */
-  --indigo-600:    #4f46e5;
-  --indigo-700:    #4338ca;
-  --indigo-500:    #6366f1;
-  --indigo-400:    #818cf8;
-  --indigo-100:    rgba(79, 70, 229, 0.08);
+  /* ── Semantic — muted, calm ── */
+  --success:       #22A06B;
+  --success-soft:  rgba(34, 160, 107, 0.10);
+  --warning:       #D97706;
+  --warning-soft:  rgba(217, 119, 6, 0.10);
+  --error:         #DC2626;
+  --error-soft:    rgba(220, 38, 38, 0.10);
+  --info:          #6E7BFF;
+  --info-soft:     rgba(110, 123, 255, 0.10);
 
-  /* ── Functional Colors ── */
-  --accent:            #4f46e5;
-  --accent-hover:      #4338ca;
-  --accent-soft:       rgba(79, 70, 229, 0.08);
-  --accent-primary:    var(--accent);
-  --accent-secondary:  var(--indigo-500);
-  --accent-gradient:   linear-gradient(135deg, var(--accent), var(--accent-hover));
-  --accent-glow:       0 2px 12px rgba(79, 70, 229, 0.12);
-  --accent-glow-sm:    0 1px 6px rgba(79, 70, 229, 0.08);
-  --btn-shadow:        0 2px 8px rgba(79, 70, 229, 0.15);
-  --shadow-inner-glow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  /* ── Text — warm grays ── */
+  --text-primary:    #1F1F22;
+  --text-secondary:  #6E6E73;
+  --text-tertiary:   #A1A1AA;
+  --text-muted:      #C8C8CC;
+  --text-inverse:    #FFFFFF;
+  --text-placeholder: #A1A1AA;
 
-  /* ── Semantic Colors ── */
-  --green-500:     #22c55e;
-  --green-600:     #16a34a;
-  --green-700:     #15803d;
-  --amber-500:     #f59e0b;
-  --amber-400:     #fbbf24;
-  --rose-500:      #f43f5e;
-  --rose-400:      #fb7185;
-  --teal-500:      #14b8a6;
-  --teal-600:      #0d9488;
+  /* ── Borders — barely visible, warm ── */
+  --border-color:     #E8E7E4;
+  --border-light:     #F2F1EE;
+  --border-subtle:    rgba(31, 31, 34, 0.04);
+  --border-active:    var(--accent);
 
-  /* ── Text ── */
-  --text-primary:    #1a1a1a;
-  --text-secondary:  #5c5c5c;
-  --text-tertiary:   #999999;
-  --text-muted:      #b0b0b0;
-  --text-inverse:    #ffffff;
-  --text-link:       var(--accent);
+  /* ── Frosted Glass ── */
+  --glass-bg:         rgba(255, 255, 255, 0.72);
+  --glass-border:     rgba(31, 31, 34, 0.05);
+  --glass-blur:       blur(20px);
+  --glass-blur-sm:    blur(12px);
 
-  /* ── Borders ── */
-  --border-color:     #e8e6e3;
-  --border-light:     #f0eeeb;
-  --border-subtle:    rgba(0, 0, 0, 0.04);
-  --border-default:   var(--border-color);
-  --border-active:    rgba(79, 70, 229, 0.3);
-  --border-glow:      rgba(79, 70, 229, 0.15);
-
-  /* ── Surfaces ── */
-  --glass-bg:        rgba(255, 255, 255, 0.7);
-  --glass-border:    rgba(0, 0, 0, 0.06);
-  --glass-highlight: rgba(79, 70, 229, 0.04);
-
-  /* ── Shadows ── */
-  --shadow-sm:   0 1px 3px rgba(0, 0, 0, 0.04);
-  --shadow-card: 0 2px 16px rgba(0, 0, 0, 0.04);
-  --shadow-md:   var(--shadow-card);
-  --shadow-float: 0 8px 32px rgba(0, 0, 0, 0.08);
-  --shadow-lg:   var(--shadow-float);
-  --shadow-xl:   0 24px 64px rgba(0, 0, 0, 0.1);
-
-  /* ── Transparency helpers ── */
-  --green-500-10: rgba(34, 197, 94, 0.1);
-  --green-500-20: rgba(34, 197, 94, 0.2);
-  --teal-500-10:  rgba(20, 184, 166, 0.1);
-  --teal-500-15:  rgba(20, 184, 166, 0.15);
-  --teal-500-25:  rgba(20, 184, 166, 0.25);
-  --amber-400-10: rgba(251, 191, 36, 0.1);
-  --amber-400-20: rgba(251, 191, 36, 0.2);
-  --rose-500-10:  rgba(244, 63, 94, 0.1);
-  --rose-500-20:  rgba(244, 63, 94, 0.2);
+  /* ── Shadows — warm, soft, layered ── */
+  --shadow-sm:        0 1px 2px rgba(31, 31, 34, 0.04);
+  --shadow-md:        0 2px 8px rgba(31, 31, 34, 0.05);
+  --shadow-lg:        0 8px 24px rgba(31, 31, 34, 0.08);
+  --shadow-xl:        0 16px 48px rgba(31, 31, 34, 0.12);
+  --shadow-glow:      0 0 16px var(--accent-glow);
+  --shadow-inset:     inset 0 1px 2px rgba(31, 31, 34, 0.04);
+  --shadow-card:      var(--shadow-md);
+  --shadow-float:     var(--shadow-lg);
 
   /* ── Scrollbar ── */
-  --scrollbar-thumb:       rgba(0, 0, 0, 0.12);
-  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.2);
+  --scrollbar-thumb:       rgba(31, 31, 34, 0.12);
+  --scrollbar-thumb-hover: rgba(31, 31, 34, 0.20);
+  --scrollbar-track:       transparent;
 
   /* ── Selection ── */
-  --selection-bg: rgba(79, 70, 229, 0.15);
-
-  /* ── Table ── */
-  --table-header-bg: #f7f5f2;
-  --table-striped-bg: #faf9f7;
-
-  /* ── Login Page Orbs ── */
-  --orb-1: radial-gradient(circle, rgba(79, 70, 229, 0.08), transparent 70%);
-  --orb-2: radial-gradient(circle, rgba(99, 102, 241, 0.06), transparent 70%);
-  --orb-3: radial-gradient(circle, rgba(129, 140, 248, 0.04), transparent 70%);
+  --selection-bg: var(--accent-soft);
 
   /* ── Misc ── */
-  --loading-mask-bg: rgba(247, 245, 242, 0.75);
-  --shadow-ambient: 0 4px 24px rgba(0, 0, 0, 0.03);
+  --loading-mask-bg: rgba(249, 248, 246, 0.75);
+  --logo-gradient: linear-gradient(135deg, #5A68E5, #6E7BFF);
+  --sidebar-bg:    var(--glass-bg);
 
-  /* ── Logo Gradient ── */
-  --logo-gradient: linear-gradient(135deg, var(--accent), var(--indigo-500));
-
-  /* ── Radius & Motion ── */
-  --radius-sm: 8px;
+  /* ── Radius ── */
+  --radius-sm:  8px;
   --radius-md: 12px;
   --radius-lg: 16px;
-  --radius-xl: 20px;
+  --radius-xl: 24px;
   --radius-full: 999px;
-  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --duration-instant: 120ms;
-  --duration-fast: 200ms;
-  --duration-normal: 300ms;
-  --duration-slow: 500ms;
 
-  /* ═══════════════════════════════════════════════════════════════
-     Legacy compatibility (old variable names → new tokens)
-     ═══════════════════════════════════════════════════════════════ */
-  --header-bg:          var(--bg-page);
-  --header-text:        var(--text-primary);
-  --header-border:      var(--border-light);
-  --header-menu-active: var(--accent-soft);
-  --card-bg:            var(--bg-card);
-  --accent-light:       var(--accent-soft);
-  --footer-bg:          var(--bg-page);
-  --footer-text:        var(--text-tertiary);
-  --input-bg:           #f5f5f5;
-  --input-border:       #e0e0e0;
-  --input-focus:        var(--accent);
-  --input-border-hover: #d0d0d0;
-  --hover-bg:           var(--bg-hover);
-  --selected-bg:        var(--accent-soft);
-  --placeholder-color:  var(--text-tertiary);
-  --sidebar-bg:         var(--bg-page);
-}
+  /* ── Motion ── */
+  --ease-smooth:    cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-snappy:    cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-bounce:    cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast:  150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
 
-/* ═══════════════════════════════════════════════════════════════════
-   Dark Theme — Midnight
-   灵感：炭黑背景 + 暖灰文字，柔和克制，无霓虹
-   ═══════════════════════════════════════════════════════════════════ */
-html.dark {
-  /* ── Background Layers ── */
-  --bg-body:       #1a1a1a;
-  --bg-page:       #242424;
-  --bg-card:       #2a2a2a;
-  --bg-hover:      rgba(255, 255, 255, 0.05);
-  --bg-active:     rgba(129, 140, 248, 0.1);
-  --bg-overlay:    rgba(26, 26, 26, 0.95);
+  /* ── Typography ── */
+  --font-sans: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', 'Hiragino Sans GB',
+               'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', 'Menlo', 'Consolas', monospace;
 
-  /* ── Legacy bg aliases ── */
+  /* ── Spacing (4px grid) ── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ── Legacy aliases (deprecated, will be removed) ── */
   --bg-canvas:     var(--bg-body);
   --bg-surface:    var(--bg-page);
   --bg-elevated:   var(--bg-card);
   --bg-main:       var(--bg-body);
-
-  /* ── Brand Colors ── */
-  --indigo-600:    #818cf8;
-  --indigo-700:    #6366f1;
-  --indigo-500:    #818cf8;
-  --indigo-400:    #a5b4fc;
-  --indigo-100:    rgba(129, 140, 248, 0.1);
-
-  /* ── Functional Colors ── */
-  --accent:            #818cf8;
-  --accent-hover:      #a5b4fc;
-  --accent-soft:       rgba(129, 140, 248, 0.1);
-  --accent-primary:    var(--accent);
-  --accent-secondary:  var(--indigo-400);
-  --accent-gradient:   linear-gradient(135deg, var(--accent), var(--accent-hover));
-  --accent-glow:       0 2px 12px rgba(129, 140, 248, 0.15);
-  --accent-glow-sm:    0 1px 6px rgba(129, 140, 248, 0.1);
-  --btn-shadow:        0 2px 8px rgba(129, 140, 248, 0.2);
-  --shadow-inner-glow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-
-  /* ── Semantic Colors ── */
-  --green-500:     #4ade80;
-  --green-600:     #22c55e;
-  --green-700:     #16a34a;
-  --amber-500:     #fbbf24;
-  --amber-400:     #fcd34d;
-  --rose-500:      #fb7185;
-  --rose-400:      #fda4af;
-  --teal-500:      #2dd4bf;
-  --teal-600:      #14b8a6;
-
-  /* ── Text ── */
-  --text-primary:    #e8e8e8;
-  --text-secondary:  #a0a0a0;
-  --text-tertiary:   #707070;
-  --text-muted:      #505050;
-  --text-inverse:    #1a1a1a;
-  --text-link:       var(--accent);
-
-  /* ── Borders ── */
-  --border-color:     #333333;
-  --border-light:     #2a2a2a;
-  --border-subtle:    rgba(255, 255, 255, 0.05);
-  --border-default:   var(--border-color);
-  --border-active:    rgba(129, 140, 248, 0.3);
-  --border-glow:      rgba(129, 140, 248, 0.15);
-
-  /* ── Surfaces ── */
-  --glass-bg:        rgba(255, 255, 255, 0.04);
-  --glass-border:    rgba(255, 255, 255, 0.08);
-  --glass-highlight: rgba(129, 140, 248, 0.06);
-
-  /* ── Shadows (warm dark) ── */
-  --shadow-sm:   0 1px 3px rgba(0, 0, 0, 0.2);
-  --shadow-card: 0 2px 16px rgba(0, 0, 0, 0.25);
-  --shadow-md:   var(--shadow-card);
-  --shadow-float: 0 8px 32px rgba(0, 0, 0, 0.35);
-  --shadow-lg:   var(--shadow-float);
-  --shadow-xl:   0 24px 64px rgba(0, 0, 0, 0.45);
-
-  /* ── Transparency helpers ── */
-  --green-500-10: rgba(74, 222, 128, 0.1);
-  --green-500-20: rgba(74, 222, 128, 0.2);
-  --teal-500-10:  rgba(45, 212, 191, 0.1);
-  --teal-500-15:  rgba(45, 212, 191, 0.15);
-  --teal-500-25:  rgba(45, 212, 191, 0.25);
-  --amber-400-10: rgba(252, 211, 77, 0.1);
-  --amber-400-20: rgba(252, 211, 77, 0.2);
-  --rose-500-10:  rgba(251, 113, 133, 0.1);
-  --rose-500-20:  rgba(251, 113, 133, 0.2);
-
-  /* ── Scrollbar ── */
-  --scrollbar-thumb:       rgba(255, 255, 255, 0.1);
-  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.18);
-
-  /* ── Selection ── */
-  --selection-bg: rgba(129, 140, 248, 0.25);
-
-  /* ── Table ── */
-  --table-header-bg: rgba(255, 255, 255, 0.03);
-  --table-striped-bg: rgba(255, 255, 255, 0.02);
-
-  /* ── Login Page Orbs ── */
-  --orb-1: radial-gradient(circle, rgba(129, 140, 248, 0.1), transparent 70%);
-  --orb-2: radial-gradient(circle, rgba(99, 102, 241, 0.08), transparent 70%);
-  --orb-3: radial-gradient(circle, rgba(165, 180, 252, 0.06), transparent 70%);
-
-  /* ── Misc ── */
-  --loading-mask-bg: rgba(26, 26, 26, 0.75);
-  --shadow-ambient: 0 4px 24px rgba(0, 0, 0, 0.3);
-
-  /* ── Logo Gradient ── */
-  --logo-gradient: linear-gradient(135deg, var(--accent), var(--indigo-400));
-
-  /* ── Legacy ── */
-  --header-bg:          var(--bg-page);
-  --header-text:        var(--text-primary);
-  --header-border:      var(--border-light);
-  --header-menu-active: var(--accent-soft);
-  --card-bg:            var(--bg-card);
-  --accent-light:       var(--accent-soft);
-  --footer-bg:          var(--bg-page);
-  --footer-text:        var(--text-tertiary);
-  --input-bg:           #2a2a2a;
-  --input-border:       #404040;
-  --input-focus:        var(--accent);
-  --input-border-hover: #505050;
-  --hover-bg:           var(--bg-hover);
-  --selected-bg:        var(--accent-soft);
-  --placeholder-color:  var(--text-tertiary);
-  --sidebar-bg:         var(--bg-page);
+  --header-bg:     var(--bg-page);
+  --header-text:   var(--text-primary);
+  --header-border: var(--border-light);
+  --card-bg:       var(--bg-card);
+  --footer-bg:     var(--bg-page);
+  --footer-text:   var(--text-tertiary);
+  --input-bg:      #F5F4F2;
+  --input-border:  #E8E7E4;
+  --input-focus:   var(--accent);
+  --hover-bg:      var(--bg-hover);
+  --selected-bg:   var(--accent-soft);
+  --placeholder-color: var(--text-placeholder);
+  --divider-color: var(--border-subtle);
+  --table-header-bg: #F8F7F5;
+  --shadow-elevation-1: var(--shadow-sm);
+  --shadow-elevation-2: var(--shadow-md);
+  --shadow-elevation-3: var(--shadow-lg);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   Base Styles
+   Theme: Effie Dark
+   灵感：Effie 暗色 — 炭黑 + 暖灰，无霓虹，毛玻璃更通透
+   ═══════════════════════════════════════════════════════════════════ */
+html[data-theme="dark"] {
+  /* ── Background Layers — deep charcoal ── */
+  --bg-body:       #1C1C1E;
+  --bg-page:       #222225;
+  --bg-card:       #2A2A2D;
+  --bg-hover:      rgba(255, 255, 255, 0.05);
+  --bg-active:     rgba(255, 255, 255, 0.08);
+  --bg-selected:   rgba(140, 154, 255, 0.12);
+  --bg-overlay:    rgba(28, 28, 30, 0.92);
+
+  /* ── Accent — lighter indigo-purple for dark mode ── */
+  --accent:            #8C9AFF;
+  --accent-hover:      #A6B1FF;
+  --accent-soft:       rgba(140, 154, 255, 0.15);
+  --accent-glow:       rgba(140, 154, 255, 0.25);
+  --accent-gradient:   linear-gradient(135deg, #8C9AFF, #A6B1FF);
+  --btn-shadow:        0 2px 8px var(--accent-glow);
+
+  /* ── Semantic — slightly lighter for dark ── */
+  --success:       #34D399;
+  --success-soft:  rgba(52, 211, 153, 0.12);
+  --warning:       #FBBF24;
+  --warning-soft:  rgba(251, 191, 36, 0.12);
+  --error:         #F87171;
+  --error-soft:    rgba(248, 113, 113, 0.12);
+  --info:          #8C9AFF;
+  --info-soft:     rgba(140, 154, 255, 0.12);
+
+  /* ── Text — warm, slightly desaturated ── */
+  --text-primary:    #F5F5F7;
+  --text-secondary:  #A1A1AA;
+  --text-tertiary:   #6E6E73;
+  --text-muted:      #4A4A4C;
+  --text-inverse:    #1C1C1E;
+  --text-placeholder: #6E6E73;
+
+  /* ── Borders ── */
+  --border-color:     #3A3A3C;
+  --border-light:     #2C2C2E;
+  --border-subtle:    rgba(255, 255, 255, 0.04);
+  --border-active:    var(--accent);
+
+  /* ── Glass ── */
+  --glass-bg:         rgba(42, 42, 45, 0.60);
+  --glass-border:     rgba(255, 255, 255, 0.06);
+  --glass-blur:       blur(20px);
+  --glass-blur-sm:    blur(12px);
+
+  /* ── Shadows — deeper, warm black ── */
+  --shadow-sm:        0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md:        0 2px 8px rgba(0, 0, 0, 0.30);
+  --shadow-lg:        0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-xl:        0 16px 48px rgba(0, 0, 0, 0.45);
+  --shadow-glow:      0 0 16px var(--accent-glow);
+  --shadow-inset:     inset 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-card:      var(--shadow-md);
+  --shadow-float:     var(--shadow-lg);
+
+  /* ── Scrollbar ── */
+  --scrollbar-thumb:       rgba(255, 255, 255, 0.10);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.18);
+  --scrollbar-track:       transparent;
+
+  /* ── Selection ── */
+  --selection-bg: var(--accent-soft);
+
+  /* ── Misc ── */
+  --loading-mask-bg: rgba(28, 28, 30, 0.75);
+  --logo-gradient: linear-gradient(135deg, #A6B1FF, #8C9AFF);
+  --sidebar-bg:    var(--glass-bg);
+
+  /* ── Legacy aliases (deprecated, will be removed) ── */
+  --header-bg:     var(--bg-page);
+  --header-text:   var(--text-primary);
+  --header-border: var(--border-light);
+  --card-bg:       var(--bg-card);
+  --footer-bg:     var(--bg-page);
+  --footer-text:   var(--text-tertiary);
+  --input-bg:      #2C2C2E;
+  --input-border:  #3A3A3C;
+  --input-focus:   var(--accent);
+  --hover-bg:      var(--bg-hover);
+  --selected-bg:   var(--accent-soft);
+  --placeholder-color: var(--text-placeholder);
+  --divider-color: var(--border-subtle);
+  --table-header-bg: rgba(255, 255, 255, 0.03);
+  --shadow-elevation-1: var(--shadow-sm);
+  --shadow-elevation-2: var(--shadow-md);
+  --shadow-elevation-3: var(--shadow-lg);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Backward-Compatible Aliases — old variable names → new equivalents
+   (deprecated, will be removed after migration)
+   ═══════════════════════════════════════════════════════════════════ */
+:root, html[data-theme="light"], html[data-theme="dark"] {
+  --accent-primary: var(--accent);
+  --accent-light: var(--accent-soft);
+  --glass-blur-md: var(--glass-blur-sm);
+  --glass-blur-lg: var(--glass-blur);
+  --glass-card: var(--glass-bg);
+  --glass-card-border: var(--glass-border);
+  --glass-input: var(--input-bg);
+  --glass-tag: var(--bg-hover);
+  --border-glass: var(--border-color);
+  --border-glass-dim: var(--border-light);
+  --divider-strong: var(--border-color);
+  --header-menu-active: var(--hover-bg);
+  --table-striped-bg: var(--bg-hover);
+  --shadow-card-glass: var(--shadow-md);
+  --shadow-card-hover: var(--shadow-lg);
+  --shadow-elevation-1: var(--shadow-sm);
+  --shadow-elevation-2: var(--shadow-md);
+  --shadow-elevation-3: var(--shadow-lg);
+}
+
+html[data-theme="dark"] {
+  --text-inverse: #1c1c1e;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Base Styles — Effie philosophy: minimal, warm, retreat
    ═══════════════════════════════════════════════════════════════════ */
 * { box-sizing: border-box; }
 
 html {
-  background: var(--bg-canvas);
-  transition: background-color 0.3s ease;
+  background: var(--bg-body);
+  transition: background-color 0.4s var(--ease-smooth);
 }
 
 body {
   margin: 0;
   font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', 'Inter',
                -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 15px;
+  font-size: 14px;
   color: var(--text-primary);
-  background: var(--bg-canvas);
+  background: var(--bg-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  line-height: 1.6;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  line-height: 1.7;
+  transition: background-color 0.4s var(--ease-smooth), color 0.4s var(--ease-smooth);
 }
 
 #app {
@@ -311,7 +291,7 @@ body {
 }
 
 a {
-  color: var(--accent-primary);
+  color: var(--accent);
   text-decoration: none;
   transition: color var(--duration-fast) ease;
 }
@@ -324,9 +304,9 @@ a:hover { color: var(--accent-hover); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   Scrollbar
+   Scrollbar — barely visible, like Effie
    ═══════════════════════════════════════════════════════════════════ */
-::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
@@ -339,7 +319,7 @@ a:hover { color: var(--accent-hover); }
    ═══════════════════════════════════════════════════════════════════ */
 ::selection {
   background: var(--selection-bg);
-  color: var(--text-inverse);
+  color: var(--text-primary);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -350,6 +330,98 @@ a:hover { color: var(--accent-hover); }
 .el-button--default, .el-tag, .el-alert,
 .el-header, .el-footer, .el-main,
 .el-menu-item, .el-tabs__item {
-  transition: background-color 0.25s ease, border-color 0.25s ease,
-              color 0.25s ease, box-shadow 0.25s ease;
+  transition: background-color 0.3s var(--ease-smooth), border-color 0.3s var(--ease-smooth),
+              color 0.3s var(--ease-smooth), box-shadow 0.3s var(--ease-smooth);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Animations — subtle, Effie-style micro-interactions
+   ═══════════════════════════════════════════════════════════════════ */
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-in {
+  animation: fadeSlideUp 0.5s var(--ease-smooth) both;
+}
+.animate-in-fast {
+  animation: fadeSlideUp 0.3s var(--ease-smooth) both;
+}
+.animate-in-scale {
+  animation: scaleIn 0.4s var(--ease-smooth) both;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Global Utility Classes — Typography, Spacing, Grid, Animation
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Typography */
+.text-xs { font-size: 12px; line-height: 1.6; }
+.text-sm { font-size: 13px; line-height: 1.55; }
+.text-base { font-size: 14px; line-height: 1.6; }
+.text-md { font-size: 15px; line-height: 1.55; font-weight: 500; }
+.text-lg { font-size: 16px; line-height: 1.5; font-weight: 600; }
+.text-xl { font-size: 20px; line-height: 1.35; font-weight: 600; }
+.text-2xl { font-size: 24px; line-height: 1.3; font-weight: 600; }
+.text-3xl { font-size: 32px; line-height: 1.25; font-weight: 700; }
+
+/* Spacing */
+.p-4  { padding: var(--space-4); }
+.p-6  { padding: var(--space-6); }
+.p-8  { padding: var(--space-8); }
+.p-10 { padding: var(--space-10); }
+.px-4 { padding-left: var(--space-4); padding-right: var(--space-4); }
+.py-4 { padding-top: var(--space-4); padding-bottom: var(--space-4); }
+.m-6  { margin: var(--space-6); }
+.m-8  { margin: var(--space-8); }
+.m-10 { margin: var(--space-10); }
+.mb-4 { margin-bottom: var(--space-4); }
+.mb-6 { margin-bottom: var(--space-6); }
+.mb-8 { margin-bottom: var(--space-8); }
+.gap-4 { gap: var(--space-4); }
+.gap-6 { gap: var(--space-6); }
+.gap-8 { gap: var(--space-8); }
+
+/* Grid */
+.app-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--space-6);
+}
+.col-12 { grid-column: span 12; }
+.col-8  { grid-column: span 8; }
+.col-6  { grid-column: span 6; }
+.col-4  { grid-column: span 4; }
+.col-3  { grid-column: span 3; }
+
+/* Animation helpers */
+.animate-in { animation: fadeSlideUp var(--duration-slow) var(--ease-smooth) both; }
+.animate-in-fast { animation: fadeSlideUp var(--duration-normal) var(--ease-smooth) both; }
+.animate-in-scale { animation: scaleIn var(--duration-normal) var(--ease-smooth) both; }
+
+/* Responsive grid */
+@media (max-width: 1279px) {
+  .col-3, .col-4 { grid-column: span 6; }
+  .col-6, .col-8 { grid-column: span 12; }
+}
+@media (max-width: 767px) {
+  .col-3, .col-4, .col-6, .col-8 { grid-column: span 12; }
+  .app-grid { gap: var(--space-4); }
 }

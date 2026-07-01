@@ -393,3 +393,20 @@ async def platform_sync_cookies(platform: str, payload: dict):
         "cookie_count": len(filtered),
         "valid": mgr.is_valid(p),
     }
+
+
+@router.delete("/{platform}/sessions")
+async def platform_unbind(platform: str):
+    """删除平台登录态（解绑账号）"""
+    try:
+        p = Platform(platform)
+    except ValueError:
+        raise HTTPException(400, f"不支持的平台: {platform}")
+
+    from szyg.platforms.session_manager import get_session_manager
+    mgr = get_session_manager()
+
+    mgr.invalidate(p)
+    logger.info(f"[{platform}] 登录态已清除（解绑）")
+
+    return {"ok": True, "platform": platform}
