@@ -210,7 +210,24 @@ function findPython() {
   return 'python'
 }
 
-function startBackend() {
+function isPortInUse(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer()
+    server.once('error', (err) => resolve(err.code !== 'EADDRNOTAVAIL'))
+    server.once('listening', () => {
+      server.close()
+      resolve(false)
+    })
+    server.listen(port, '127.0.0.1')
+  })
+}
+
+async function startBackend() {
+  if (await isPortInUse(PORT)) {
+    console.log(`Backend already running on port ${PORT}, skipping spawn`)
+    return
+  }
+
   const python = findPython()
   const projectRoot = path.join(__dirname, '..')
   const serverDir = path.join(projectRoot, 'server')
@@ -277,6 +294,13 @@ function startComfyUI() {
   }
   if (!fs.existsSync(path.join(COMFYUI_DIR, 'main.py'))) {
     console.log(`ComfyUI main.py not found in ${COMFYUI_DIR} — skipping`)
+    return
+  }
+  // Validate the venv Python actually runs (handles broken relocated venvs)
+  const probe = require('child_process').spawnSync(COMFYUI_PYTHON, ['--version'], { encoding: 'utf8' })
+  if (probe.status !== 0) {
+    console.log(`ComfyUI Python validation failed — skipping`)
+    console.log(probe.stderr || probe.error?.message || '')
     return
   }
 
@@ -370,7 +394,7 @@ function createWindow() {
     `)
   })
 
-  mainWindow.loadURL(isDev ? `http://localhost:${FRONTEND_PORT}` : `http://127.0.0.1:${PORT}/login`)
+  mainWindow.loadURL(isDev ? `http://localhost:${FRONTEND_PORT}` : `http://127.0.0.1:${PORT}/`)
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show()

@@ -438,7 +438,15 @@ SYSTEM_PROMPT = """你是 szyg 智能矩阵运营系统的超级AI员工。
 6. acquisition_monitor_add(platform="douyin", video_url="...") → 添加要监听的目标
 
 ## 回复要求
-用简体中文，简洁专业。函数调用的参数要准确填写。"""
+用简体中文，简洁专业。函数调用的参数要准确填写。
+
+### 工具结果呈现规则（必须严格遵守）
+1. 禁止原样输出工具返回的 JSON。工具返回的数据是供你分析的内部数据，不是给用户看的原始内容。
+2. 调用工具后，用自然语言 + 结构化格式（表格、列表）向用户总结关键信息。
+3. 列表数据（搜索结果、评论列表）提取关键字段以表格或编号列表呈现。
+4. 操作结果用一句话确认，附上关键标识。
+5. 错误用自然语言解释原因和解决方案，不输出原始 error JSON。
+6. 绝对不要在回复中包含原始 JSON 片段。"""
 
 # ── Agent-aware system prompt builder ───────────────────
 
@@ -1763,6 +1771,62 @@ async def hermes_chat(chat_req: HermesChatRequest, user: User | None = Depends(o
                             msgs.append({"role": "tool", "tool_call_id": tool_id, "content": result})
                             tool_call_history.append(tool_name)
 
+                            # 检测图片生成工具，发送 image 事件
+                            if tool_name == "ai_image_generate":
+                                try:
+                                    rj = json.loads(result)
+                                    if rj.get("ok") and rj.get("url"):
+                                        yield _sse(
+                                            type='image',
+                                            url=rj["url"],
+                                            prompt=rj.get("prompt", ""),
+                                        )
+                                except Exception as e:
+                                    logger.debug(f"Failed to parse image result: {e}")
+
+                            # 检测视频生成工具，发送 video_task / video / video_status 事件
+                            if tool_name == "ai_video_create":
+                                try:
+                                    rj = json.loads(result)
+                                    if rj.get("ok") and rj.get("task_id"):
+                                        yield _sse(
+                                            type='video_task',
+                                            task_id=rj["task_id"],
+                                            prompt=rj.get("prompt", ""),
+                                            status=rj.get("status", "queued"),
+                                        )
+                                except Exception as e:
+                                    logger.debug(f"Failed to parse video_task result: {e}")
+
+                            elif tool_name == "ai_video_task_status":
+                                try:
+                                    rj = json.loads(result)
+                                    status = rj.get("status", "")
+                                    # 兼容 succeed / succeeded 两种拼写
+                                    if status in ("succeed", "succeeded"):
+                                        local_path = rj.get("local_path", "")
+                                        if local_path:
+                                            fname = Path(local_path).name
+                                            video_url = f"/api/files/volcengine_output/{fname}"
+                                        else:
+                                            video_url = rj.get("video_url", "")
+                                        if video_url:
+                                            yield _sse(
+                                                type='video',
+                                                task_id=rj.get("task_id", ""),
+                                                url=video_url,
+                                                prompt=rj.get("prompt", ""),
+                                            )
+                                    else:
+                                        yield _sse(
+                                            type='video_status',
+                                            task_id=rj.get("task_id", ""),
+                                            status=status,
+                                            progress=rj.get("progress", 0),
+                                        )
+                                except Exception as e:
+                                    logger.debug(f"Failed to parse video_status result: {e}")
+
                     continue  # next iteration — feed results back to LLM
 
                 else:
@@ -1787,3 +1851,159 @@ async def hermes_chat(chat_req: HermesChatRequest, user: User | None = Depends(o
             yield _sse(type='done')
 
     return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+# ── Case Cards: Dynamic Douyin Video Recommendations ─────────────────────────────
+
+_case_card_cache: dict[str, tuple[float, list]] = {}  # keyword -> (timestamp, cards)
+_CASE_CARD_CACHE_TTL = 1800  # 30 minutes
+_DEFAULT_CASE_KEYWORD = "AI营销自动化工具"  # 无对话历史时使用的默认搜索关键词
+
+
+class CaseCardRequest(BaseModel):
+    recent_titles: list[str] = Field(default_factory=list, description="近期对话标题列表，最多10条")
+    limit: int = Field(default=3, description="返回卡片数量")
+
+
+class CaseCard(BaseModel):
+    title: str          # 视频标题（截断至 50 字符）
+    cover_url: str      # 视频封面图 URL
+    video_url: str      # 视频页面 URL (https://www.douyin.com/video/{vid})
+    author: str         # 作者昵称
+    likes: int          # 点赞数
+
+
+class CaseCardResponse(BaseModel):
+    cards: list[CaseCard]
+    keyword: str        # 实际使用的搜索关键词（用于调试/展示）
+    source: str         # "douyin" (固定)
+
+
+async def _infer_search_keyword(titles: list[str]) -> str:
+    """用 LLM 从近期对话标题中推断搜索关键词。
+
+    Prompt: "根据以下用户近期任务标题，生成一个适合在抖音搜索的短视频关键词（5-15个字，不要加引号）：
+    标题列表: {titles}
+    只返回关键词本身，不要其他文字。"
+    """
+    if not titles:
+        return ""
+    
+    try:
+        prompt = f"""根据以下用户近期任务标题，生成一个适合在抖音搜索的短视频关键词（5-15个字，不要加引号）：
+标题列表: {', '.join(titles[:5])}
+只返回关键词本身，不要其他文字。"""
+        
+        # 调用 LLM 获取关键词 (10秒超时)
+        messages = [{"role": "user", "content": prompt}]
+        content = ""
+
+        async def _do_infer():
+            nonlocal content
+            async for chunk in _stream_llm_response("doubao-seed-2-0-lite-260428", messages, temperature=0.3):
+                content += chunk
+
+        await asyncio.wait_for(_do_infer(), timeout=10)
+        
+        keyword = content.strip().strip('"').strip("'")
+        if keyword and len(keyword) <= 20:
+            return keyword
+    except asyncio.TimeoutError:
+        logger.warning("LLM keyword inference timed out (10s)")
+    except Exception as e:
+        logger.warning(f"LLM keyword inference failed: {e}")
+    
+    return ""
+
+
+async def _select_top_videos(videos: list[dict], titles: list[str], limit: int) -> list[CaseCard]:
+    """从搜索结果中选出最匹配的 limit 个视频。
+
+    策略:
+    1. 优先用 LLM 对视频标题与用户任务标题做相关性排序
+    2. LLM 不可用时 fallback: 按 likes 降序取前 limit 条
+    """
+    if not videos:
+        return []
+    
+    # Fallback: 按 likes 降序取前 limit 条
+    sorted_videos = sorted(videos, key=lambda v: v.get("likes", 0), reverse=True)[:limit]
+    
+    cards = []
+    for item in sorted_videos:
+        cards.append(CaseCard(
+            title=item.get("title", "")[:50],
+            cover_url=item.get("cover", ""),
+            video_url=item.get("url", ""),
+            author=item.get("author", ""),
+            likes=item.get("likes", 0),
+        ))
+    
+    return cards
+
+
+def _cleanup_expired_cache(now: float):
+    """清理过期的缓存条目"""
+    expired_keys = []
+    for key, (timestamp, _) in _case_card_cache.items():
+        if now - timestamp >= _CASE_CARD_CACHE_TTL:
+            expired_keys.append(key)
+    
+    for key in expired_keys:
+        del _case_card_cache[key]
+    
+    if expired_keys:
+        logger.info(f"Cleaned up {len(expired_keys)} expired case card cache entries")
+
+
+@router.post("/api/hermes/case-cards")
+async def get_case_cards(req: CaseCardRequest):
+    """获取欢迎页精选案例卡片（动态抖音短视频推荐）"""
+    # 1. 关键词推断
+    if not req.recent_titles:
+        keyword = _DEFAULT_CASE_KEYWORD
+    else:
+        keyword = await _infer_search_keyword(req.recent_titles)
+        if not keyword:
+            keyword = req.recent_titles[0]  # fallback
+    
+    # 2. 检查缓存
+    cache_key = f"case_cards:{keyword}"
+    now = time.time()
+    if cache_key in _case_card_cache:
+        timestamp, cached_cards = _case_card_cache[cache_key]
+        if now - timestamp < _CASE_CARD_CACHE_TTL:
+            logger.info(f"Case cards cache hit for keyword: {keyword}")
+            return CaseCardResponse(cards=cached_cards, keyword=keyword, source="douyin")
+    
+    # 清理过期缓存
+    _cleanup_expired_cache(now)
+    
+    # 3. 抖音搜索
+    try:
+        from szyg.integrations.acquisition_adapters import get_acquisition_adapter
+        adapter = get_acquisition_adapter("douyin")
+        logger.info(f"Case cards: searching douyin for keyword='{keyword}'")
+        results = await asyncio.wait_for(
+            adapter.search(keyword, limit=10),
+            timeout=60,
+        )
+        logger.info(f"Case cards: search returned {len(results)} results")
+    except asyncio.TimeoutError:
+        logger.warning(f"Case cards: douyin search timed out (60s) for keyword='{keyword}'")
+        return CaseCardResponse(cards=[], keyword=keyword, source="douyin")
+    except Exception as e:
+        logger.warning(f"Case card search failed: {e}", exc_info=True)
+        return CaseCardResponse(cards=[], keyword=keyword, source="douyin")
+    
+    if not results:
+        logger.warning(f"Case cards: douyin search returned 0 results for keyword='{keyword}'")
+        return CaseCardResponse(cards=[], keyword=keyword, source="douyin")
+    
+    # 4. LLM 排序筛选
+    top_cards = await _select_top_videos(results, req.recent_titles, req.limit)
+    
+    # 5. 缓存结果
+    _case_card_cache[cache_key] = (now, top_cards)
+    
+    return CaseCardResponse(cards=top_cards, keyword=keyword, source="douyin")

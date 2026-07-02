@@ -21,6 +21,7 @@ dependencies = [
     "playwright>=1.60.0",
     "bilibili-api-python>=17.4.2",
     "douyin-tiktok-scraper>=1.2.9",
+    "pyexecjs>=1.5.1",
 ]
 
 [project.optional-dependencies]

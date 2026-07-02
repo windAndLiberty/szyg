@@ -1,3 +1,266 @@
+## [2026-07-02 19:52:00] | Agent: Elite_Coder | Action: SCALE_UP_WELCOME_PAGE
+
+- **🎯 核心目的**: 放大欢迎页面尺寸（25-30%），提升视觉冲击力和可读性
+- **📂 变更文件**:
+  - `web/src/pages/SuperAgent.vue` (Modified: CSS 样式尺寸放大)
+  - `KnowledgeBase/ARCHITECTURE/welcome-page-redesign-spec.md` (Updated: 尺寸规范更新)
+- **⚡ 实现内容**:
+  - **容器尺寸**: max-width 640px → 720px，gap 32px → 40px
+  - **Logo 尺寸**: 80×80px → 104×104px，margin-bottom 16px → 20px，阴影 0 4px 16px → 0 4px 20px
+  - **品牌标题**: font-size 32px → 40px，letter-spacing 4px → 6px，margin-bottom 40px → 48px
+  - **输入框**: max-width 560px → 640px，border-radius 24px → 28px，padding 4px 4px 4px 20px → 6px 6px 6px 24px
+  - **输入框文字**: font-size 14px → 16px，padding 12px 56px 12px 4px
+  - **发送按钮**: 尺寸 ~32px → 40×40px，位置 right: 8px → 10px，bottom: 8px → 10px
+  - **案例区**: max-width 560px → 640px，margin-top 48px → 56px
+  - **案例标题**: font-size 13px → 15px，margin-bottom 16px → 20px
+  - **案例卡片**: gap 16px → 20px
+  - **卡片图片**: height 100px → 130px
+  - **卡片标题**: font-size 13px → 15px，padding 10px 14px → 12px 16px
+  - **空态文字**: font-size 13px → 15px，padding 24px 0 → 28px 0
+  - **残留清理**: 移除 .case-more 样式
+- **🏁 当前状态**: ✅ 欢迎页面尺寸放大完成，整体放大约 25-30%，保持比例协调
+
+## [2026-07-02 14:40:00] | Agent: Elite_Coder | Action: FIX_QA_AUDIT_ISSUES
+
+- **🎯 核心目的**: 修复 QA_Guardian 审计报告中的精选案例卡片动态推荐相关问题
+- **📂 变更文件**:
+  - `server/szyg/api/hermes_chat.py` (Modified: LLM 模型配置，缓存清理机制)
+  - `web/src/pages/SuperAgent.vue` (Modified: newConversation 调用 loadCaseCards，移除死代码 quickTags/insertTag，移除残留 CSS)
+- **⚡ 修复内容**:
+  - **P0 模型配置**: _infer_search_keyword 中 moonshot-v1-8k 改为 doubao-seed-2-0-lite-260428（已配置模型）
+  - **P1 newConversation**: 添加 loadCaseCards() 调用，确保新对话回到欢迎页时重新加载案例卡片
+  - **P2 死代码移除**: 移除 quickTags 数组和 insertTag 函数（模板中未引用）
+  - **P2 CSS 清理**: 移除 .quick-tags 和 .quick-tag 样式（模板中未引用）
+  - **P2 缓存清理**: 新增 _cleanup_expired_cache 函数，在 get_case_cards 中调用，清理过期缓存条目
+- **🏁 当前状态**: ✅ 审计报告中的 P0、P1、P2 问题全部修复完成
+
+## [2026-07-02 14:21:00] | Agent: Elite_Coder | Action: IMPLEMENT_DYNAMIC_CASE_CARDS
+
+- **🎯 核心目的**: 实现欢迎页精选案例卡片动态抖音短视频推荐，基于用户近期对话历史自动生成搜索关键词
+- **📂 变更文件**:
+  - `server/szyg/api/hermes_chat.py` (Modified: 新增 POST /api/hermes/case-cards 端点 + _infer_search_keyword + _select_top_videos + 缓存机制)
+  - `web/src/pages/SuperAgent.vue` (Modified: 移除硬编码 caseCards，新增 loadCaseCards 函数，修改 onMounted，模板动态渲染，CSS 样式)
+- **⚡ 实现内容**:
+  - **后端端点**: POST /api/hermes/case-cards，接收 recent_titles 和 limit，返回抖音短视频卡片列表
+  - **关键词推断**: _infer_search_keyword 使用 LLM 从近期对话标题推断抖音搜索关键词（5-15字）
+  - **抖音搜索**: 调用 PlaywrightAcquisitionAdapter.search 获取视频列表
+  - **排序筛选**: _select_top_videos 按 likes 降序取前 limit 条（LLM 排序暂未实现）
+  - **缓存机制**: 30 分钟内存缓存，避免重复启动 Playwright
+  - **前端状态**: caseCards ref + caseCardsLoading ref
+  - **前端函数**: loadCaseCards 获取近期对话标题，调用 API 加载卡片
+  - **模板变更**: 动态渲染 + v-loading 加载态 + 空态（暂无推荐案例），移除"更多 →"链接
+  - **CSS 样式**: case-card-image overflow + img object-fit: cover，case-empty 空态样式，welcome-page 垂直居中 + overflow: hidden + gap: 32px
+  - **点击行为**: 卡片点击后将视频标题填入输入框并发送
+- **🏁 当前状态**: ✅ 欢迎页精选案例卡片动态抖音短视频推荐功能完成
+
+## [2026-07-02 13:34:00] | Agent: Elite_Coder | Action: REDESIGN_WELCOME_PAGE
+
+- **🎯 核心目的**: 实现超级员工欢迎页面重设计，采用 Kimi 极简居中布局 + 黄金比例美学
+- **📂 变更文件**:
+  - `web/src/pages/SuperAgent.vue` (Modified: 欢迎页面模板、CSS 样式、数据结构)
+- **⚡ 实现内容**:
+  - **数据结构**: 新增 caseCards 常量（全栈代码开发助手、品牌营销策划案、企业数据分析报告）
+  - **模板重写**: welcome-state 改为 welcome-page，包含 brand-block（logo1 80px 圆形 + 超级员工标题）、welcome-input-box（极简输入框 + 内嵌发送按钮）、case-section（精选案例三列卡片）
+  - **CSS 样式**: 黄金比例布局（38vh 顶部留白、10vh 底部留白），品牌标题 32px + letter-spacing 4px，输入框 24px 大圆角，案例卡片 grid 布局 + hover 效果，响应式 768px 以下单列
+  - **移除项**: logo2Url 导入，thinkMode（不存在），底部工具栏（已移除）
+  - **保留项**: 对话历史面板、底部输入框、logo1Url 头像、右键菜单功能
+- **🏁 当前状态**: ✅ 欢迎页面重设计完成，符合 Kimi 极简美学和黄金比例布局
+
+## [2026-07-02 09:49:00] | Agent: Elite_Coder | Action: FIX_QA_ISSUES
+
+- **🎯 核心目的**: 修复 QA_Guardian 审计报告中的 minor 问题和 Electron 生产 URL 错误
+- **📂 变更文件**:
+  - `web/src/pages/SuperAgent.vue` (Modified: renameConversation/loadConversations, exportConversation/deleteConversation 错误处理)
+  - `electron/main.js` (Modified: 生产模式 URL 从 /login 改为 /)
+- **⚡ 修复内容**:
+  - **renameConversation**: 添加 loadConversations 调用，统一刷新对话列表
+  - **exportConversation**: 添加 catch 错误处理，console.error 记录失败
+  - **deleteConversation**: 添加 catch 错误处理，区分 cancel 和真实错误
+  - **Electron 生产 URL**: 将 `http://127.0.0.1:8000/login` 改为 `http://127.0.0.1:8000/`，适配已移除的登录页
+- **🏁 当前状态**: ✅ QA 审计问题全部修复
+
+## [2026-07-02 09:40:00] | Agent: QA_Guardian | Action: FIX_STARTUP_AND_ELECTRON
+
+- **🎯 核心目的**: 修复应用启动和 Electron 运行中的阻塞问题
+- **📂 变更文件**:
+  - `restart_szyg.ps1` (Modified: 完整重写，清理僵尸进程、强制 Vite 5173 端口、等待服务就绪)
+  - `start_electron.bat` (Modified: 设置 `NODE_ENV=development` 以加载 Vite dev server)
+  - `electron/main.js` (Modified: 后端端口检测避免重复启动死循环，ComfyUI Python 有效性校验)
+  - `D:\ComfyUI\.venv` (Fixed: 通过 `uv python install 3.11.15` 恢复缺失的 Python 解释器)
+- **⚡ 修复内容**:
+  - **僵尸进程清理**: `restart_szyg.ps1` 启动前杀死 8000 后端和 5173-5200 的 Vite 进程
+  - **Vite 端口固定**: `npm run dev -- --port 5173 --strictPort` 防止端口漂移
+  - **服务就绪等待**: 轮询后端 8000 和 Vite 5173 就绪后再打开浏览器
+  - **终端进度条降噪**: 添加 `$ProgressPreference = 'SilentlyContinue'` 消除健康检查轮询刷屏
+  - **Electron dev 模式**: `start_electron.bat` 设置 `NODE_ENV=development`，加载 `http://localhost:5173`
+  - **Electron 后端复用**: `electron/main.js` 检测 8000 已有后端则跳过 spawn，避免后端启动失败导致的 2 秒死循环
+  - **ComfyUI venv 修复**: `D:\ComfyUI\.venv` 的 Python 3.11.15 解释器缺失，通过 uv 重新安装恢复
+- **🏁 当前状态**: ✅ 应用启动和 Electron 运行路径已修复
+
+## [2026-07-02 09:36:00] | Agent: Elite_Coder | Action: ADD_CONTEXT_MENU
+
+- **🎯 核心目的**: 实现对话历史面板右键上下文菜单功能
+- **📂 变更文件**:
+  - `server/szyg/api/conversation_routes.py` (Modified: 新增 pinned 字段和排序逻辑)
+  - `web/src/pages/SuperAgent.vue` (Modified: 右键菜单组件、函数、CSS 样式)
+- **⚡ 实现内容**:
+  - **后端**: ConversationUpdate 新增 pinned 字段，update_conversation 处理 pinned，_list_convs 返回 pinned，list_conversations 排序改为置顶优先，create_conversation 新增 pinned 默认值
+  - **前端**: 导入右键菜单图标和 ElMessageBox，新增 ctxMenu 状态，对话项添加右键事件和置顶样式，添加右键菜单组件，实现重命名/置顶/导出/删除函数，添加右键菜单 CSS 样式
+  - **功能**: 重命名（ElMessageBox.prompt）、置顶/取消置顶（pinned 字段 + 后端排序）、导出（前端 Markdown 下载）、删除（二次确认 + 已有 DELETE 接口）
+  - **边界处理**: 菜单 position: fixed + nextTick 边界检测，点击空白关闭
+- **🏁 当前状态**: ✅ 对话历史右键菜单功能完成，可测试右键菜单操作
+
+## [2026-07-01 20:53:00] | Agent: Elite_Coder | Action: ADD_VIDEO_CARD_RENDERING
+
+- **🎯 核心目的**: 实现 SuperAgent 对话流中 AI 生成视频的完整渲染链路
+- **📂 变更文件**:
+  - `server/szyg/api/hermes_chat.py` (Modified: SSE 新增 video_task/video_status/video 事件)
+  - `web/src/pages/SuperAgent.vue` (Modified: 视频卡片组件、Video Modal、SSE 处理、CSS 样式)
+- **⚡ 实现内容**:
+  - **后端 SSE 事件**: 检测 `ai_video_create` 和 `ai_video_task_status`，发送 video_task/video_status/video 事件
+  - **兼容状态拼写**: 兼容 VolcEngine 返回的 `succeed` 和 `succeeded` 两种状态
+  - **前端状态管理**: 新增 `streamVideoTasks` 和 `streamVideos` 收集流式视频数据
+  - **SSE 事件处理**: 新增 video_task/video_status/video 分支，支持进度更新和完成检测
+  - **进度卡片**: 显示 spinner + prompt + status，通过 task_id 原地更新避免闪烁
+  - **视频卡片**: 内嵌 `<video controls>` 播放器，支持放大/全屏/下载按钮
+  - **Video Modal**: 半透明背景 overlay，居中大播放器，支持全屏和关闭
+  - **CSS 样式**: 进度卡片、视频卡片、Video Modal 完整样式
+  - **对话持久化**: 保存时包含 video_url、task_id、status、progress 字段
+- **🏁 当前状态**: ✅ 视频卡片渲染功能完成，可测试视频生成工具
+
+## [2026-07-01 20:37:00] | Agent: Elite_Coder | Action: FIX_VITE_PROXY_CONFIG
+
+- **🎯 核心目的**: 修复 Vite 代理连接不上后端的网络问题
+- **📂 变更文件**:
+  - `web/vite.config.js` (Fixed: 代理目标改为 127.0.0.1 强制 IPv4)
+  - `restart_szyg.ps1` (Fixed: 浏览器打开地址改为前端 dev server)
+- **⚡ 修复内容**:
+  - **Vite 代理配置**: 改为 `http://127.0.0.1:8000` 强制 IPv4，避免 Windows localhost 解析到 IPv6
+  - **浏览器地址**: 改为 `http://localhost:5173` 前端 dev server，而非后端 404 地址
+- **🏁 当前状态**: ✅ 网络连接问题修复完成，可测试图片生成工具
+
+## [2026-07-01 20:25:00] | Agent: Elite_Coder | Action: FIX_IMAGE_CARD_REVIEW_ISSUES
+
+- **🎯 核心目的**: 修复图片卡片渲染审查中的 P0 问题
+- **📂 变更文件**:
+  - `server/szyg/api/hermes_chat.py` (Fixed: 工具名和响应字段不匹配)
+  - `web/src/pages/SuperAgent.vue` (Fixed: 保存对话丢失图片字段)
+- **⚡ 修复内容**:
+  - **P0 - 工具名不匹配**: 改为 `ai_image_generate` 而非 `image_generate`/`image_generate_tool`
+  - **P0 - 响应字段不匹配**: 改为 `ok`/`url` 而非 `success`/`image`
+  - **P0 - 保存对话丢失字段**: 保存时保留 `image_url` 和 `prompt`
+- **🏁 当前状态**: ✅ 图片卡片功能修复完成，可测试图片生成工具
+
+## [2026-07-01 20:13:00] | Agent: Elite_Coder | Action: ADD_IMAGE_CARD_RENDERING
+
+- **🎯 核心目的**: 修复 SuperAgent.vue 白屏问题，实现图片卡片渲染和 Lightbox 预览
+- **📂 变更文件**:
+  - `server/szyg/api/hermes_chat.py` (Modified: SSE 新增 image 事件)
+  - `web/src/pages/SuperAgent.vue` (Modified: ImageCard 组件、Lightbox、SSE 处理)
+- **⚡ 实现内容**:
+  - **后端 SSE image 事件**: 检测图片生成工具返回值，发送 image 事件包含 url 和 prompt
+  - **前端 ImageCard 组件**: 新增 `msg.type === 'image'` 分支，显示图片卡片和 prompt
+  - **SSE image 事件处理**: 收集 streamImages 数组，流结束后插入对话流
+  - **Lightbox 预览**: 使用 el-image-viewer 实现图片点击放大预览
+  - **markdown img 点击**: 事件委托监听 `.msg-text img` 点击，纳入 Lightbox
+  - **CSS 样式**: 添加 image-card 样式，悬停显示 prompt overlay
+- **🏁 当前状态**: ✅ 图片卡片渲染功能完成，可测试图片生成工具
+
+## [2026-07-01 19:55:00] | Agent: Elite_Coder | Action: FIX_MEDIACRAWLER_REVIEW_ISSUES
+
+- **🎯 核心目的**: 修复 MediaCrawler 审查报告中的新问题和遗留问题
+- **📂 变更文件**:
+  - `server/szyg/integrations/mediacrawler_bridge.py` (Fixed: P0 新 bug 和遗留问题)
+  - `server/szyg/integrations/normalize_utils.py` (Fixed: P1 schema 回归)
+- **⚡ 修复内容**:
+  - **P0 - get_douyin_comments 方法名错误**: 改为 get_aweme_comments，参数是 cursor 不是 count
+  - **P0 - get_douyin_detail/get_douyin_comments context 泄漏**: 添加 finally 块归还 context
+  - **P0 - 缓存 client 失效**: 在 _get_douyin_client 里检查 page.is_closed()，失效时清除缓存
+  - **P1 - _normalize_comment schema 回归**: 恢复 reply_count 和 ip_location 字段，保持向后兼容
+  - **P2 - search_douyin 异常时清除缓存**: 异常时调用 self._clients.pop("douyin", None)
+- **🏁 当前状态**: ✅ 所有审查问题已修复，可重启后端测试
+
+## [2026-07-01 19:14:00] | Agent: Elite_Coder | Action: FIX_MEDIACRAWLER_AUDIT_ISSUES
+
+- **🎯 核心目的**: 修复 MediaCrawler 集成审计报告中的问题
+- **📂 变更文件**:
+  - `server/szyg/integrations/mediacrawler_bridge.py` (Fixed: P0/P1/P2 问题)
+  - `server/szyg/integrations/normalize_utils.py` (Created: 解耦循环依赖)
+  - `server/szyg/integrations/acquisition_adapters.py` (Modified: 使用单例、从 normalize_utils 导入)
+- **⚡ 修复内容**:
+  - **P0 - 浏览器上下文泄漏**: 在 search_douyin 的 finally 块中调用 return_context 归还 context
+  - **P1 - Cookie 域匹配错误**: 建立平台到域名的映射表 _PLATFORM_DOMAINS
+  - **P2 - 循环依赖**: 创建独立的 normalize_utils.py，两边都从那里导入
+  - **P2 - 响应解析不一致**: 统一响应解析逻辑，兼容 dict/list
+  - **P2 - 实例不复用**: 添加模块级别单例 get_mediacrawler_bridge()
+  - **P2 - limit > 15 限制**: 添加分页逻辑，offset 递增直到达到 limit
+  - **P3 - 未使用导入**: 清理 XhsClient/KuaishouClient/BilibiliClient/make_async_client
+- **🏁 当前状态**: ✅ 所有审计问题已修复，可重启后端测试
+
+## [2026-07-01 19:06:00] | Agent: Elite_Coder | Action: INTEGRATE_MEDIACRAWLER
+
+- **🎯 核心目的**: 集成 MediaCrawler 实现多平台搜索功能
+- **📂 变更文件**:
+  - `vendor/MediaCrawler/` (Added: Git Submodule)
+  - `server/szyg/integrations/mediacrawler_bridge.py` (Created: MediaCrawler 桥接层)
+  - `server/szyg/integrations/acquisition_adapters.py` (Modified: _search_douyin 集成 MediaCrawler)
+  - `pyproject.toml` (Modified: 添加 PyExecJS 依赖)
+- **⚡ 实现内容**:
+  - **Git Submodule**: 添加 MediaCrawler 作为 vendor/MediaCrawler
+  - **依赖安装**: MediaCrawler uv sync + PyExecJS
+  - **桥接层**: MediaCrawlerBridge 类实现
+    - 从 SessionManager 加载 storage_state
+    - 通过 BrowserPool 创建 BrowserContext
+    - 初始化 DouYinClient 并调用搜索 API
+    - 返回统一格式的搜索结果
+  - **双模式策略**: 优先 MediaCrawler 桥接模式，失败时 fallback 到浏览器拦截模式
+  - **日志区分**: [MediaCrawler] 和 [BrowserFallback] 两种模式日志
+- **🏁 当前状态**: ✅ MediaCrawler 集成完成，需重启后端测试
+
+## [2026-07-01 17:29:00] | Agent: Elite_Coder | Action: FIX_LLM_OUTPUT_RULES
+
+- **🎯 核心目的**: 修改 SYSTEM_PROMPT 解决 LLM 原样输出工具返回 JSON 的问题
+- **📂 变更文件**:
+  - `server/szyg/api/hermes_chat.py` (Modified: SYSTEM_PROMPT 回复要求部分)
+- **⚡ 修改内容**:
+  - **工具结果呈现规则**: 追加 6 条严格规则
+    - 禁止原样输出工具返回的 JSON
+    - 用自然语言 + 结构化格式（表格、列表）总结关键信息
+    - 列表数据提取关键字段以表格或编号列表呈现
+    - 操作结果用一句话确认，附上关键标识
+    - 错误用自然语言解释原因和解决方案
+    - 绝对不要在回复中包含原始 JSON 片段
+- **🏁 当前状态**: ✅ SYSTEM_PROMPT 已按规范修改，需重启后端测试
+
+## [2026-07-01 17:04:00] | Agent: Elite_Coder | Action: DOUYIN_SEARCH_DEBUG
+
+- **🎯 核心目的**: 为抖音搜索添加调试功能，定位数据采集层缺陷
+- **📂 变更文件**:
+  - `server/szyg/integrations/acquisition_adapters.py` (Modified: _search_douyin 方法)
+- **⚡ 添加的调试功能**:
+  - **API 拦截日志**: 记录所有响应 URL，匹配时记录 body keys 和提取结果数量
+  - **DOM 快照**: 保存页面截图 (search_page.png) 和 HTML (search_page.html)
+  - **选择器统计**: 统计 7 种可能的选择器匹配数量
+  - **滚动触发**: 添加 3 次滚动触发懒加载逻辑
+  - **JSON 保存**: 保存 API 响应原始 JSON (last_api_response.json)
+- **🏁 当前状态**: ✅ 调试功能已添加，需重启后端测试
+
+## [2026-07-01 16:55:00] | Agent: QA_Guardian | Action: DOUYIN_SEARCH_AUDIT
+
+- **🎯 核心目的**: 审计 SuperAgent 中抖音搜索返回 0 结果的问题，定位数据采集层缺陷
+- **📂 审计范围**:
+  - `server/szyg/api/hermes_chat.py` (acq_search 工具调用链)
+  - `server/szyg/mcp_servers/acquisition_mcp.py` (acq_search 工具定义)
+  - `server/szyg/integrations/acquisition_adapters.py` (`PlaywrightAcquisitionAdapter._search_douyin`)
+  - `server/szyg/intercept_engine.py` (搜索聚合与 fallback)
+- **⚡ 发现的关键缺陷**:
+  - **P0 - 采集拿不到数据**: `_search_douyin` 只等待 4 秒且不滚动，抖音搜索页的真实视频列表通常由滚动懒加载触发，导致 API 拦截和 DOM fallback 都拿不到数据。
+  - **P1 - API 路径匹配过窄**: 仅监听 `/aweme/v1/web/general/search/` 和 `/aweme/v1/web/search/item/`，抖音接口路径或结构变更后容易失效。
+  - **P1 - DOM 选择器脆弱**: 使用 `[data-e2e="search-video-item"]` 等属性，抖音改版后极易失效；未验证页面是否出现反爬/验证码/登录弹窗。
+  - **P2 - 错误静默吞掉**: API 拦截和 DOM 解析均使用 `try/except` 后直接返回空列表，没有错误信息返回给前端，无法判断失败原因。
+  - **P2 - 缺少调试证据**: 没有截图、网络请求日志、页面 HTML 快照，无法复现页面真实状态。
+- **🏁 当前状态**: ⚠️ 审计完成 | ❌ 抖音搜索功能实际不可用 | 🔧 需增加滚动触发、调试输出、错误暴露
+
 ## [2026-07-01 14:15:00] | Agent: Elite_Coder | Action: REMOVE_LOGIN_PAGE
 
 - **🎯 核心目的**: 移除登录页，改为自动认证策略

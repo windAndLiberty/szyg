@@ -17,41 +17,7 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-
-# ── Unified Data Structures ──────────────────────────────────────────────
-
-def _normalize_search_result(item: dict, platform: str) -> dict:
-    """将各平台搜索结果统一为标准格式"""
-    return {
-        "video_id": str(item.get("video_id", item.get("id", item.get("bvid", "")))),
-        "platform": platform,
-        "title": item.get("title", item.get("desc", ""))[:200],
-        "description": item.get("description", item.get("desc", ""))[:500],
-        "author": item.get("author", item.get("name", item.get("nickname", ""))),
-        "author_followers": item.get("author_followers", item.get("followers", 0)),
-        "url": item.get("url", item.get("link", "")),
-        "cover": item.get("cover", item.get("pic", item.get("cover_url", ""))),
-        "plays": item.get("plays", item.get("play", item.get("view_count", 0))),
-        "likes": item.get("likes", item.get("like", item.get("digg_count", 0))),
-        "comments_count": item.get("comments_count", item.get("comment", item.get("comment_count", 0))),
-        "shares": item.get("shares", item.get("share", item.get("share_count", 0))),
-        "published_at": item.get("published_at", item.get("pubdate", item.get("create_time", ""))),
-    }
-
-
-def _normalize_comment(item: dict, platform: str) -> dict:
-    """将各平台评论统一为标准格式"""
-    return {
-        "comment_id": str(item.get("comment_id", item.get("rpid", item.get("cid", "")))),
-        "platform": platform,
-        "author": item.get("author", item.get("name", item.get("nickname", item.get("member", {}).get("uname", "")))),
-        "author_id": str(item.get("author_id", item.get("mid", item.get("uid", "")))),
-        "text": item.get("text", item.get("content", item.get("message", ""))),
-        "likes": item.get("likes", item.get("like", item.get("digg_count", 0))),
-        "created_at": item.get("created_at", item.get("ctime", item.get("create_time", ""))),
-        "reply_count": item.get("reply_count", item.get("replies", item.get("sub_comment_count", 0))),
-        "ip_location": item.get("ip_location", item.get("ip_location", "")),
-    }
+from .normalize_utils import _normalize_search_result, _normalize_comment
 
 
 # ── Base Acquisition Adapter ─────────────────────────────────────────────
@@ -267,7 +233,7 @@ class PlaywrightAcquisitionAdapter(BaseAcquisitionAdapter):
         self._session = None
 
     async def _ensure_browser(self):
-        """确保浏览器上下文已初始化"""
+        """确保浏览器上下文已初始化（headless 模式，无可见窗口）"""
         if self._page:
             return self._page
 
@@ -275,7 +241,7 @@ class PlaywrightAcquisitionAdapter(BaseAcquisitionAdapter):
         from szyg.platforms.session_manager import get_session_manager
         from szyg.publisher import Platform
 
-        self._pool = get_browser_pool()
+        self._pool = get_browser_pool(headless=True)
         await self._pool.start()
         self._session = get_session_manager()
 
@@ -322,7 +288,11 @@ class PlaywrightAcquisitionAdapter(BaseAcquisitionAdapter):
 
     async def search(self, keyword: str, limit: int = 20) -> list[dict]:
         """在平台搜索视频 — 子类可覆盖实现平台特定逻辑"""
-        page = await self._ensure_browser()
+        try:
+            page = await self._ensure_browser()
+        except Exception as e:
+            logger.error(f"{self.platform} _ensure_browser failed: {e}", exc_info=True)
+            return []
         results = []
 
         try:
@@ -333,32 +303,181 @@ class PlaywrightAcquisitionAdapter(BaseAcquisitionAdapter):
             elif self.platform == "kuaishou":
                 results = await self._search_kuaishou(page, keyword, limit)
         except Exception as e:
-            logger.error(f"{self.platform} search error: {e}")
+            logger.error(f"{self.platform} search error: {e}", exc_info=True)
         finally:
             await self._close_browser()
 
         return results
 
     async def _search_douyin(self, page, keyword: str, limit: int) -> list[dict]:
-        """抖音搜索"""
-        await page.goto(f"https://www.douyin.com/search/{keyword}", wait_until="domcontentloaded")
-        await page.wait_for_timeout(3000)
+        """抖音搜索 — 优先 MediaCrawler 桥接模式，fallback 到浏览器拦截模式"""
+        # ── 策略 1: MediaCrawler 桥接模式 ─────────────────────────────
+        try:
+            from .mediacrawler_bridge import get_mediacrawler_bridge
+            bridge = get_mediacrawler_bridge()
+            mc_results = await bridge.search_douyin(keyword, limit)
+            if mc_results:
+                logger.info(f"[MediaCrawler] Douyin search succeeded: {len(mc_results)} results")
+                return mc_results
+            else:
+                logger.warning("[MediaCrawler] Douyin search returned 0 results, falling back to browser mode")
+        except Exception as e:
+            logger.warning(f"[MediaCrawler] Douyin search failed: {e}, falling back to browser mode")
 
-        video_items = await page.query_selector_all('[data-e2e="search-video-item"]')
-        results = []
-        for item in video_items[:limit]:
-            try:
-                link = await item.query_selector("a")
-                href = await link.get_attribute("href") if link else ""
-                title = await item.inner_text() if link else ""
-                aweme_id = re.search(r'/video/(\d+)', href or "")
-                results.append(_normalize_search_result({
-                    "video_id": aweme_id.group(1) if aweme_id else "",
-                    "title": title[:200],
-                    "url": f"https://www.douyin.com{href}" if href.startswith("/") else href,
-                }, "douyin"))
-            except Exception:
-                continue
+        # ── 策略 2: 浏览器拦截模式 (fallback) ─────────────────────────
+        logger.info("[BrowserFallback] Using browser interception mode")
+        results: list[dict] = []
+        seen_ids: set[str] = set()
+
+        def _extract_from_api_data(data: dict) -> list[dict]:
+            """从抖音搜索 API JSON 响应中提取视频列表"""
+            # 保存原始 JSON 用于调试
+            import json
+            import os
+            os.makedirs("data/audit/douyin", exist_ok=True)
+            with open("data/audit/douyin/last_api_response.json", "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+
+            items = []
+            # 抖音搜索 API 返回结构: { data: [ { aweme_info: {...}, ... } ] }
+            raw = data.get("data", [])
+            if isinstance(raw, dict):
+                raw = raw.get("aweme_list", raw.get("data", []))
+            if not isinstance(raw, list):
+                return items
+            for entry in raw:
+                aweme = entry.get("aweme_info") or entry.get("aweme") or entry
+                if not aweme or not isinstance(aweme, dict):
+                    continue
+                vid = str(aweme.get("aweme_id", aweme.get("id", "")))
+                if not vid or vid in seen_ids:
+                    continue
+                desc = aweme.get("desc", "")
+                author_obj = aweme.get("author", aweme.get("author_info", {}))
+                stats = aweme.get("statistics", aweme.get("stats", {}))
+                video_obj = aweme.get("video", {})
+                cover_obj = video_obj.get("cover", video_obj.get("origin_cover", {}))
+                play_url = video_obj.get("play_addr", {}).get("url_list", [None])
+                items.append({
+                    "video_id": vid,
+                    "title": desc[:200],
+                    "description": desc[:500],
+                    "author": author_obj.get("nickname", author_obj.get("name", "")) if isinstance(author_obj, dict) else "",
+                    "author_followers": author_obj.get("follower_count", 0) if isinstance(author_obj, dict) else 0,
+                    "url": f"https://www.douyin.com/video/{vid}",
+                    "cover": cover_obj.get("url_list", [None])[0] if isinstance(cover_obj, dict) else "",
+                    "plays": stats.get("play_count", stats.get("digg_count", 0)) if isinstance(stats, dict) else 0,
+                    "likes": stats.get("digg_count", 0) if isinstance(stats, dict) else 0,
+                    "comments_count": stats.get("comment_count", 0) if isinstance(stats, dict) else 0,
+                    "shares": stats.get("share_count", 0) if isinstance(stats, dict) else 0,
+                    "published_at": aweme.get("create_time", ""),
+                })
+            return items
+
+        # ── 策略 1: 拦截网络响应 ──────────────────────────────────
+        api_results: list[dict] = []
+
+        async def _on_response(response):
+            url = response.url
+            logger.info("Douyin response url: %s", url)
+            if "/aweme/v1/web/general/search/" in url or "/aweme/v1/web/search/item/" in url:
+                try:
+                    body = await response.json()
+                    logger.info("Douyin API matched, body keys: %s", list(body.keys()))
+                    extracted = _extract_from_api_data(body)
+                    api_results.extend(extracted)
+                    logger.info("Douyin API intercept: got %d items from %s", len(extracted), url)
+                except Exception as e:
+                    logger.warning("Douyin API response parse failed: %s | url=%s", e, url)
+
+        page.on("response", _on_response)
+        try:
+            await page.goto(
+                f"https://www.douyin.com/search/{keyword}",
+                wait_until="domcontentloaded",
+            )
+            # 等待 API 响应或滚动触发加载
+            await page.wait_for_timeout(2000)
+
+            # 滚动几次触发懒加载
+            for i in range(3):
+                await page.evaluate("window.scrollBy(0, 800)")
+                await page.wait_for_timeout(2000)
+
+            # 新增：截图 + 保存 HTML
+            import os
+            os.makedirs("data/audit/douyin", exist_ok=True)
+            await page.screenshot(path="data/audit/douyin/search_page.png", full_page=True)
+            html = await page.content()
+            with open("data/audit/douyin/search_page.html", "w", encoding="utf-8") as f:
+                f.write(html)
+
+            # 新增：统计各种可能的选择器
+            selectors = [
+                '[data-e2e="search-video-item"]',
+                '[data-e2e="search-result-video"]',
+                'ul[data-e2e="search-result-list"] li',
+                'a[href*="/video/"]',
+                'a[href*="/video/"] img',
+                '[class*="search-result"]',
+                '[class*="video-card"]',
+            ]
+            for sel in selectors:
+                count = len(await page.query_selector_all(sel))
+                logger.info("Douyin selector %s => %d", sel, count)
+
+            # 如果 API 拦截已拿到足够数据，直接返回
+            if api_results:
+                for item in api_results:
+                    vid = item["video_id"]
+                    if vid in seen_ids:
+                        continue
+                    seen_ids.add(vid)
+                    results.append(_normalize_search_result(item, "douyin"))
+                    if len(results) >= limit:
+                        break
+                logger.info("Douyin search via API intercept: %d results", len(results))
+                return results
+
+            # ── 策略 2: DOM 选择器 fallback ────────────────────────
+            logger.warning("Douyin API intercept got 0 results, falling back to DOM scraping")
+            video_items = await page.query_selector_all('[data-e2e="search-video-item"]')
+            if not video_items:
+                video_items = await page.query_selector_all('[data-e2e="search-result-video"]')
+            if not video_items:
+                video_items = await page.query_selector_all('ul[data-e2e="search-result-list"] li')
+            if not video_items:
+                video_items = await page.query_selector_all('a[href*="/video/"]')
+
+            for item in video_items[:limit * 2]:
+                try:
+                    if await item.evaluate("el => el.tagName") == "A":
+                        link = item
+                    else:
+                        link = await item.query_selector("a[href*='/video/']") or await item.query_selector("a")
+                    if not link:
+                        continue
+                    href = await link.get_attribute("href") or ""
+                    if "/video/" not in href:
+                        continue
+                    aweme_id = re.search(r'/video/(\d+)', href)
+                    vid = aweme_id.group(1) if aweme_id else ""
+                    if vid in seen_ids:
+                        continue
+                    seen_ids.add(vid)
+                    title = (await item.inner_text()).strip()[:200]
+                    results.append(_normalize_search_result({
+                        "video_id": vid,
+                        "title": title,
+                        "url": f"https://www.douyin.com{href}" if href.startswith("/") else href,
+                    }, "douyin"))
+                    if len(results) >= limit:
+                        break
+                except Exception:
+                    continue
+            logger.info("Douyin search via DOM fallback: %d results", len(results))
+        finally:
+            page.remove_listener("response", _on_response)
         return results
 
     async def _search_xhs(self, page, keyword: str, limit: int) -> list[dict]:

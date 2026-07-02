@@ -99,20 +99,34 @@ def get_launch_config_native(headless: bool = False) -> dict:
 
     使用 Playwright 自带的 ms-playwright 缓存中的 Chromium，
     而非系统安装的 Chrome。保证版本锁定与协议合规。
+
+    headless=True: 无头模式，增加反检测参数避免被识别为自动化浏览器。
     """
+    args = [
+        "--disable-blink-features=AutomationControlled",
+        "--no-sandbox",
+        "--disable-infobars",
+        "--disable-features=IsolateOrigins,site-per-process",
+        "--disable-gpu",
+        "--disable-dev-shm-usage",
+        "--window-size=1536,864",
+        "--window-position=0,0",
+    ]
+    if headless:
+        args.extend([
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-extensions",
+            "--disable-component-extensions-with-background-pages",
+            "--disable-popup-blocking",
+            "--disable-prompt-on-repost",
+            "--disable-renderer-backgrounding",
+            "--force-fieldtrials=*SiteIsolationExtensionsIPC@None/",
+        ])
     return {
         "headless": headless,
         # 不指定 channel — Playwright 自动定位 ms-playwright 中的捆绑 Chromium
-        "args": [
-            "--disable-blink-features=AutomationControlled",
-            "--no-sandbox",
-            "--disable-infobars",
-            "--disable-features=IsolateOrigins,site-per-process",
-            "--disable-gpu",
-            "--disable-dev-shm-usage",
-            "--window-size=1536,864",
-            "--window-position=0,0",
-        ],
+        "args": args,
     }
 
 

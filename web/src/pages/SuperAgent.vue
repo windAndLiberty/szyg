@@ -1,5 +1,5 @@
 <template>
-  <div class="super-agent">
+  <div class="super-agent" @click="closeContextMenu">
     <div class="agent-layout">
       <!-- Left: Conversation History Panel -->
       <div class="conv-history-panel">
@@ -14,10 +14,14 @@
             v-for="conv in state.conversations"
             :key="conv.id"
             class="conv-item"
-            :class="{ active: conv.id === state.activeConvId }"
+            :class="{ active: conv.id === state.activeConvId, pinned: conv.pinned }"
             @click="selectConversation(conv.id)"
+            @contextmenu.prevent="openContextMenu($event, conv)"
           >
-            <div class="conv-item-title">{{ conv.title }}</div>
+            <div class="conv-item-title">
+              <span v-if="conv.pinned" class="pin-icon">📌</span>
+              {{ conv.title }}
+            </div>
             <div class="conv-item-time">{{ formatTime(conv.updated_at) }}</div>
           </div>
         </div>
@@ -30,30 +34,111 @@
       <!-- Right: Chat Area -->
       <div class="chat-area">
         <!-- Messages Area -->
-        <div class="messages-area" ref="messagesRef">
+        <div class="messages-area" ref="messagesRef" :class="{ 'welcome-mode': state.messages.length === 0 }">
           <!-- Welcome Empty State -->
-          <div v-if="state.messages.length === 0" class="welcome-state">
-            <div class="agent-icon">🤖</div>
-            <div class="welcome-title">你好，我是超级员工</div>
-            <div class="welcome-desc">用一句话指挥我完成任何营销任务</div>
-            <div class="quick-cards-grid">
-              <div
-                v-for="card in quickCards"
-                :key="card.title"
-                class="quick-card"
-                @click="sendQuickCard(card.content)"
+          <div v-if="state.messages.length === 0" class="welcome-page">
+            <!-- Logo + 品牌标识 -->
+            <div class="brand-block">
+              <div class="brand-logo"><img :src="logo1Url" alt="logo" /></div>
+              <h1 class="brand-title">超级员工</h1>
+            </div>
+
+            <!-- 核心输入框（极简，发送按钮内嵌） -->
+            <div class="welcome-input-box">
+              <el-input
+                v-model="inputText"
+                type="textarea"
+                :rows="3"
+                placeholder='输入 "/" 唤起工具和能力'
+                @keydown.enter.exact.prevent="sendMessage"
+                :disabled="state.streaming"
+                resize="none"
+              />
+              <el-button
+                class="welcome-send-btn"
+                type="primary"
+                circle
+                @click="sendMessage"
+                :loading="state.streaming"
               >
-                <div class="card-title">{{ card.title }}</div>
-                <div class="card-desc">{{ card.desc }}</div>
+                <el-icon><Promotion /></el-icon>
+              </el-button>
+            </div>
+
+            <!-- 精选案例 -->
+            <div class="case-section">
+              <div class="case-header">
+                <span class="case-title">智能员工 精选案例</span>
+              </div>
+              <div class="case-cards" v-loading="caseCardsLoading">
+                <div
+                  v-for="card in caseCards"
+                  :key="card.video_url"
+                  class="case-card"
+                  @click="sendQuickCard(card.title)"
+                >
+                  <div class="case-card-image">
+                    <img v-if="card.cover_url" :src="card.cover_url" :alt="card.title" />
+                  </div>
+                  <div class="case-card-title">{{ card.title }}</div>
+                </div>
+              </div>
+              <div v-if="!caseCardsLoading && caseCards.length === 0" class="case-empty">
+                暂无推荐案例
               </div>
             </div>
           </div>
 
           <!-- Messages -->
           <div v-for="msg in state.messages" :key="msg.id" class="message" :class="msg.role">
-            <div class="msg-avatar">{{ msg.role === 'user' ? getUserInitial() : '🤖' }}</div>
+            <div class="msg-avatar">{{ msg.role === 'user' ? getUserInitial() : '' }}<img v-if="msg.role !== 'user'" :src="logo1Url" alt="AI" class="avatar-logo" /></div>
             <div class="msg-content">
-              <div class="msg-text" v-html="renderMarkdown(msg.content)"></div>
+              <!-- 视频进度卡片 -->
+              <div v-if="msg.type === 'video_pending'" class="video-card-pending">
+                <div class="video-pending-icon">
+                  <el-icon class="is-loading"><Loading /></el-icon>
+                </div>
+                <div class="video-pending-info">
+                  <div class="video-pending-title">🎬 视频生成中...</div>
+                  <div class="video-pending-prompt">{{ msg.prompt }}</div>
+                  <div class="video-pending-status">
+                    状态: {{ msg.status }} {{ msg.progress > 0 ? msg.progress + '%' : '' }}
+                  </div>
+                </div>
+              </div>
+              <!-- 视频播放卡片 -->
+              <div v-else-if="msg.type === 'video'" class="video-card">
+                <video
+                  :src="msg.video_url"
+                  controls
+                  preload="metadata"
+                  class="video-player"
+                  :ref="el => videoRefs[msg.id] = el"
+                />
+                <div class="video-card-footer">
+                  <span class="video-card-prompt">{{ msg.prompt }}</span>
+                  <div class="video-card-actions">
+                    <el-button text size="small" @click="enlargeVideo(msg)">
+                      <el-icon><ZoomIn /></el-icon> 放大
+                    </el-button>
+                    <el-button text size="small" @click="fullscreenVideo(msg)">
+                      <el-icon><FullScreen /></el-icon> 全屏
+                    </el-button>
+                    <el-button text size="small" @click="downloadVideo(msg)">
+                      <el-icon><Download /></el-icon> 下载
+                    </el-button>
+                  </div>
+                </div>
+              </div>
+              <!-- 图片卡片 -->
+              <div v-else-if="msg.type === 'image'" class="image-card" @click="openLightbox(msg.image_url)">
+                <img :src="msg.image_url" :alt="msg.prompt" loading="lazy" />
+                <div class="image-card-overlay">
+                  <span>{{ msg.prompt }}</span>
+                </div>
+              </div>
+              <!-- 文本 -->
+              <div v-else class="msg-text" v-html="renderMarkdown(msg.content)" @click="handleMsgClick"></div>
               <div v-if="msg.toolCall" class="tool-calls">
                 <div class="tool-call-item">
                   <el-tag size="small" :type="msg.toolCall.status === 'success' ? 'success' : msg.toolCall.status === 'error' ? 'danger' : 'warning'">
@@ -65,7 +150,7 @@
             </div>
           </div>
           <div v-if="state.streaming" class="message assistant">
-            <div class="msg-avatar">🤖</div>
+            <div class="msg-avatar"><img :src="logo1Url" alt="AI" class="avatar-logo" /></div>
             <div class="msg-content">
               <div class="msg-text streaming-text" v-html="renderMarkdown(streamText)"></div><span class="cursor">▊</span>
               <div v-if="streamTools.length" class="tool-calls">
@@ -81,24 +166,12 @@
         </div>
 
         <!-- Input Area -->
-        <div class="input-area">
-          <div class="quick-tags">
-            <el-tag
-              v-for="tag in quickTags"
-              :key="tag"
-              class="quick-tag"
-              effect="plain"
-              round
-              @click="insertTag(tag)"
-            >
-              {{ tag }}
-            </el-tag>
-          </div>
+        <div class="input-area" v-if="state.messages.length > 0">
           <div class="input-row">
             <el-input
               v-model="inputText"
               type="textarea"
-              :rows="2"
+              :rows="3"
               placeholder="输入指令，如：帮我搜索抖音上关于AI培训的视频，生成评论并发送"
               @keydown.enter.exact.prevent="sendMessage"
               :disabled="state.streaming"
@@ -110,12 +183,69 @@
         </div>
       </div>
     </div>
+
+    <!-- Lightbox -->
+    <el-image-viewer
+      v-if="lightbox.show"
+      :url-list="[lightbox.url]"
+      @close="lightbox.show = false"
+    />
+
+    <!-- Video Modal -->
+    <div v-if="videoModal.show" class="video-modal-overlay" @click.self="closeVideoModal">
+      <div class="video-modal-container">
+        <video
+          v-if="videoModal.url"
+          :src="videoModal.url"
+          controls
+          autoplay
+          class="video-modal-player"
+          :ref="el => videoModalRef = el"
+        />
+        <div class="video-modal-actions">
+          <el-button text size="small" @click="fullscreenModalVideo">
+            <el-icon><FullScreen /></el-icon> 全屏
+          </el-button>
+          <el-button text size="small" @click="closeVideoModal">
+            <el-icon><Close /></el-icon> 关闭
+          </el-button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右键菜单 -->
+    <div
+      v-if="ctxMenu.show"
+      class="ctx-menu"
+      :style="{ left: ctxMenu.x + 'px', top: ctxMenu.y + 'px' }"
+      @click.stop
+    >
+      <div class="ctx-menu-item" @click="renameConversation(ctxMenu.conv)">
+        <el-icon><Edit /></el-icon>
+        <span>重命名</span>
+      </div>
+      <div class="ctx-menu-item" @click="togglePin(ctxMenu.conv)">
+        <el-icon><Top v-if="!ctxMenu.conv?.pinned" /><Bottom v-else /></el-icon>
+        <span>{{ ctxMenu.conv?.pinned ? '取消置顶' : '置顶' }}</span>
+      </div>
+      <div class="ctx-menu-item" @click="exportConversation(ctxMenu.conv)">
+        <el-icon><Download /></el-icon>
+        <span>导出</span>
+      </div>
+      <div class="ctx-menu-divider"></div>
+      <div class="ctx-menu-item danger" @click="deleteConversation(ctxMenu.conv)">
+        <el-icon><Delete /></el-icon>
+        <span>删除</span>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, nextTick, onMounted, reactive } from 'vue'
-import { Plus, Promotion } from '@element-plus/icons-vue'
+import { Plus, Promotion, Loading, ZoomIn, FullScreen, Download, Close, Edit, Top, Bottom, Delete } from '@element-plus/icons-vue'
+import logo1Url from '../assets/logo1.png'
+import { ElMessageBox } from 'element-plus'
 import axios from 'axios'
 import { getErrorMessage, autoLogin } from '../api.js'
 import { marked } from 'marked'
@@ -126,7 +256,126 @@ marked.setOptions({ breaks: true, gfm: true })
 const inputText = ref('')
 const streamText = ref('')
 const streamTools = ref([])
+const streamImages = ref([])
+const streamVideoTasks = ref([])
+const streamVideos = ref([])
 const messagesRef = ref(null)
+const videoRefs = ref({})
+const videoModalRef = ref(null)
+const caseCards = ref([])
+const caseCardsLoading = ref(false)
+
+const lightbox = reactive({
+  show: false,
+  url: '',
+})
+
+const videoModal = reactive({
+  show: false,
+  url: '',
+})
+
+const ctxMenu = reactive({
+  show: false,
+  x: 0,
+  y: 0,
+  conv: null,
+})
+
+function openContextMenu(event, conv) {
+  ctxMenu.show = true
+  ctxMenu.x = event.clientX
+  ctxMenu.y = event.clientY
+  ctxMenu.conv = conv
+  nextTick(() => {
+    const menuEl = document.querySelector('.ctx-menu')
+    const menuW = menuEl?.offsetWidth || 140
+    const menuH = menuEl?.offsetHeight || 160
+    ctxMenu.x = Math.min(event.clientX, window.innerWidth - menuW - 8)
+    ctxMenu.y = Math.min(event.clientY, window.innerHeight - menuH - 8)
+  })
+}
+
+function closeContextMenu() {
+  ctxMenu.show = false
+}
+
+async function renameConversation(conv) {
+  closeContextMenu()
+  try {
+    const { value } = await ElMessageBox.prompt('请输入新的对话标题', '重命名', {
+      inputValue: conv.title,
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputPattern: /.+/,
+      inputErrorMessage: '标题不能为空',
+    })
+    await axios.put(`/api/conversations/${conv.id}`, { title: value })
+    await loadConversations()
+  } catch {}
+}
+
+async function togglePin(conv) {
+  closeContextMenu()
+  const newPinned = !conv.pinned
+  await axios.put(`/api/conversations/${conv.id}`, { pinned: newPinned })
+  conv.pinned = newPinned
+  await loadConversations()
+}
+
+function exportConversation(conv) {
+  closeContextMenu()
+  axios.get(`/api/conversations/${conv.id}`).then(({ data }) => {
+    const messages = data.messages || []
+    const lines = [
+      `# ${data.title || conv.title}`,
+      '',
+      `> 导出时间: ${new Date().toLocaleString('zh-CN')}`,
+      `> 消息数: ${messages.length}`,
+      '',
+      '---',
+      '',
+    ]
+    for (const m of messages) {
+      const role = m.role === 'user' ? '用户' : m.role === 'assistant' ? '助手' : '系统'
+      lines.push(`### ${role}`)
+      lines.push('')
+      lines.push(m.content || '(空)')
+      lines.push('')
+      lines.push('---')
+      lines.push('')
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${data.title || conv.title || '对话'}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }).catch(e => {
+    console.error('导出对话失败:', e)
+  })
+}
+
+async function deleteConversation(conv) {
+  closeContextMenu()
+  try {
+    await ElMessageBox.confirm(
+      `确定删除对话「${conv.title}」吗？此操作不可撤销。`,
+      '删除对话',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' }
+    )
+    await axios.delete(`/api/conversations/${conv.id}`)
+    if (state.activeConvId === conv.id) {
+      clearMessages()
+    }
+    await loadConversations()
+  } catch (e) {
+    if (e !== 'cancel') {
+      console.error('删除对话失败:', e)
+    }
+  }
+}
 
 const state = reactive({
   conversations: [],
@@ -150,6 +399,48 @@ function renderMarkdown(text) {
   return DOMPurify.sanitize(marked.parse(text))
 }
 
+function openLightbox(url) {
+  lightbox.url = url
+  lightbox.show = true
+}
+
+function handleMsgClick(e) {
+  if (e.target.tagName === 'IMG') {
+    openLightbox(e.target.src)
+  }
+}
+
+function enlargeVideo(msg) {
+  videoModal.url = msg.video_url
+  videoModal.show = true
+}
+
+function fullscreenVideo(msg) {
+  const el = videoRefs.value[msg.id]
+  if (el && el.requestFullscreen) {
+    el.requestFullscreen()
+  }
+}
+
+function fullscreenModalVideo() {
+  const el = videoModalRef.value
+  if (el && el.requestFullscreen) {
+    el.requestFullscreen()
+  }
+}
+
+function closeVideoModal() {
+  videoModal.show = false
+  videoModal.url = ''
+}
+
+function downloadVideo(msg) {
+  const a = document.createElement('a')
+  a.href = msg.video_url
+  a.download = ''
+  a.click()
+}
+
 let msgId = 0
 function addMessage(msg) {
   state.messages.push({ id: ++msgId, ...msg })
@@ -165,6 +456,29 @@ async function loadConversations() {
     const { data } = await axios.get('/api/conversations')
     state.conversations = data.conversations || []
   } catch {}
+}
+
+async function loadCaseCards() {
+  if (state.messages.length > 0) return  // 仅欢迎页面加载
+  caseCardsLoading.value = true
+  try {
+    // 获取近期对话标题
+    const titles = state.conversations
+      .slice(0, 10)
+      .map(c => c.title)
+      .filter(Boolean)
+
+    const { data } = await axios.post('/api/hermes/case-cards', {
+      recent_titles: titles,
+      limit: 3,
+    })
+    caseCards.value = data.cards || []
+  } catch (e) {
+    console.error('加载精选案例失败:', e)
+    caseCards.value = []
+  } finally {
+    caseCardsLoading.value = false
+  }
 }
 
 async function loadConversation(id) {
@@ -186,7 +500,13 @@ async function saveConversation() {
         role: m.role,
         content: m.content,
         type: m.type || 'text',
-        timestamp: m.timestamp || Date.now() / 1000
+        timestamp: m.timestamp || Date.now() / 1000,
+        image_url: m.image_url,
+        prompt: m.prompt,
+        video_url: m.video_url,
+        task_id: m.task_id,
+        status: m.status,
+        progress: m.progress,
       })),
       agent_id: state.activeStaffId || '',
       model: state.model
@@ -202,24 +522,14 @@ async function saveConversation() {
   } catch {}
 }
 
-onMounted(() => {
-  loadConversations()
+onMounted(async () => {
+  await loadConversations()
+  await loadCaseCards()
 })
 
 function newConversation() {
   clearMessages()
-}
-
-const quickTags = [
-  '搜索抖音AI培训视频并截流',
-  '生成5条护肤文案',
-  '今天12点发3个视频到抖音',
-  '查看今日截流数据',
-  '给新客户发欢迎语',
-]
-
-function insertTag(tag) {
-  inputText.value = tag
+  loadCaseCards()
 }
 
 async function selectConversation(id) {
@@ -316,6 +626,34 @@ async function sendMessage() {
             case 'error':
               streamText.value += '\n⚠️ ' + event.content
               break
+            case 'image':
+              streamImages.value.push({ url: event.url, prompt: event.prompt })
+              break
+            case 'video_task':
+              streamVideoTasks.value.push({
+                task_id: event.task_id,
+                prompt: event.prompt,
+                status: event.status,
+                progress: 0,
+              })
+              break
+            case 'video_status':
+              const task = streamVideoTasks.value.find(t => t.task_id === event.task_id)
+              if (task) {
+                task.status = event.status
+                task.progress = event.progress
+              }
+              break
+            case 'video':
+              streamVideoTasks.value = streamVideoTasks.value.filter(
+                t => t.task_id !== event.task_id
+              )
+              streamVideos.value.push({
+                task_id: event.task_id,
+                url: event.url,
+                prompt: event.prompt,
+              })
+              break
             case 'status':
             case 'done':
               break
@@ -337,6 +675,55 @@ async function sendMessage() {
         toolCall: { id: t.id, tool: t.name, status: t.status },
       })
     }
+    // 将图片作为独立消息插入对话流
+    for (const img of streamImages.value) {
+      addMessage({
+        role: 'assistant',
+        type: 'image',
+        image_url: img.url,
+        prompt: img.prompt,
+      })
+    }
+    // 插入或更新视频进度卡片
+    for (const vt of streamVideoTasks.value) {
+      const existing = state.messages.find(
+        m => m.type === 'video_pending' && m.task_id === vt.task_id
+      )
+      if (existing) {
+        existing.status = vt.status
+        existing.progress = vt.progress
+      } else {
+        addMessage({
+          role: 'assistant',
+          type: 'video_pending',
+          task_id: vt.task_id,
+          prompt: vt.prompt,
+          status: vt.status,
+          progress: vt.progress,
+        })
+      }
+    }
+    // 视频完成时，替换进度卡片为视频卡片
+    for (const vid of streamVideos.value) {
+      const pendingIdx = state.messages.findIndex(
+        m => m.type === 'video_pending' && m.task_id === vid.task_id
+      )
+      if (pendingIdx >= 0) {
+        state.messages[pendingIdx] = {
+          ...state.messages[pendingIdx],
+          type: 'video',
+          video_url: vid.url,
+        }
+      } else {
+        addMessage({
+          role: 'assistant',
+          type: 'video',
+          task_id: vid.task_id,
+          video_url: vid.url,
+          prompt: vid.prompt,
+        })
+      }
+    }
   } catch (e) {
     addMessage({
       role: 'assistant',
@@ -349,6 +736,9 @@ async function sendMessage() {
     await loadConversations()
     streamText.value = ''
     streamTools.value = []
+    streamImages.value = []
+    streamVideoTasks.value = []
+    streamVideos.value = []
     await scrollToBottom()
   }
 }
@@ -388,10 +778,6 @@ function sendQuickCard(content) {
   inputText.value = content
   sendMessage()
 }
-
-onMounted(() => {
-  loadConversations()
-})
 </script>
 
 <style scoped>
@@ -531,6 +917,10 @@ onMounted(() => {
   padding: 32px;
 }
 
+.messages-area.welcome-mode {
+  flex: 0 1 auto;
+}
+
 .messages-area::-webkit-scrollbar {
   width: 4px;
 }
@@ -543,13 +933,147 @@ onMounted(() => {
 /* ═══════════════════════════════════════════════════════════════════
    Welcome Empty State
    ═══════════════════════════════════════════════════════════════════ */
-.welcome-state {
+.welcome-page {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 32px;
+  overflow: hidden;
+  padding: 24px 32px;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  gap: 40px;
+}
+
+.brand-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 48px;
+}
+
+.brand-logo {
+  width: 104px;
+  height: 104px;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.14);
+}
+
+.brand-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.brand-title {
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.welcome-input-box {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  border: 1px solid var(--border-light);
+  border-radius: 28px;
+  background: var(--bg-body);
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
+  padding: 6px 6px 6px 24px;
+  box-sizing: border-box;
+}
+
+.welcome-input-box :deep(.el-textarea__inner) {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  resize: none;
+  font-size: 16px;
+  padding: 12px 56px 12px 4px;
+}
+
+.welcome-send-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: 40px;
+  height: 40px;
+}
+
+.case-section {
+  width: 100%;
+  max-width: 640px;
+  margin-top: 56px;
+}
+
+.case-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.case-title {
+  font-size: 15px;
+  color: var(--text-secondary);
+}
+
+.case-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.case-card {
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.case-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.case-card-image {
+  height: 130px;
+  background: var(--accent-soft);
+  overflow: hidden;
+}
+
+.case-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.case-card-title {
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+@media (max-width: 768px) {
+  .case-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.case-empty {
+  text-align: center;
+  font-size: 15px;
+  color: var(--text-tertiary);
+  padding: 28px 0;
 }
 
 .agent-icon {
@@ -562,6 +1086,32 @@ onMounted(() => {
   justify-content: center;
   font-size: 32px;
   margin-bottom: 24px;
+  overflow: hidden;
+}
+
+.agent-icon-large {
+  width: 160px;
+  height: 160px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 20px;
+  margin-bottom: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+}
+
+.agent-icon-large img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.agent-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .welcome-title {
@@ -637,6 +1187,14 @@ onMounted(() => {
   font-size: 14px;
   flex-shrink: 0;
   color: var(--accent);
+  overflow: hidden;
+}
+
+.avatar-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 999px;
 }
 
 .msg-content {
@@ -649,6 +1207,205 @@ onMounted(() => {
   line-height: 1.7;
   color: var(--text-primary);
   word-break: break-word;
+}
+
+.image-card {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  max-width: 300px;
+}
+
+.image-card img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 8px;
+}
+
+.image-card-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  padding: 8px 12px;
+  color: white;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.image-card:hover .image-card-overlay {
+  opacity: 1;
+}
+
+.video-card-pending {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  max-width: 400px;
+}
+
+.video-pending-icon {
+  font-size: 24px;
+  color: var(--accent);
+}
+
+.video-pending-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.video-pending-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.video-pending-prompt {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.video-pending-status {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.video-card {
+  border-radius: 8px;
+  overflow: hidden;
+  max-width: 400px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+}
+
+.video-player {
+  width: 100%;
+  height: auto;
+  display: block;
+  max-height: 300px;
+  object-fit: contain;
+  background: #000;
+}
+
+.video-card-footer {
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.video-card-prompt {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.video-card-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.video-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.video-modal-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.video-modal-player {
+  max-width: 90vw;
+  max-height: 80vh;
+  border-radius: 8px;
+  background: #000;
+}
+
+.video-modal-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.video-modal-actions .el-button {
+  color: white;
+}
+
+.ctx-menu {
+  position: fixed;
+  z-index: 3000;
+  min-width: 140px;
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border-light, #e4e7ed);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 4px 0;
+}
+
+.ctx-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--text-primary, #303133);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.ctx-menu-item:hover {
+  background: var(--fill-light, #f5f7fa);
+}
+
+.ctx-menu-item.danger {
+  color: var(--color-danger, #f56c6c);
+}
+
+.ctx-menu-item.danger:hover {
+  background: var(--color-danger-light-9, #fef0f0);
+}
+
+.ctx-menu-divider {
+  height: 1px;
+  background: var(--border-light, #e4e7ed);
+  margin: 4px 0;
+}
+
+.conv-item.pinned {
+  background: var(--fill-light, #f5f7fa);
+}
+
+.conv-item.pinned .pin-icon {
+  font-size: 12px;
+  margin-right: 4px;
 }
 
 .message.user .msg-text {
@@ -700,22 +1457,6 @@ onMounted(() => {
   border-top: 1px solid var(--border-light);
   padding: 16px 32px;
   background: var(--bg-body);
-}
-
-.quick-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.quick-tag {
-  cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-smooth);
-}
-
-.quick-tag:hover {
-  background: var(--bg-active);
 }
 
 .input-row {

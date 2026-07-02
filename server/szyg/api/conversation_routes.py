@@ -35,6 +35,7 @@ class ConversationCreate(BaseModel):
 class ConversationUpdate(BaseModel):
     title: Optional[str] = None
     messages: Optional[list[ConversationMessage]] = None
+    pinned: Optional[bool] = None
 
 
 def _conv_path(conv_id: str) -> Path:
@@ -69,6 +70,7 @@ def _list_convs() -> list[dict]:
                 "model": data.get("model", ""),
                 "created_at": data.get("created_at", ""),
                 "updated_at": data.get("updated_at", ""),
+                "pinned": data.get("pinned", False),
             })
         except (json.JSONDecodeError, OSError) as e:
             logger.warning("Skipping corrupt conversation file %s: %s", f.name, e)
@@ -77,8 +79,16 @@ def _list_convs() -> list[dict]:
 
 @router.get("")
 async def list_conversations(limit: int = 50):
-    """列出所有会话（按更新时间倒序）"""
-    return {"conversations": _list_convs()[:limit]}
+    """列出所有会话（置顶在前，其余按更新时间倒序）"""
+    convs = _list_convs()
+    convs.sort(
+        key=lambda c: (
+            c.get("pinned", False),
+            c.get("updated_at", ""),
+        ),
+        reverse=True,
+    )
+    return {"conversations": convs[:limit]}
 
 
 @router.get("/{conv_id}")
@@ -101,6 +111,7 @@ async def create_conversation(body: ConversationCreate):
         "messages": [m.model_dump() for m in body.messages],
         "agent_id": body.agent_id,
         "model": body.model,
+        "pinned": False,
         "created_at": now,
         "updated_at": now,
     }
@@ -119,6 +130,8 @@ async def update_conversation(conv_id: str, body: ConversationUpdate):
         conv["title"] = body.title
     if body.messages is not None:
         conv["messages"] = [m.model_dump() for m in body.messages]
+    if body.pinned is not None:
+        conv["pinned"] = body.pinned
 
     conv["updated_at"] = datetime.now(timezone.utc).isoformat()
     _save_conv(conv_id, conv)

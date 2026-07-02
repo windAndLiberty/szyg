@@ -25,9 +25,15 @@ MAX_CONTEXTS = 8    # Max concurrent contexts across all platforms
 CLEANUP_INTERVAL = 300  # Every 5 minutes
 
 class BrowserPool:
-    """Singleton shared browser pool. One browser, many contexts."""
+    """Singleton shared browser pool. One browser, many contexts.
 
-    def __init__(self):
+    Args:
+        headless: If True, launch browser in headless mode (no visible window).
+                  Used for background search/acquisition tasks.
+    """
+
+    def __init__(self, headless: bool = False):
+        self._headless = headless
         self._playwright = None
         self._browser = None
         self._contexts: dict[str, dict] = {}  # platform_key → {context, last_used, lock}
@@ -52,8 +58,8 @@ class BrowserPool:
         if not self._playwright:
             from playwright.async_api import async_playwright
             self._playwright = await async_playwright().start()
-        from szyg.platforms.anti_detect import get_launch_config
-        cfg = get_launch_config(headless=False)
+        from szyg.platforms.anti_detect import get_launch_config_native
+        cfg = get_launch_config_native(headless=self._headless)
         self._browser = await self._playwright.chromium.launch(**cfg)
         try:
             pid = self._browser._impl_obj._process.pid if hasattr(self._browser, '_impl_obj') and hasattr(self._browser._impl_obj, '_process') else '?'
@@ -203,10 +209,15 @@ class BrowserPool:
 
 # ── Singleton ──────────────────────────────────────────
 
-_pool: Optional[BrowserPool] = None
+_pools: dict[bool, BrowserPool] = {}
 
-def get_browser_pool() -> BrowserPool:
-    global _pool
-    if _pool is None:
-        _pool = BrowserPool()
-    return _pool
+def get_browser_pool(headless: bool = False) -> BrowserPool:
+    """Get the shared browser pool.
+
+    Args:
+        headless: If True, returns a separate headless pool (no visible window).
+                  If False, returns the standard headed pool for login/publish.
+    """
+    if headless not in _pools:
+        _pools[headless] = BrowserPool(headless=headless)
+    return _pools[headless]
