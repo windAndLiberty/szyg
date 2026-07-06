@@ -1,22 +1,28 @@
-# 🔌 API 接口规格 索引
+﻿# 🔌 API 接口规格 索引
 
 > 本目录存放域灵系统所有 API 路由的接口契约文档。Elite_Coder 编码时必须严格遵守此处的规格。
 
-## 文档列表
+## 已填充文档
 
-| 文件 | 对应源码 | 路由前缀 | 状态 |
-|------|----------|----------|------|
-| `auth-routes.md` | `auth_routes.py` | `/api/auth` | 待填充 |
-| `infra-routes.md` | `infra_routes.py` | `/api/infra` | 待填充 |
-| `platform-routes.md` | `platform_routes.py` | `/api/platforms` | 待填充 |
-| `publisher-routes.md` | `publisher_routes.py` | `/api/publisher` | 待填充 |
-| `staff-routes.md` | `staff_routes.py` | `/api/staff` | 待填充 |
-| `data-routes.md` | `data_routes.py` | `/api/data` | 待填充 |
-| `skills-routes.md` | `skills_routes.py` | `/api/skills` | 待填充 |
-| `scheduler-routes.md` | `scheduler_routes.py` | `/api/scheduler` | 待填充 |
-| `acquisition-routes.md` | `acquisition_routes.py` | `/api/acquisition` | 待填充 |
-| `chat-routes.md` | `chat.py` + `hermes_chat.py` | `/api/chat` + `/api/hermes` | 待填充 |
-| `frontend-routes.md` | `frontend_routes.py` | `/api/frontend` | 待填充 |
+| 文件 | 对应源码 | 内容 | 状态 |
+|------|----------|------|------|
+| `welcome-case-cards-spec.md` | `hermes_chat.py` | 欢迎页精选案例卡片 API | ✅ 已填充 |
+
+## 待填充的核心 API
+
+以下路由模块已在后端实现，接口契约文档待补充：
+
+| 路由文件 | 路由前缀 | 职责 |
+|----------|----------|------|
+| `auth_routes.py` | `/api/auth` | 认证/登录/JWT |
+| `hermes_chat.py` | `/api/hermes` | 超级员工对话 SSE |
+| `conversation_routes.py` | `/api/conversations` | 对话持久化 CRUD |
+| `publisher_routes.py` | `/api/publisher` | 多平台发布 |
+| `agent_routes.py` | `/api/agents` | 智能体管理 |
+| `scheduler_routes.py` | `/api/scheduler` | 调度任务 |
+| `acquisition_routes.py` | `/api/acquisition` | 获客/截流 |
+| `skills_routes.py` | `/api/skills` | 技能市场 |
+| `platform_routes.py` | `/api/platforms` | 平台操作 |
 
 ## 规约
 

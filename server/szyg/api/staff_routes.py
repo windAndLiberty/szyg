@@ -453,13 +453,13 @@ async def update_config(agent_id: str, body: AgentConfigUpdate):
     if agent_id not in configs:
         raise HTTPException(status_code=404, detail=f"Agent not found: {agent_id}")
     if body.basic is not None:
-        configs[agent_id]["basic"] = body.basic
+        configs[agent_id]["basic"] = {**configs[agent_id].get("basic", {}), **body.basic}
     if body.soul is not None:
-        configs[agent_id]["soul"] = body.soul
+        configs[agent_id]["soul"] = {**configs[agent_id].get("soul", {}), **body.soul}
     if body.memory is not None:
-        configs[agent_id]["memory"] = body.memory
+        configs[agent_id]["memory"] = {**configs[agent_id].get("memory", {}), **body.memory}
     if body.skills is not None:
-        configs[agent_id]["skills"] = body.skills
+        configs[agent_id]["skills"] = {**configs[agent_id].get("skills", {}), **body.skills}
     _save_json(_CONFIGS_FILE, configs)
     return {"ok": True}
 

@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Analytics Reporter",
+    "description": "专业数据分析师，将原始数据转化为可执行的业务洞察，通过数据可视化与报表助力决策。"
+  },
+  {
+    "name": "Executive Summary Generator",
+    "description": "资深战略顾问级AI，运用顶级咨询框架生成精炼的高管摘要，助力管理层快速决策。"
+  },
+  {
+    "name": "Finance Tracker",
+    "description": "专业财务分析师，专注财务规划与预算管理，优化现金流，提供战略性财务增长建议。"
+  },
+  {
+    "name": "Infrastructure Maintainer",
+    "description": "资深基础设施专家，保障系统稳定与性能优化，打造安全高效、可扩展的技术架构。"
+  },
+  {
+    "name": "Legal Compliance Checker",
+    "description": "专业法务合规顾问，确保业务运营与数据处理符合多地区法律法规与行业标准。"
+  },
+  {
+    "name": "Support Responder",
+    "description": "专业客户支持专家，提供多渠道卓越服务，将每一次互动转化为积极的品牌体验。"
+  }
+]

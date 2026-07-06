@@ -1,148 +1,183 @@
-# 🏗️ 前端目录结构与页面路由
+﻿---
+title: 域灵前端架构与路由设计
+status: 已更新 v2.0
+desc: React 19 + TypeScript + Vite 6 + Tailwind CSS 3
+---
 
-## 1. 顶层结构
+# 🏗️ 前端架构与路由设计 (React版)
+
+## 1. 技术栈
+
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| React | 19 | UI 框架 |
+| TypeScript | 5.7 | 类型系统 |
+| Vite | 6 | 构建工具 |
+| Tailwind CSS | 3 | 原子化样式 |
+| Framer Motion | 12 | 动画引擎 |
+| Lucide React | 0.48+ | 图标库 |
+| Recharts | 2.15+ | 图表库 |
+| Radix UI | 1.x | 无头组件基座 |
+| React Router | 7.5 | 路由管理 |
+| class-variance-authority | 0.7 | 组件变体管理 |
+
+## 2. 项目结构
 
 ```
-web/
-├── index.html              # SPA 入口 HTML
-├── package.json            # 依赖声明 (Vue 3 + Element Plus + Pinia + Vue Router)
-├── vite.config.js          # Vite 构建配置
-├── tsconfig.json           # TypeScript 配置
-├── src/
-│   ├── main.js             # 应用入口 (创建 Vue app + 挂载 Element Plus + Pinia + Router)
-│   ├── App.vue             # 根组件
-│   ├── api.js              # axios 实例 (baseURL + JWT 拦截器)
-│   ├── router.js           # 路由定义 (7 大版块 + 向后兼容重定向)
-│   ├── style.css           # 全局样式
-│   ├── tech-theme.css      # 科技主题样式
-│   ├── assets/             # 静态资源
-│   ├── components/         # 公共组件 (AppLayout 等)
-│   ├── pages/              # 页面组件 (43 个 .vue 文件)
-│   └── stores/             # Pinia 状态管理
+szyg-frontend/
+├── index.html
+├── package.json
+├── vite.config.ts
+├── tailwind.config.js
+├── tsconfig.json
+├── postcss.config.js
 ├── public/
-│   ├── favicon.svg
-│   └── icons.svg
-├── e2e/                    # Playwright E2E 测试
-└── dist/                   # 构建产物 (被后端 StaticFiles 挂载)
+│   └── szyg-logo.svg
+└── src/
+    ├── main.tsx              # 入口
+    ├── App.tsx               # 路由配置
+    ├── index.css             # 全局样式 + Design Tokens
+    ├── api.ts                # API 通信层 (代理到后端 :8000)
+    ├── types/                # TypeScript 类型定义
+    ├── lib/                  # 工具函数 (utils, hooks, format)
+    ├── components/
+    │   ├── Layout.tsx        # 布局壳 (Sidebar + TopBar + Content)
+    │   ├── Sidebar.tsx       # 侧边栏导航
+    │   ├── TopBar.tsx        # 顶部栏
+    │   ├── Footer.tsx        # 页脚
+    │   ├── ui/               # 基础组件库
+    │   │   ├── button.tsx
+    │   │   ├── card.tsx
+    │   │   ├── badge.tsx
+    │   │   ├── input.tsx
+    │   │   ├── avatar.tsx
+    │   │   ├── switch.tsx
+    │   │   ├── label.tsx
+    │   │   ├── separator.tsx
+    │   │   └── empty.tsx
+    │   └── superagent/       # 超级员工组件
+    │       ├── ChatMessageView.tsx
+    │       ├── ConversationPanel.tsx
+    │       └── WelcomeState.tsx
+    └── pages/
+        ├── Dashboard.tsx     # 运营仪表盘
+        ├── DigitalHuman.tsx  # 数字人管理
+        ├── Settings.tsx      # 系统设置
+        └── SuperAgent.tsx   # 超级员工对话页面
 ```
 
-## 2. 路由树 — 7 大版块
+## 3. 应用外壳布局
 
-### 2.1 🤖 AI员工 (`/ai-staff`)
-
-| 路径 | 组件 | 页面标题 |
-|------|------|----------|
-| `/ai-staff/super-agent` | `SuperAgent.vue` | 超级员工 |
-| `/ai-staff/overview` | `StaffOverview.vue` | 员工概览 |
-| `/ai-staff/tasks` | `TaskBoard.vue` | 任务看板 |
-| `/ai-staff/profiles` | `AgentProfiles.vue` | 员工配置 |
-
-- **Shell**: `AiStaff.vue` → 默认重定向到 `super-agent`
-- **认证**: 无需认证（自动认证模式）
-
-### 2.2 📦 内容工厂 (`/content`)
-
-| 路径 | 组件 | 页面标题 |
-|------|------|----------|
-| `/content/production` | `ContentStudio.vue` | 内容生产 |
-| `/content/video-editor` | `VideoEditor.vue` | 视频剪辑 |
-| `/content/video-search` | `VideoSearch.vue` | 视频搜索 |
-| `/content/digital-human` | `DigitalHuman.vue` | 数字人 |
-| `/content/assets` | `ContentAssets.vue` | 内容资产 |
-| `/content/publish` | `PublishCenter.vue` | 多平台发布 |
-
-- **Shell**: `ContentShell.vue` → 默认重定向到 `production`
-
-### 2.3 🎯 营销拓客 (`/marketing`)
-
-| 路径 | 组件 | 页面标题 |
-|------|------|----------|
-| `/marketing/intercept` | `AcquisitionStudio.vue` | 智能截流 |
-| `/marketing/listen` | `ListenCenter.vue` | 舆情监听 |
-| `/marketing/conversion` | `ConversionStudio.vue` | 客户转化 |
-| `/marketing/ab-test` | `ABTestCenter.vue` | A/B测试 |
-| `/marketing/customers` | `CustomerAssets.vue` | 客户资产 |
-| `/marketing/enterprise` | `EnterpriseAcquisition.vue` | 企业获客 |
-| `/marketing/nfc` | `NfcMarketing.vue` | 到店引流 |
-
-- **Shell**: `MarketingShell.vue` → 默认重定向到 `intercept`
-
-### 2.4 ⚙️ 工作流编排 (`/workflow`)
-
-| 路径 | 组件 | 页面标题 |
-|------|------|----------|
-| `/workflow/pipeline` | `PipelineDesigner.vue` | 流水线编排 |
-| `/workflow/scheduler` | `SchedulerEngine.vue` | 调度引擎 |
-| `/workflow/sop` | `SOPManager.vue` | SOP管理 |
-
-- **Shell**: `WorkflowShell.vue` → 默认重定向到 `pipeline`
-
-### 2.5 📊 数据洞察 (`/insights`)
-
-| 路径 | 组件 | 页面标题 |
-|------|------|----------|
-| `/insights/dashboard` | `Dashboard.vue` | 运营仪表盘 |
-| `/insights/content-analytics` | `ContentAnalytics.vue` | 内容分析 |
-| `/insights/acquisition-analytics` | `AcquisitionAnalytics.vue` | 截流效果 |
-| `/insights/conversion-analytics` | `ConversionAnalytics.vue` | 转化分析 |
-
-- **Shell**: `InsightsShell.vue` → 默认重定向到 `dashboard`
-- **默认首页**: `/` → 重定向到 `/insights/dashboard`
-
-### 2.6 📚 知识库 (`/knowledge`)
-
-| 路径 | 组件 | 页面标题 |
-|------|------|----------|
-| `/knowledge/base` | `KnowledgeBase.vue` | 知识管理 |
-| `/knowledge/memory` | `MemoryCenter.vue` | 长期记忆 |
-| `/knowledge/skills` | `SettingsSkills.vue` | 技能市场 |
-| `/knowledge/academy` | `Academy.vue` | 商学院 |
-
-- **Shell**: `KnowledgeShell.vue` → 默认重定向到 `base`
-
-### 2.7 ⚙️ 系统设置 (`/settings`)
-
-| 路径 | 组件 | 页面标题 | 权限 |
-|------|------|----------|------|
-| `/settings/risk-control` | `SettingsRiskControl.vue` | 风控策略 | user |
-| `/settings/tools` | `SettingsTools.vue` | 工具管理 | user |
-| `/settings/system` | `SettingsSystem.vue` | 系统配置 | user |
-| `/settings/brand` | `SettingsBrand.vue` | 品牌配置 | **admin** |
-| `/settings/team` | `SettingsTeam.vue` | 团队管理 | **admin** |
-| `/settings/billing` | `SettingsBilling.vue` | 计费管理 | **admin** |
-
-- **Shell**: `Settings.vue` → 默认重定向到 `risk-control`
-
-## 3. 认证守卫
-
-```javascript
-// router.js beforeEach
-// 自动认证模式：不再检查 token，不重定向到 /login
-router.beforeEach(async (to, from, next) => {
-  next()
-})
+```
+┌────────────────────────────────────────────────────┐
+│  Sidebar (260px)  │  TopBar (64px)                 │
+│                   ├────────────────────────────────┤
+│  Logo             │                                │
+│  ─────────        │  Page Content                  │
+│  AI员工           │  (pt-8 px-8)                   │
+│  内容创作         │                                │
+│  营销获客         │                                │
+│  发布管理         │                                │
+│  工作流           │                                │
+│  数据洞察         │                                │
+│  知识库           │                                │
+│  系统设置         │                                │
+│  ─────────        │                                │
+│  Collapse ◀       │                                │
+└──────────────────┴────────────────────────────────┘
 ```
 
-## 4. 向后兼容重定向
+- **Sidebar**：260px 展开 / 72px 折叠，`bg-[#111827]`
+- **TopBar**：64px 固定高度，`bg-[#111827]`
+- **Content**：`flex-1 pt-[64px] pl-[260px]` (折叠时 72px)
 
-路由文件包含 5 代历史路径重定向（Gen 1-5），确保旧链接不断裂：
+## 4. 9大一级模块与路由
 
-- `/chat` → 首页 (panel=open)
-- `/agents` → `/ai-staff/overview`
-- `/publisher` → `/content/publish`
-- `/dashboard` → `/insights/dashboard`
-- `/infra/*` → `/settings/risk-control`
-- `/login` → `/` (登录页已移除，重定向到首页)
-- 等共 40+ 条重定向规则
+```
+域灵 (szyg) — 智能矩阵运营系统
+│
+├── 🤖 AI员工         /ai-staff     ← P0 默认入口
+│   ├── 💬 超级员工    /             ← 系统首页
+│   ├── 🎬 AI视频      /ai-staff/video
+│   ├── 🧠 AI人才市场  /ai-staff/market
+│   └── 📋 任务看板    /ai-staff/tasks
+│
+├── 📦 内容创作       /content
+│   ├── ✏️ 内容生产    /content/production
+│   ├── 🖼️ 素材管理    /content/assets
+│   └── 🧍 数字人      /content/digital-human
+│
+├── 🎯 营销获客       /marketing
+│   ├── 🎣 智能截流    /marketing/intercept
+│   ├── 📡 舆情监听    /marketing/listen
+│   ├── 💼 客户转化    /marketing/conversion
+│   └── 👥 客户资产    /marketing/customers
+│
+├── 📤 发布管理       /publish
+│   ├── 📮 发布中心    /publish/center
+│   ├── 🔐 账号管理    /publish/accounts
+│   └── 📅 内容日历    /publish/calendar
+│
+├── ⚙️ 工作流         /workflow
+│   ├── 🔄 流水线编排  /workflow/pipeline
+│   ├── ⏰ 调度引擎    /workflow/scheduler
+│   └── 📋 SOP管理     /workflow/sop
+│
+├── 📊 数据洞察       /insights
+│   ├── 📈 运营仪表盘  /insights/dashboard
+│   ├── 📉 内容分析    /insights/content-analytics
+│   └── 🎯 获客分析    /insights/acquisition-analytics
+│
+├── 📚 知识库         /knowledge
+│   ├── 📖 知识管理    /knowledge/base
+│   ├── 🧠 长期记忆    /knowledge/memory
+│   ├── 🛠️ 技能市场    /knowledge/skills
+│   └── 🏫 商学院      /knowledge/academy
+│
+└── ⚙️ 系统设置       /settings
+    ├── 🛡️ 风控策略    /settings/risk-control
+    ├── 🔧 工具管理    /settings/tools
+    ├── ⚙️ 系统配置    /settings/system
+    ├── 🎨 品牌配置    /settings/brand
+    ├── 👥 团队管理    /settings/team
+    └── 💳 计费管理    /settings/billing
+```
 
-## 5. API 通信
+## 5. 当前已实现页面
 
-- **axios 实例**: `web/src/api.js`
-- **JWT 拦截器**: 请求头自动附加 `Authorization: Bearer {token}`
-- **baseURL**: 空字符串 (同源请求，后端 StaticFiles 挂载 SPA)
+| 路由 | 文件 | 状态 | 说明 |
+|------|------|------|------|
+| `/` | `SuperAgent.tsx` | ✅ 已实现 | 超级员工对话主页面，含SSE流式 |
+| `/dashboard` | `Dashboard.tsx` | ✅ 已实现 | KPI卡片+趋势图+实时动态+任务队列 |
+| `/digital-human` | `DigitalHuman.tsx` | ✅ 已实现 | 数字人卡片网格+搜索筛选+上传 |
+| `/settings` | `Settings.tsx` | ✅ 已实现 | Tab式设置页面(通用/AI模型/Agent/集成/团队) |
 
-## 6. 构建产物
+## 6. 待实现的页面
 
-- `web/dist/` → 被 `server/szyg/api/app.py` 中 `StaticFiles` 挂载
-- `/assets/*` → 静态资源
-- `/{full_path:path}` → SPA 客户端路由 fallback (返回 index.html)
+按模块树结构，需要逐步创建：
+
+| 优先级 | 路由 | 建议 |
+|--------|------|------|
+| P0 | `/ai-staff/chat` | 复用SuperAgent.tsx，作为AI员工子路由 |
+| P1 | `/ai-staff/video` | 复用DigitalHuman.tsx中视频能力，或新建 |
+| P1 | `/ai-staff/market` | 新建AI人才市场页 (Agency集成) |
+| P1 | `/content/production` | 新建AI内容生产页 |
+| P1 | `/content/assets` | 新建素材管理页 |
+| P1 | `/publish/center` | 新建发布中心页 |
+| P1 | `/publish/accounts` | 新建平台账号管理页 |
+| P1 | `/marketing/intercept` | 新建智能截流配置页 |
+| P1 | `/marketing/listen` | 新建舆情监听页 |
+
+## 7. 向后兼容重定向
+
+```typescript
+// App.tsx 中需要维护的重定向规则
+const redirects = [
+  { from: "/chat", to: "/ai-staff/chat" },
+  { from: "/agents", to: "/ai-staff/market" },
+  { from: "/publisher", to: "/publish/center" },
+  { from: "/old-content", to: "/content/production" },
+  // ... 共40+条
+];
+```
+

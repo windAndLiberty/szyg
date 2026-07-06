@@ -1,0 +1,17 @@
+{
+  "id": "17cab080d5b9",
+  "title": "人类学家",
+  "expert_slug": "academic-anthropologist",
+  "expert_name": "人类学家",
+  "expert_emoji": "🌍",
+  "expert_division": "academic",
+  "messages": [
+    {
+      "role": "user",
+      "content": "亚洲人类怎么来的",
+      "timestamp": 1783320114.785
+    }
+  ],
+  "created_at": "2026-07-06T06:41:40.791019+00:00",
+  "updated_at": "2026-07-06T06:41:54.788545+00:00"
+}

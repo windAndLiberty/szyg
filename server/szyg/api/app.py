@@ -68,6 +68,10 @@ def create_app() -> FastAPI:
     app.include_router(agent_router)
     app.include_router(hub_router)
     app.include_router(announce_router)
+
+    # Agency 专家市场 — 155 个领域专家（集成 Agency 开源项目）
+    from szyg.api.agency_routes import router as agency_router
+    app.include_router(agency_router)
     # AI Brain (nanobot)
     from szyg.api.brain_routes import router as brain_router
 
@@ -182,6 +186,15 @@ def create_app() -> FastAPI:
     except Exception as e:
         logger.warning(f"Skipped data_routes: {e}")
 
+    # 仪表盘 / 数字员工聚合 API — 为 szyg-frontend 提供真实聚合数据
+    try:
+        from szyg.api.dashboard_routes import router as dashboard_router
+        app.include_router(dashboard_router)
+        logger.info("Dashboard routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped dashboard_routes: {e}")
+
+
     @app.get("/api/health")
     async def health():
         return {"status": "ok", "version": VERSION, "service": "szyg"}
@@ -203,7 +216,7 @@ def create_app() -> FastAPI:
     app.mount("/api/files/volcengine_output", StaticFiles(directory=volc_output), name="volcengine_output")
 
     # Serve built SPA (static files + client-side routing fallback)
-    spa_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "web", "dist")
+    spa_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "szyg-frontend", "dist")
     if os.path.isdir(spa_dir):
         app.mount("/assets", StaticFiles(directory=os.path.join(spa_dir, "assets")), name="assets")
 
@@ -215,18 +228,19 @@ def create_app() -> FastAPI:
                 return FileResponse(favicon_path, media_type="image/svg+xml")
             return FileResponse(os.path.join(spa_dir, "index.html"))
 
-        @app.get("/login")
-        @app.get("/dashboard")
-        @app.get("/tools")
-        @app.get("/agents")
-        @app.get("/hub")
-        @app.get("/scheduler")
-        @app.get("/publisher")
-        @app.get("/chat")
-        @app.get("/admin")
-        @app.get("/oem")
-        @app.get("/image")
-        @app.get("/video")
+        @app.get("/logo1.jpg")
+        async def serve_logo1():
+            """Serve logo1 branding image."""
+            logo_path = os.path.join(spa_dir, "logo1.jpg")
+            if os.path.isfile(logo_path):
+                return FileResponse(logo_path, media_type="image/jpeg")
+            return FileResponse(os.path.join(spa_dir, "index.html"))
+
+        # szyg-frontend (React Router) 路由
+        @app.get("/")
+        @app.get("/digital-human")
+        @app.get("/settings")
+        @app.get("/super-agent")
         @app.get("/{full_path:path}")
         async def serve_spa(full_path: str = ""):
             # API paths already matched by routers above. Anything reaching here:

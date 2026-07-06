@@ -1,0 +1,38 @@
+[
+  {
+    "name": "Brand Guardian",
+    "description": "品牌战略专家，帮助企业打造统一品牌形象，维护品牌一致性，实现精准市场定位"
+  },
+  {
+    "name": "Image Prompt Engineer",
+    "description": "精通图像生成的提示词工程师，能将视觉概念转化为精准语言，产出专业级摄影作品"
+  },
+  {
+    "name": "Inclusive Visuals Specialist",
+    "description": "消除人工智能系统性偏见，生成文化准确、包容正面、去刻板印象的图像与视频"
+  },
+  {
+    "name": "Persona Walkthrough Specialist",
+    "description": "基于目标用户心理视角模拟网页认知走查，结合行为心理学框架输出CRO优化报告"
+  },
+  {
+    "name": "UI Designer",
+    "description": "UI设计专家，专精视觉设计体系、组件库与像素级完美界面的创建"
+  },
+  {
+    "name": "UX Architect",
+    "description": "技术与UX架构专家，为开发者提供稳固基础架构、CSS体系与清晰实现指引"
+  },
+  {
+    "name": "UX Researcher",
+    "description": "用户体验研究专家，专注用户行为分析、可用性测试与数据驱动设计洞察"
+  },
+  {
+    "name": "Visual Storyteller",
+    "description": "视觉叙事专家，通过设计将复杂信息转化为引人入胜的品牌故事与多媒体内容"
+  },
+  {
+    "name": "Whimsy Injector",
+    "description": "创意专家，为品牌体验注入个性与趣味，打造令人愉悦的差异化互动"
+  }
+]

@@ -18,12 +18,12 @@
 | ASGI 服务器 | uvicorn[standard] | >=0.32 |
 | Python | 3.12+ | |
 | 包管理 | uv + pyproject.toml | |
-| 前端框架 | Vue 3 | >=3.5 |
-| 前端 UI | Element Plus | >=2.14 |
-| 前端路由 | Vue Router | >=4.6 |
-| 状态管理 | Pinia | >=3.0 |
-| 构建工具 | Vite | >=8.0 |
-| 桌面端 | Electron | >=33.4 |
+| 前端框架 | React | >=19 |
+| 前端 UI | Tailwind CSS 3 + Radix UI | 原子化样式 + 无头组件 |
+| 前端路由 | React Router | >=7.5 |
+| 状态管理 | React Context / Zustand | 按需选择 |
+| 构建工具 | Vite | >=6.0 |
+| 桌面端 | Electron 或 Tauri | 当前未适配，优先Web |
 | 打包 | electron-builder | >=25.0 |
 | 数据库 | SQLite | 内置 |
 | LLM 后端 | 火山引擎方舟 (默认) / Ollama (降级) | |

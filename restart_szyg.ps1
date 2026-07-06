@@ -62,8 +62,8 @@ Kill-Listeners -Ports @(5173..5200)
 Start-Sleep -Seconds 2
 
 # ── 3. Build frontend ─────────────────────────────────────────────────────
-Write-Host "[szyg] Step 3: Build frontend" -ForegroundColor Cyan
-Push-Location "$root\web"
+Write-Host "[szyg] Step 3: Build frontend (szyg-frontend)" -ForegroundColor Cyan
+Push-Location "$root\szyg-frontend"
 if (-not (Test-Path "node_modules")) {
     Write-Host "  Installing dependencies..."
     npm install --silent
@@ -95,7 +95,7 @@ Wait-For-Port -Port $BackendPort -Name "Backend" -TimeoutSeconds 30
 # ── 5. Start Vite dev server ────────────────────────────────────────────────
 Write-Host "[szyg] Step 6: Start Vite dev server (port $VitePort)" -ForegroundColor Cyan
 $viteProc = Start-Process -FilePath "powershell.exe" `
-    -ArgumentList "-NoExit", "-Command", "cd `"$root\web`"; npm run dev -- --port $VitePort --strictPort" `
+    -ArgumentList "-NoExit", "-Command", "cd `"$root\szyg-frontend`"; npm run dev -- --port $VitePort --strictPort" `
     -WindowStyle Minimized `
     -PassThru
 Write-Host "  Vite PID: $($viteProc.Id)"

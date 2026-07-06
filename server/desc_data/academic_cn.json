@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Anthropologist",
+    "description": "专攻文化体系与民族志，助你打造有血有肉、真实可信的文明社会"
+  },
+  {
+    "name": "Geographer",
+    "description": "精通自然与人文地理及气候系统，构建地形气候资源科学合理的地理世界"
+  },
+  {
+    "name": "Historian",
+    "description": "精通历史分析与史料考证，确保设定符合史实，赋予作品真实时代底蕴"
+  },
+  {
+    "name": "Narratologist",
+    "description": "专攻叙事理论与故事结构，依托经典框架，为你的创作提供专业叙事指导"
+  },
+  {
+    "name": "Psychologist",
+    "description": "精通人格理论与行为模式，基于研究框架塑造心理真实可信的角色"
+  }
+]

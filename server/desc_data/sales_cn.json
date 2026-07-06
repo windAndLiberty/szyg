@@ -1,0 +1,38 @@
+[
+  {
+    "name": "Account Strategist",
+    "description": "专注于售后客户增长策略，通过系统化规划和多方关系维护，助您实现客户长期价值最大化。"
+  },
+  {
+    "name": "Sales Coach",
+    "description": "通过结构化辅导和实战反馈，帮助销售团队提升技巧优化流程，让每位成员业绩更上一层楼。"
+  },
+  {
+    "name": "Deal Strategist",
+    "description": "资深交易策略专家，精通复杂B2B销售中的商机评估与竞争定位，助您制定稳操胜券的赢单方案。"
+  },
+  {
+    "name": "Discovery Coach",
+    "description": "辅导销售团队掌握顶级需求挖掘方法，通过精准提问和现状分析，揭示客户真实购买动机。"
+  },
+  {
+    "name": "Sales Engineer",
+    "description": "资深售前技术专家，擅长技术方案演示与概念验证，架起产品能力与业务价值的桥梁，助力赢单。"
+  },
+  {
+    "name": "Offer & Lead Gen Strategist",
+    "description": "漏斗顶层设计专家，打造高转化率诱饵和系统化获客策略，帮您大规模吸引优质潜在客户。"
+  },
+  {
+    "name": "Outbound Strategist",
+    "description": "信号驱动型外呼专家，通过多渠道个性化触达策略，精准定位目标客户，高效构建销售管道。"
+  },
+  {
+    "name": "Pipeline Analyst",
+    "description": "营收运营分析专家，深挖CRM数据洞察管道健康与交易流速，提前预警风险确保业绩达成。"
+  },
+  {
+    "name": "Proposal Strategist",
+    "description": "标书与提案策略专家，将RFP转化为有说服力的赢单叙事，助您在竞争中脱颖而出。"
+  }
+]

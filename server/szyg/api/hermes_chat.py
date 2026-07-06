@@ -131,6 +131,7 @@ class HermesChatRequest(BaseModel):
     messages: list = Field(default_factory=list)
     stream: bool = True
     agent_id: str = ""  # 员工 ID: content/acquisition/conversion/ops，空=通用模式
+    expert_prompt: str = ""  # AI人才市场专家 prompt（独立通道，不影响超级员工）
 
 # ── Tools (same as before, OpenAI format) ─────────────
 
@@ -450,11 +451,30 @@ SYSTEM_PROMPT = """你是 szyg 智能矩阵运营系统的超级AI员工。
 
 # ── Agent-aware system prompt builder ───────────────────
 
-def _build_system_prompt(agent_id: str = "") -> tuple[str, float]:
+def _build_system_prompt(agent_id: str = "", expert_prompt: str = "") -> tuple[str, float]:
     """Build system prompt from staff agent config.
 
     Returns: (system_prompt, temperature)
+
+    优先级：显式传入的 expert_prompt（AI人才市场）> staff agent config > 默认 Hermes Prompt
     """
+    # 优先：AI人才市场显式传入的专家 prompt（独立通道，不影响超级员工）
+    if expert_prompt:
+        cn_instruction = "\n\n---\n## 重要：总是使用中文和用户对话\n"
+        tool_hint = (
+            "\n\n---\n## 你的工具能力（szyg 智能矩阵运营系统）\n"
+            "你同时拥有以下工具能力，可按需调用完成营销任务：\n"
+            "- 内容发布管道（创建/审核/排期/发布多平台内容）\n"
+            "- 平台自动化（抖音/小红书/微信/B站登录态与发布）\n"
+            "- 视频剪辑引擎（裁剪/拼接/变速/字幕/混音/模板）\n"
+            "- 智能调度引擎（cron/interval 定时任务）\n"
+            "- 知识库（FTS5 全文检索/文档摄入/RAG）\n"
+            "- AI 图像/视频生成（火山引擎豆包系列）\n"
+            "- 获客截流（搜索目标视频/生成真人评论/批量发送）\n\n"
+            "回复要求：用中文回复，专业简洁，主动使用工具完成任务。"
+        )
+        return expert_prompt + cn_instruction + tool_hint, 0.7
+
     if not agent_id:
         return SYSTEM_PROMPT, 0.7  # default for generic mode
 
@@ -1622,7 +1642,7 @@ async def hermes_chat(chat_req: HermesChatRequest, user: User | None = Depends(o
     is_admin = user is not None and getattr(user, "role", "") == "admin"
 
     async def stream():
-        system_prompt, agent_temperature = _build_system_prompt(chat_req.agent_id)
+        system_prompt, agent_temperature = _build_system_prompt(chat_req.agent_id, chat_req.expert_prompt)
         msgs = [{"role": "system", "content": system_prompt}]
         for m in chat_req.messages[:-1]:
             content = m.get("content","") if isinstance(m, dict) else str(m)
