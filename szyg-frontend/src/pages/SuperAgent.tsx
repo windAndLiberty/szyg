@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { Send } from 'lucide-react'
 import type { ChatMessage, Conversation, CaseCard } from '@/types'
-import { cn } from '@/lib/utils'
 import {
   autoLogin,
   apiGet,
@@ -51,6 +50,7 @@ export default function SuperAgent() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputText, setInputText] = useState('')
   const [streaming, setStreaming] = useState(false)
+  const [statusText, setStatusText] = useState('')
   const [caseCards, setCaseCards] = useState<CaseCard[]>([])
   const [caseCardsLoading, setCaseCardsLoading] = useState(false)
   const messagesRef = useRef<HTMLDivElement>(null)
@@ -293,6 +293,9 @@ export default function SuperAgent() {
           ensureStreamMsg()
           appendText('\n⚠️ ' + (ev.content || ''))
           break
+        case 'status':
+          setStatusText(ev.content || '')
+          break
         default:
           break
       }
@@ -391,6 +394,7 @@ export default function SuperAgent() {
       setInputText('')
       scrollToBottom()
       setStreaming(true)
+      setStatusText('')
       streamBufRef.current = ''
       streamMsgIdRef.current = null
 
@@ -418,6 +422,7 @@ export default function SuperAgent() {
         if (streamBufRef.current === '') {
           setMessages((prev) => prev.filter((m) => m.id !== id))
         }
+        setStatusText('')
         setStreaming(false)
         await saveConversation()
         await loadConversations()
@@ -464,39 +469,39 @@ export default function SuperAgent() {
           <>
             {/* Messages */}
             <div ref={messagesRef} className="flex-1 overflow-y-auto">
-              <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
-                {messages.map((m) => (
-                  <ChatMessageView key={m.id} message={m} />
+              <div className="px-8 py-6 space-y-6">
+                {messages.map((m, idx) => (
+                  <ChatMessageView key={m.id} message={m} statusText={streaming && idx === messages.length - 1 ? statusText : undefined} />
                 ))}
               </div>
             </div>
 
             {/* Input bar */}
-            <div className="shrink-0 border-t border-[#1E293B] bg-[#0B0F1A] p-4">
-              <div className="max-w-3xl mx-auto flex items-end gap-2 rounded-card border border-[#1E293B] bg-[#0D1321] focus-within:border-[#334155] transition-colors px-3 py-2">
-                <img src="/logo1.jpg" alt="" className="w-5 h-5 rounded object-cover shrink-0 mb-1.5" />
+            <div className="shrink-0 border-t border-[#1E293B] bg-[#111827]/80 backdrop-blur-md">
+              {/* 微渐变装饰线 */}
+              <div className="h-px bg-gradient-to-r from-[rgba(99,102,241,0.2)] via-transparent to-transparent" />
+              <div className="flex items-end gap-3 px-5 py-4">
                 <textarea
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={handleInputKeyDown}
                   disabled={streaming}
-                  rows={1}
+                  rows={3}
                   placeholder="描述你想要生成的视频或图片，或与超级员工对话..."
-                  className="flex-1 bg-transparent text-body-md text-[#F1F5F9] placeholder-[#64748B] resize-none focus:outline-none max-h-32 py-1"
+                  className="flex-1 bg-transparent text-body-md text-[#F1F5F9] placeholder-[#64748B] resize-none focus:outline-none max-h-48 py-2"
                 />
                 <button
                   onClick={() => sendMessage()}
                   disabled={streaming || !inputText.trim()}
-                  className={cn(
-                    'flex items-center justify-center w-9 h-9 rounded-button transition-all shrink-0',
-                    inputText.trim() && !streaming
-                      ? 'bg-[#6366F1] text-white hover:bg-[#818CF8] active:scale-95 shadow-glow'
-                      : 'bg-[#1A2235] text-[#64748B] cursor-not-allowed',
-                  )}
+                  className="flex items-center justify-center w-12 h-12 rounded-button bg-[#6366F1] text-white shrink-0 disabled:opacity-40 hover:bg-[#818CF8] active:scale-95 shadow-glow transition-all disabled:hover:bg-[#6366F1] disabled:shadow-none"
                   aria-label="发送"
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-5 h-5" />
                 </button>
+              </div>
+              {/* 快捷键提示 */}
+              <div className="flex justify-end px-5 pb-2">
+                <span className="text-[11px] text-[#64748B]">Enter 发送 · Shift+Enter 换行</span>
               </div>
             </div>
           </>
