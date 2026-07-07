@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 
 type ChatMessageViewProps = {
   message: ChatMessage
+  statusText?: string
 }
 
 // Lightweight rich-text renderer: **bold**, `code`, and line breaks
@@ -77,7 +78,7 @@ const Avatar: React.FC<{ role: string }> = ({ role }) => {
 }
 
 // === ChatMessageView component body ===
-const ChatMessageView: React.FC<ChatMessageViewProps> = ({ message }) => {
+const ChatMessageView: React.FC<ChatMessageViewProps> = ({ message, statusText }) => {
   const isUser = message.role === 'user'
 
   return (
@@ -85,26 +86,33 @@ const ChatMessageView: React.FC<ChatMessageViewProps> = ({ message }) => {
       className={cn('flex gap-3', isUser ? 'flex-row' : 'flex-row')}
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
     >
       <Avatar role={message.role} />
 
       <div className="flex-1 min-w-0 pt-0.5">
         {/* Text message */}
         {message.type === 'text' && (
-          <div
-            className={cn(
-              'inline-block rounded-card px-4 py-2.5 text-body-md leading-relaxed max-w-full',
-              isUser
-                ? 'bg-[rgba(99,102,241,0.1)] border border-[rgba(99,102,241,0.2)] text-[#F1F5F9]'
-                : 'text-[#94A3B8]',
-            )}
-          >
-            <span className="whitespace-pre-wrap break-words">{renderRichText(message.content)}</span>
-            {message.isStreaming && (
-              <span className="inline-block w-[7px] h-[14px] bg-[#6366F1] ml-0.5 align-middle animate-pulse" />
-            )}
-          </div>
+          message.content ? (
+            <div
+              className={cn(
+                'inline-block rounded-card px-4 py-2.5 text-body-md leading-relaxed',
+                isUser
+                  ? 'ml-auto max-w-[70%] bg-[rgba(99,102,241,0.15)] border border-[rgba(99,102,241,0.25)] text-[#F1F5F9] shadow-[0_0_12px_rgba(99,102,241,0.08)]'
+                  : 'mr-auto max-w-[75%] bg-[rgba(17,24,39,0.5)] border-l-2 border-[rgba(99,102,241,0.2)] rounded-r-card px-4 py-2.5 text-[#94A3B8]',
+              )}
+            >
+              <span className="whitespace-pre-wrap break-words">{renderRichText(message.content)}</span>
+              {message.isStreaming && (
+                <span className="inline-block w-[7px] h-[14px] bg-[#818CF8] ml-0.5 align-middle animate-pulse" />
+              )}
+            </div>
+          ) : message.isStreaming ? (
+            <div className="flex items-center gap-2 py-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#818CF8]" />
+              <span className="text-[13px] text-[#94A3B8]">{statusText || '思考中…'}</span>
+            </div>
+          ) : null
         )}
 
         {/* Tool result */}
