@@ -41,7 +41,7 @@ const WelcomeState: React.FC<WelcomeStateProps> = ({
     >
       {/* Brand block */}
       <motion.div
-        className="flex flex-col items-center gap-4 mb-8"
+        className="flex flex-col items-center gap-4 mb-10"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
@@ -68,7 +68,7 @@ const WelcomeState: React.FC<WelcomeStateProps> = ({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 0.15, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
       >
-        <div className="relative rounded-card-lg border border-[#1E293B] bg-[#0D1321] focus-within:border-[#334155] transition-colors overflow-hidden">
+        <div className="relative rounded-card-lg border border-[#1E293B] bg-[#111827]/80 backdrop-blur-md focus-within:border-[#334155] focus-within:ring-1 focus-within:ring-[#6366F1]/20 transition-all overflow-hidden">
           <textarea
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
@@ -84,14 +84,14 @@ const WelcomeState: React.FC<WelcomeStateProps> = ({
               onClick={onSend}
               disabled={streaming || !inputText.trim()}
               className={cn(
-                'flex items-center justify-center w-9 h-9 rounded-button transition-all',
+                'flex items-center justify-center w-12 h-12 rounded-button transition-all',
                 inputText.trim() && !streaming
                   ? 'bg-[#6366F1] text-white hover:bg-[#818CF8] active:scale-95 shadow-glow'
                   : 'bg-[#1A2235] text-[#64748B] cursor-not-allowed',
               )}
               aria-label="发送"
             >
-              <Send className="w-4 h-4" />
+              <Send className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -120,13 +120,13 @@ const WelcomeState: React.FC<WelcomeStateProps> = ({
             <span className="text-[11px]">发送一条消息即可开始对话</span>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
             {caseCards.map((card, i) => (
               <motion.button
                 key={`${card.video_url}-${i}`}
                 onClick={() => onCaseClick(card)}
                 disabled={streaming}
-                className="group text-left rounded-card overflow-hidden border border-[#1E293B] hover:border-[#334155] transition-all disabled:opacity-50"
+                className="group text-left rounded-card overflow-hidden border border-[#1E293B] hover:border-[#6366F1]/30 hover:shadow-card-hover transition-all disabled:opacity-50"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 + i * 0.06, duration: 0.4 }}
