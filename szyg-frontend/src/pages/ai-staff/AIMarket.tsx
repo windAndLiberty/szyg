@@ -7,8 +7,10 @@ import {
   Trash2, Bot,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { apiGet, apiPost, apiDel, streamHermesChat, getErrorMessage } from '@/lib/api'
+import { apiGet, apiPost, apiDel, streamHermesChat, getErrorMessage, getCurrentUser } from '@/lib/api'
 import type { LucideIcon } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 // ── 类型定义 ──
 interface Division {
@@ -78,6 +80,40 @@ const cardVariants = {
 }
 
 const DEFAULT_MODEL = 'doubao-seed-2-0-pro-260215'
+const AVATAR_COUNT = 15
+
+const mdComponents = {
+  h1: ({ children, ...props }: any) => <h1 className="text-lg font-bold text-[#F1F5F9] mb-2 mt-4 first:mt-0" {...props}>{children}</h1>,
+  h2: ({ children, ...props }: any) => <h2 className="text-base font-bold text-[#F1F5F9] mb-1.5 mt-3 first:mt-0" {...props}>{children}</h2>,
+  h3: ({ children, ...props }: any) => <h3 className="text-sm font-semibold text-[#F1F5F9] mb-1 mt-2.5 first:mt-0" {...props}>{children}</h3>,
+  p: ({ children, ...props }: any) => <p className="mb-2 last:mb-0 leading-relaxed" {...props}>{children}</p>,
+  ul: ({ children, ...props }: any) => <ul className="list-disc pl-5 mb-2 space-y-0.5" {...props}>{children}</ul>,
+  ol: ({ children, ...props }: any) => <ol className="list-decimal pl-5 mb-2 space-y-0.5" {...props}>{children}</ol>,
+  li: ({ children, ...props }: any) => <li className="text-[#CBD5E1]" {...props}>{children}</li>,
+  strong: ({ children, ...props }: any) => <strong className="font-semibold text-[#F1F5F9]" {...props}>{children}</strong>,
+  em: ({ children, ...props }: any) => <em className="italic text-[#E2E8F0]" {...props}>{children}</em>,
+  code: ({ children, className, ...props }: any) =>
+    className ? (
+      <code className="block px-4 py-3 rounded-lg bg-[#0D1321] text-[#E2E8F0] text-[13px] font-mono leading-relaxed overflow-x-auto my-2" {...props}>{children}</code>
+    ) : (
+      <code className="px-1.5 py-0.5 rounded bg-[rgba(99,102,241,0.15)] text-[#A5B4FC] text-[12px] font-mono" {...props}>{children}</code>
+    ),
+  pre: ({ children, ...props }: any) => <pre className="last:mb-0" {...props}>{children}</pre>,
+  blockquote: ({ children, ...props }: any) => (
+    <blockquote className="border-l-2 border-[#6366F1] pl-3 my-2 text-[#94A3B8] italic" {...props}>{children}</blockquote>
+  ),
+  a: ({ children, href, ...props }: any) => (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="text-[#818CF8] underline hover:text-[#A5B4FC] transition-colors" {...props}>{children}</a>
+  ),
+  hr: (props: any) => <hr className="border-t border-[#1E293B] my-3" {...props} />,
+  table: ({ children, ...props }: any) => (
+    <div className="overflow-x-auto my-2">
+      <table className="min-w-full border-collapse border border-[#1E293B] text-[13px]" {...props}>{children}</table>
+    </div>
+  ),
+  th: ({ children, ...props }: any) => <th className="border border-[#1E293B] px-3 py-2 bg-[#0D1321] text-[#F1F5F9] font-semibold text-left" {...props}>{children}</th>,
+  td: ({ children, ...props }: any) => <td className="border border-[#1E293B] px-3 py-2 text-[#CBD5E1]" {...props}>{children}</td>,
+}
 
 export default function AIMarket() {
   // ── 视图状态 ──
@@ -92,6 +128,11 @@ export default function AIMarket() {
   const [loading, setLoading] = useState(true)
   const [activating, setActivating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [avatarMap, setAvatarMap] = useState<Record<string, number>>({})
+  const userName = useMemo(() => {
+    const user = getCurrentUser()
+    return user?.username || ''
+  }, [])
 
   // ── 聊天状态 ──
   const [conversations, setConversations] = useState<AgencyConversation[]>([])
@@ -99,10 +140,20 @@ export default function AIMarket() {
   const [messages, setMessages] = useState<AgencyMessage[]>([])
   const [inputText, setInputText] = useState('')
   const [streaming, setStreaming] = useState(false)
+  const [statusText, setStatusText] = useState('')
   const [showHistory, setShowHistory] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const initDone = useRef(false)
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const autoResize = useCallback(() => {
+    const el = textareaRef.current
+    if (el) {
+      el.style.height = 'auto'
+      el.style.height = Math.min(el.scrollHeight, 128) + 'px'
+    }
+  }, [])
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -120,6 +171,18 @@ export default function AIMarket() {
         setDivisions(data.divisions)
         setAgents(data.agents)
         setActiveExpert(data.active)
+        const sorted = [...data.agents].sort((a, b) => a.slug.localeCompare(b.slug))
+        const n = sorted.length
+        const indices = Array.from({ length: n }, (_, i) => i % AVATAR_COUNT)
+        let s = 42
+        const rng = () => { s = (s * 1664525 + 1013904223) | 0; return (s >>> 0) / 4294967296 }
+        for (let i = indices.length - 1; i > 0; i--) {
+          const j = Math.floor(rng() * (i + 1));
+          [indices[i], indices[j]] = [indices[j], indices[i]]
+        }
+        const map: Record<string, number> = {}
+        sorted.forEach((agent, i) => { map[agent.slug] = indices[i] })
+        setAvatarMap(map)
         initDone.current = true
       })
       .catch((e) => setError(getErrorMessage(e, '加载失败')))
@@ -236,6 +299,7 @@ export default function AIMarket() {
     const allMsgs = [...messages, userMsg].map((m) => ({ role: m.role, content: m.content }))
 
     setStreaming(true)
+    setStatusText('')
     let fullContent = ''
     // 添加占位 assistant 消息
     setMessages((prev) => [...prev, { role: 'assistant', content: '', timestamp: Date.now() / 1000 }])
@@ -246,7 +310,7 @@ export default function AIMarket() {
         messages: allMsgs,
         expert_prompt: activeExpert?.prompt || '',
         onEvent: (ev) => {
-          if (ev.type === 'chunk' && ev.content) {
+          if (ev.type === 'text' && ev.content) {
             fullContent += ev.content
             setMessages((prev) => {
               const next = [...prev]
@@ -257,6 +321,8 @@ export default function AIMarket() {
               next[next.length - 1] = { ...next[next.length - 1], content: fullContent }
               return next
             })
+          } else if (ev.type === 'status' && ev.content) {
+            setStatusText(ev.content)
           }
         },
       })
@@ -348,7 +414,7 @@ export default function AIMarket() {
                         )}
                       >
                         <div className="flex items-center gap-2">
-                          <span className="text-lg shrink-0">{c.expert_emoji}</span>
+                          <img src={`/avatars/avatar-${avatarMap[c.expert_slug] ?? 0}.png`} alt="" className="w-7 h-7 rounded-lg object-cover shrink-0" />
                           <div className="flex-1 min-w-0">
                             <div className="text-body-sm font-medium text-[#F1F5F9] truncate">{c.title}</div>
                             <div className="text-[11px] text-[#64748B] truncate">{c.expert_name}</div>
@@ -382,10 +448,7 @@ export default function AIMarket() {
 
             {expert && (
               <div className="flex items-center gap-2 flex-1 min-w-0">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg shrink-0"
-                  style={{ background: `${divisions.find((d) => d.id === expert.division)?.color || '#6366F1'}22` }}>
-                  {expert.emoji}
-                </div>
+                <img src={`/avatars/avatar-${avatarMap[expert.slug] ?? 0}.png`} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0" />
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="text-body-sm font-semibold text-[#F1F5F9] truncate">{expert.name}</span>
@@ -421,9 +484,7 @@ export default function AIMarket() {
           <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-4">
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center min-h-[40vh] text-[#64748B] gap-3">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#6366F1] to-[#8B5CF6] flex items-center justify-center text-3xl shadow-glow">
-                  {expert?.emoji || '🤖'}
-                </div>
+                <img src={`/avatars/avatar-${avatarMap[expert?.slug || ''] ?? 0}.png`} alt="" className="w-16 h-16 rounded-2xl object-cover shadow-glow" />
                 <p className="text-body-md font-medium text-[#F1F5F9]">{expert?.name || '专家'}</p>
                 <p className="text-body-sm text-[#64748B] text-center max-w-sm">
                   {expert?.description || '开始对话，让专家为你提供专业建议'}
@@ -433,28 +494,32 @@ export default function AIMarket() {
               messages.map((msg, idx) => (
                 <div key={idx} className={cn('flex gap-3', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
                   {msg.role === 'assistant' && (
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0 mt-0.5"
-                      style={{ background: `${divisions.find((d) => d.id === expert?.division)?.color || '#6366F1'}22` }}>
-                      {expert?.emoji || '🤖'}
+                    <img src={`/avatars/avatar-${avatarMap[expert?.slug || ''] ?? 0}.png`} alt="" className="w-8 h-8 rounded-lg object-cover shrink-0 mt-0.5" />
+                  )}
+                  {msg.role === 'assistant' && !msg.content && streaming && idx === messages.length - 1 ? (
+                    <div className="flex items-center gap-2 py-2">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#818CF8]" />
+                      <span className="text-[13px] text-[#94A3B8]">{statusText || '思考中…'}</span>
+                    </div>
+                  ) : (
+                    <div className={cn(
+                      'max-w-[75%] rounded-card-lg px-4 py-3 text-body-sm leading-relaxed',
+                      msg.role === 'user'
+                        ? 'bg-[#6366F1] text-white'
+                        : 'bg-[#1A2235] text-[#F1F5F9] border border-[#1E293B]',
+                    )}>
+                      <div className={cn('break-words', msg.role === 'assistant' ? 'leading-relaxed' : 'whitespace-pre-wrap')}>
+                        {msg.role === 'assistant' && msg.content ? (
+                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{msg.content}</ReactMarkdown>
+                        ) : msg.role === 'user' ? (
+                          msg.content
+                        ) : ''}
+                      </div>
                     </div>
                   )}
-                  <div className={cn(
-                    'max-w-[75%] rounded-card-lg px-4 py-3 text-body-sm leading-relaxed',
-                    msg.role === 'user'
-                      ? 'bg-[#6366F1] text-white'
-                      : 'bg-[#1A2235] text-[#F1F5F9] border border-[#1E293B]',
-                  )}>
-                    <div className="whitespace-pre-wrap break-words">
-                      {msg.content || (streaming && idx === messages.length - 1 ? (
-                        <span className="flex items-center gap-1 text-[#64748B]">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> 思考中…
-                        </span>
-                      ) : '')}
-                    </div>
-                  </div>
                   {msg.role === 'user' && (
-                    <div className="w-8 h-8 rounded-lg bg-[#6366F1] flex items-center justify-center shrink-0 mt-0.5">
-                      <Bot className="w-4 h-4 text-white" />
+                    <div className="w-8 h-8 rounded-lg bg-[#6366F1] flex items-center justify-center shrink-0 mt-0.5 text-white text-sm font-semibold">
+                      {userName ? userName.slice(0, 1).toUpperCase() : 'U'}
                     </div>
                   )}
                 </div>
@@ -462,22 +527,23 @@ export default function AIMarket() {
             )}
             <div ref={messagesEndRef} />
           </div>
-
           {/* 输入栏 */}
-          <div className="shrink-0 px-4 py-3 border-t border-[#1E293B]">
-            <div className="flex items-center gap-2">
-              <input
+          <div className="shrink-0 border-t border-[#1E293B] bg-[#0D1321]">
+            <div className="flex items-end gap-2 px-4 py-3">
+              <textarea
+                ref={textareaRef}
                 value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
+                onChange={(e) => { setInputText(e.target.value); autoResize() }}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
                 placeholder={expert ? `向${expert.name}提问…` : '输入消息…'}
                 disabled={streaming}
-                className="flex-1 h-11 px-4 rounded-card bg-[#0D1321] border border-[#1E293B] text-body-md text-[#F1F5F9] placeholder-[#64748B] focus:outline-none focus:border-[#334155] transition-colors disabled:opacity-50"
+                rows={1}
+                className="flex-1 bg-transparent text-body-md text-[#F1F5F9] placeholder-[#64748B] resize-none focus:outline-none max-h-32 py-1.5 disabled:opacity-50"
               />
               <button
                 onClick={handleSend}
                 disabled={!inputText.trim() || streaming}
-                className="w-11 h-11 rounded-card bg-[#6366F1] text-white flex items-center justify-center hover:bg-[#818CF8] active:scale-95 transition-all disabled:opacity-40 shrink-0"
+                className="flex items-center justify-center w-11 h-11 rounded-card bg-[#6366F1] text-white shrink-0 disabled:opacity-40"
               >
                 {streaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               </button>
@@ -508,9 +574,7 @@ export default function AIMarket() {
           className="rounded-card-lg border border-[rgba(99,102,241,0.3)] p-4 flex items-center gap-4"
           style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(17,24,39,0.6) 100%)' }}
         >
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#6366F1] to-[#8B5CF6] flex items-center justify-center text-2xl shrink-0 shadow-glow">
-            {activeExpert.emoji}
-          </div>
+          <img src={`/avatars/avatar-${avatarMap[activeExpert.slug] ?? 0}.png`} alt="" className="w-12 h-12 rounded-xl object-cover shrink-0 shadow-glow" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-body-md font-medium text-[#F1F5F9]">{activeExpert.name}</span>
@@ -578,8 +642,7 @@ export default function AIMarket() {
                 <div className="p-5">
                   {/* 顶部：emoji + 名称 + 状态 */}
                   <div className="flex items-start gap-3 mb-3">
-                    <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0"
-                      style={{ background: `${div?.color || '#6366F1'}22` }}>{agent.emoji}</div>
+                    <img src={`/avatars/avatar-${avatarMap[agent.slug] ?? 0}.png`} alt="" className="w-11 h-11 rounded-xl object-cover shrink-0" />
                     <div className="flex-1 min-w-0 pt-0.5">
                       <div className="flex items-center gap-2">
                         <h3 className="text-body-md font-semibold text-[#F1F5F9] truncate group-hover:text-[#6366F1] transition-colors">{agent.name}</h3>

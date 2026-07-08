@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "name": "验收测试任务",
+    "assignee": "内容专员",
+    "status": "ready",
+    "priority": "medium",
+    "progress": 0,
+    "deadline": "",
+    "reviewStatus": null,
+    "reviewComment": "",
+    "reviewTime": ""
+  },
+  {
+    "id": 2,
+    "name": "完整字段任务",
+    "assignee": "运营专员",
+    "status": "ready",
+    "priority": "high",
+    "progress": 0,
+    "deadline": "2026-12-31",
+    "reviewStatus": null,
+    "reviewComment": "",
+    "reviewTime": ""
+  },
+  {
+    "id": 3,
+    "name": "待更新任务",
+    "assignee": "内容专员",
+    "status": "running",
+    "priority": "medium",
+    "progress": 50,
+    "deadline": "",
+    "reviewStatus": null,
+    "reviewComment": "",
+    "reviewTime": ""
+  }
+]

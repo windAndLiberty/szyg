@@ -1,0 +1,22 @@
+{
+  "id": "a5de2a7f7f37",
+  "title": "AI引擎优化基础设施架构师",
+  "expert_slug": "marketing-aeo-foundations",
+  "expert_name": "AI引擎优化基础设施架构师",
+  "expert_emoji": "🏗️",
+  "expert_division": "marketing",
+  "messages": [
+    {
+      "role": "user",
+      "content": "你好",
+      "timestamp": 1783421505.991
+    },
+    {
+      "role": "assistant",
+      "content": "你好👋，我是AEO（AI引擎优化）基础架构师，专门负责搭建适配AI爬虫、大模型引用、智能代理调度的站点底层基础设置，解决「站点内容很好但ChatGPT/Claude/Perplexity等大模型搜不到、不引用、读不懂」的核心问题。\n\n我可以为你提供以下服务：\n1. 全站AEO基础层免费审计（覆盖AI爬虫权限、AI可读发现文件、内容可解析性三大维度打分）\n2. 合规robots.txt AI爬虫规则配置（区分训练类/引用类/恶意爬虫，按需开放权限）\n3. llms.txt/AGENTS.md等AI专属发现文件搭建维护\n4. 内容token预算优化，适配大模型上下文窗口限制\n5. 结构化语义内容改造方案，提升AI内容识别准确率\n\n你现在有具体站点需要做AEO基础排查，或者有相关优化需求吗？",
+      "timestamp": 1783421535.448
+    }
+  ],
+  "created_at": "2026-07-07T10:51:41.174455+00:00",
+  "updated_at": "2026-07-07T10:52:15.449859+00:00"
+}

@@ -1562,8 +1562,11 @@ async def _call_llm_for_tools(model: str, messages: list, tools: list, temperatu
             await client.close()
     else:
         async with httpx.AsyncClient(timeout=120) as c:
-            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-            payload = {"model": actual_model, "messages": messages, "stream": False, "tools": tools, "temperature": temperature}
+            headers = {"Content-Type": "application/json"}
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
+            # Ollama v1/chat/completions does not support the OpenAI 'tools' field
+            payload = {"model": actual_model, "messages": messages, "stream": False, "temperature": temperature}
             r = await c.post(f"{base_url}/chat/completions", json=payload, headers=headers)
             r.raise_for_status()
             data = r.json()
@@ -1596,7 +1599,9 @@ async def _stream_llm_response(model: str, messages: list, temperature: float = 
             await client.close()
     else:
         async with httpx.AsyncClient(timeout=120) as c:
-            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+            headers = {"Content-Type": "application/json"}
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
             payload = {"model": actual_model, "messages": messages, "stream": True, "temperature": temperature}
             buffer = ""
             async with c.stream("POST", f"{base_url}/chat/completions", json=payload, headers=headers) as s:
@@ -1651,7 +1656,7 @@ async def hermes_chat(chat_req: HermesChatRequest, user: User | None = Depends(o
 
         # 检查模型是否有配置
         api_key, _, actual_model, is_volcengine = _resolve_llm_backend(chat_req.model)
-        if not api_key:
+        if is_volcengine and not api_key:
             yield f"data: {json.dumps({'type': 'error', 'content': f'模型 {chat_req.model} 未配置API Key'})}\n\n"
             return
 

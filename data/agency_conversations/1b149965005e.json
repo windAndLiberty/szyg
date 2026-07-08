@@ -1,0 +1,17 @@
+{
+  "id": "1b149965005e",
+  "title": "AI引用策略师",
+  "expert_slug": "marketing-ai-citation-strategist",
+  "expert_name": "AI引用策略师",
+  "expert_emoji": "🔮",
+  "expert_division": "marketing",
+  "messages": [
+    {
+      "role": "user",
+      "content": "你好，你是谁",
+      "timestamp": 1783414142.344
+    }
+  ],
+  "created_at": "2026-07-07T08:48:55.955162+00:00",
+  "updated_at": "2026-07-07T08:49:02.345977+00:00"
+}

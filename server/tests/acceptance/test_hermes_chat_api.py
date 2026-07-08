@@ -33,7 +33,7 @@ class TestHermesChatBasic:
         """Basic text chat via Ollama (zero cost)."""
         require_ollama()
         events = await _stream_collect(client, {
-            "model": "qwen3:0.6B",
+            "model": "llama3:latest",
             "messages": [{"role": "user", "content": "你好，用中文回复一句话"}],
         })
         assert len(events) > 0
@@ -77,7 +77,7 @@ class TestHermesChatSSEFormat:
         """Verify status -> text -> done event sequence."""
         require_ollama()
         events = await _stream_collect(client, {
-            "model": "qwen3:0.6B",
+            "model": "llama3:latest",
             "messages": [{"role": "user", "content": "说三个字"}],
         })
         types_in_order = [e.get("type") for e in events]
@@ -88,7 +88,7 @@ class TestHermesChatSSEFormat:
         """Invalid message format -> error event."""
         require_ollama()
         events = await _stream_collect(client, {
-            "model": "qwen3:0.6B",
+            "model": "llama3:latest",
             "messages": [{"role": "tool", "content": "orphan tool message"}],
         })
         types = {e.get("type") for e in events}
@@ -103,7 +103,7 @@ class TestHermesChatAgentConfig:
         """agent_id=content loads content staff config."""
         require_ollama()
         events = await _stream_collect(client, {
-            "model": "qwen3:0.6B",
+            "model": "llama3:latest",
             "messages": [{"role": "user", "content": "介绍一下你的职责"}],
             "agent_id": "content",
         })
@@ -113,7 +113,7 @@ class TestHermesChatAgentConfig:
         """agent_id=acquisition loads acquisition staff config."""
         require_ollama()
         events = await _stream_collect(client, {
-            "model": "qwen3:0.6B",
+            "model": "llama3:latest",
             "messages": [{"role": "user", "content": "你的工作是什么"}],
             "agent_id": "acquisition",
         })
@@ -123,7 +123,7 @@ class TestHermesChatAgentConfig:
         """expert_prompt overrides agent_id system prompt."""
         require_ollama()
         events = await _stream_collect(client, {
-            "model": "qwen3:0.6B",
+            "model": "llama3:latest",
             "messages": [{"role": "user", "content": "说一句自我介绍"}],
             "expert_prompt": "你是一个数学家，请用数学家身份回答",
         })
@@ -137,7 +137,7 @@ class TestHermesChatToolCall:
         """Ask to search knowledge base -> should trigger tool_call event."""
         require_ollama()
         events = await _stream_collect(client, {
-            "model": "qwen3:0.6B",
+            "model": "llama3:latest",
             "messages": [{"role": "user", "content": "搜索知识库中关于营销的内容"}],
         })
         assert len(events) > 0

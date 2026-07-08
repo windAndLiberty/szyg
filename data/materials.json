@@ -1,0 +1,20 @@
+[
+  {
+    "id": "7107e32f",
+    "name": "测试素材",
+    "type": "image",
+    "tags": [],
+    "platform": "all",
+    "url": "https://example.com/test.jpg",
+    "created_at": "2026-07-08T10:24:34.991804"
+  },
+  {
+    "id": "aa686354",
+    "name": "测试素材",
+    "type": "image",
+    "tags": [],
+    "platform": "all",
+    "url": "https://example.com/test.jpg",
+    "created_at": "2026-07-08T10:26:26.748385"
+  }
+]

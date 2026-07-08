@@ -1,0 +1,5 @@
+SZYG_SECRET_KEY not set ¡ª using insecure default. Set SZYG_SECRET_KEY to a random 32+ char value in production.
+INFO:     Started server process [3944]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
