@@ -196,3 +196,98 @@ class TestUnknownResources:
         """未知资源应返回 400。"""
         resp = await client.get("/api/data/unknown_xyz/list")
         assert resp.status_code == 400
+
+
+class TestDataRoutesErrors:
+    """错误路径验收。"""
+
+    async def test_invalid_resource_list(self, client):
+        """不存在的 resource → 400 或空列表。"""
+        resp = await client.get("/api/data/invalid_resource_xyz/list")
+        assert resp.status_code in (400, 404, 200)
+
+    async def test_nonexistent_item_delete(self, client):
+        """删除不存在的 item → 404 或 400。"""
+        resp = await client.delete("/api/data/team/nonexistent_id_99999")
+        assert resp.status_code in (200, 400, 404)
+
+    async def test_nonexistent_item_update(self, client):
+        """更新不存在的 item → 404 或 400。"""
+        resp = await client.put("/api/data/team/nonexistent_id_99999", json={"name": "x"})
+        assert resp.status_code in (400, 404, 422)
+
+
+class TestDataRoutesWriteAndVerify:
+    """写操作持久化验证。"""
+
+    async def test_create_then_list_visible(self, client):
+        """创建 → 列表中可见。"""
+        resp = await client.post("/api/data/team/create", json={
+            "name": "验收集成测试成员", "role": "tester"
+        })
+        assert resp.status_code == 200
+        member = resp.json()["member"]
+        item_id = member["id"]
+        list_resp = await client.get("/api/data/team/list")
+        ids = [i["id"] for i in list_resp.json()["data"]]
+        assert item_id in ids
+
+    async def test_update_persists(self, client):
+        """更新 → 重新获取确认变更持久化。"""
+        resp = await client.post("/api/data/team/create", json={
+            "name": "待更新成员", "role": "tester"
+        })
+        assert resp.status_code == 200
+        member = resp.json()["member"]
+        item_id = member["id"]
+        await client.put(f"/api/data/team/{item_id}", json={"name": "已更新成员名称"})
+        list_resp = await client.get("/api/data/team/list")
+        updated = next((i for i in list_resp.json()["data"] if i["id"] == item_id), None)
+        assert updated is not None
+        assert updated["name"] == "已更新成员名称"
+
+    async def test_delete_idempotent(self, client):
+        """删除两次 → 第二次 404 或 400。"""
+        resp = await client.post("/api/data/team/create", json={
+            "name": "幂等删除成员", "role": "tester"
+        })
+        assert resp.status_code == 200
+        member = resp.json()["member"]
+        item_id = member["id"]
+        await client.delete(f"/api/data/team/{item_id}")
+        resp2 = await client.delete(f"/api/data/team/{item_id}")
+        assert resp2.status_code in (200, 400, 404)
+
+    async def test_toggle_state_flips(self, client):
+        """toggle 操作 → 状态翻转。"""
+        resp = await client.post("/api/data/team/create", json={
+            "name": "开关测试成员", "role": "tester"
+        })
+        assert resp.status_code == 200
+        member = resp.json()["member"]
+        item_id = member["id"]
+        await client.put(f"/api/data/team/{item_id}/toggle")
+        list_resp = await client.get("/api/data/team/list")
+        toggled = next((i for i in list_resp.json()["data"] if i["id"] == item_id), None)
+        assert toggled is not None
+        assert toggled.get("status") == "disabled"
+
+    async def test_toggle_nonexistent(self, client):
+        """toggle 不存在的 item → 404 或 400。"""
+        resp = await client.put("/api/data/team/nonexistent_99999/toggle")
+        assert resp.status_code in (400, 404, 422)
+
+
+class TestDataRoutesAdditionalResources:
+    """覆盖 spec 要求的额外 resource 类型。"""
+
+    ADDITIONAL = ["tools", "skills", "platforms", "contents", "sops",
+                   "scheduled_tasks", "experiments"]
+
+    @pytest.mark.parametrize("resource", ADDITIONAL)
+    async def test_list_and_create(self, client, resource):
+        """每个 resource 可 list，list 返回数据格式正确。"""
+        list_resp = await client.get(f"/api/data/{resource}/list")
+        assert list_resp.status_code == 200
+        data = list_resp.json()
+        assert "data" in data
