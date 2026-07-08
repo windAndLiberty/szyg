@@ -37,9 +37,8 @@ async def generate_image(req: GenerateRequest):
 
     # ── Try VolcEngine first ──
     try:
-        import yaml
-        cfg_path = Path(__file__).parent.parent.parent.parent / "config.yaml"
-        cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
+        from szyg.config.loader import load_config
+        cfg = load_config()
         vc = cfg.get("llm", {}).get("volcengine", {})
         api_key = vc.get("api_key", "")
         ep = vc.get("endpoints", {}).get("doubao-image", "")
