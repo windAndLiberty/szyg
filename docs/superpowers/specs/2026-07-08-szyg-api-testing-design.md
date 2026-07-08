@@ -14,11 +14,12 @@
 
 ## 全局约束
 
-- 节省 API 费用：仅 `image_endpoint` 真实调用火山引擎 API
+- **真实调用，不 mock LLM**：本地 Ollama + 火山引擎 API 均真实调用
 - 不做压力测试，不做视频生成测试
-- 使用项目已有技术栈：pytest + pytest-asyncio + respx + httpx.AsyncClient
+- 使用项目已有技术栈：pytest + pytest-asyncio + httpx.AsyncClient
 - 测试数据与生产数据隔离（使用临时存储或独立 fixture）
 - Agency（`agency_routes`）已由用户手动验证，不在本次范围
+- 需要 `VOLCENGINE_API_KEY` 环境变量 + Ollama 本地运行
 
 ---
 
@@ -26,31 +27,31 @@
 
 ### 1.1 模块优先级
 
-| # | 模块 | Mock 策略 | 外部依赖 |
+| # | 模块 | 调用策略 | 外部依赖 |
 |---|------|-----------|----------|
-| 1 | `hermes_chat` | Mock LLM 流式，真实工具分发逻辑 | 无（respx mock） |
+| 1 | `hermes_chat` | **真实 LLM 调用**（火山引擎 + 本地 Ollama 回退）+ 真实工具分发 | 火山引擎 API + 本地 Ollama |
 | 2 | `conversation_routes` | 全真实 | 无（本地 JSON 存储） |
 | 3 | `auth_routes` | 全真实 | 无（本地 SQLite） |
 | 4 | `data_routes` | 全真实 | 无（本地 JSON 存储） |
 | 5 | `staff_routes` | 全真实 | 无（本地 JSON 配置） |
 | 6 | `publisher_routes` | 真实 CRUD，跳过分发到外部平台 | 无（本地 JSON 存储） |
-| 7 | `image_endpoint` | **真实调用火山引擎** | 火山引擎 API（需有效 key） |
+| 7 | `image_endpoint` | **真实调用火山引擎** | 火山引擎 API |
 
-### 1.2 Mock 技术方案
+### 1.2 真实调用策略
 
-- **火山引擎 LLM 调用**：`respx.mock` 拦截 `https://ark.cn-beijing.volces.com/api/v3/*`，返回预定义 JSON
-- **Ollama**：`respx.mock` 拦截 `http://localhost:11434/*`
-- **SSE 流式输出**：直接调用 `hermes_chat.py` 内部函数验证事件生成，不触发真实 LLM 轮次
-- **工具执行**：mock `_execute_tool()` 返回预设结果
+- **hermes_chat**：直接 POST `/api/hermes/chat`，接收真实 SSE 流式响应。优先使用火山引擎模型（`doubao-seed-2-0-pro-260215`），Ollama 作为本地回退（`qwen3:0.6B`）
+- **工具分发**：真实调用 `_execute_tool()`，验证工具链完整（如知识库搜索、内容 CRUD）
+- **image_endpoint**：真实 POST `/api/image/generate`，验证火山引擎返回有效图片 URL
+- **本地端点**（auth、conversation、data、staff、publisher）：纯本地操作，无外部依赖，直接验证 CRUD 完整性
 
 ### 1.3 测试工具
 
 | 工具 | 用途 |
 |------|------|
 | `pytest` + `pytest-asyncio` | 测试框架（项目已有，`asyncio_mode = "auto"`） |
-| `respx` | Mock 外部 HTTP 调用 |
 | `httpx.AsyncClient` + `ASGITransport` | 对真实 FastAPI app 发起集成测试请求 |
 | `factories` | 测试数据工厂（减少重复构造代码） |
+| `env_config` | 从环境变量/settings 读取 API key 和 endpoint 配置 |
 
 ---
 
@@ -66,11 +67,11 @@ server/tests/
 │   ├── test_data_api.py                # P0-4：统一数据 API（已有，扩充）
 │   ├── test_staff_api.py               # P0-5：AI 员工 API
 │   ├── test_publisher_api.py           # P0-6：内容发布 API
-│   ├── test_hermes_chat_api.py         # P0-1：Hermes 聊天 API
-│   └── test_image_api.py              # P0-7：图片生成 API
+│   ├── test_hermes_chat_api.py         # P0-1：Hermes 聊天 API（真实 LLM）
+│   └── test_image_api.py              # P0-7：图片生成 API（真实火山引擎）
 └── fixtures/
     ├── factories.py                     # 测试数据工厂
-    └── mock_llm.py                      # 共享 LLM mock 函数
+    └── env_config.py                    # API key / endpoint 配置读取
 ```
 
 ---
@@ -144,26 +145,21 @@ server/tests/
 
 **不测试：** 实际平台发布（`/publish`）、平台登录/会话管理（需要真实账号）。
 
-### 3.6 hermes_chat_api（~20 用例）
+### 3.6 hermes_chat_api（~15 用例）
 
-**测试策略：** Mock 外部 LLM 调用，测试 SSE 事件生成和工具分发逻辑。
+**测试策略：** 真实调用火山引擎 API + 本地 Ollama，接收完整 SSE 流式响应。
 
 **覆盖内容：**
-- 请求验证：空 messages、无效 model、超长 prompt
-- `agent_id` 参数加载员工配置（`content`/`acquisition`/`conversion`/`ops`）
-- `expert_prompt` 通道：自定义专家 prompt 优先于 agent_id
-- SSE 事件格式：`text`、`tool_call`、`tool_result`、`error`、`done` 类型
-- 工具分发正确性：指定工具名 → 正确调用对应的内部函数
-- 错误处理：LLM 返回非预期格式、工具执行异常
-- `case-cards` 端点：`POST /api/hermes/case-cards` 返回推荐案例
+- 请求验证：空 messages → 422、无效 model → 正常回退 Ollama
+- 普通对话：发送 "你好，请用中文回复" → 验证 SSE 流式返回 `text` 事件 + `done` 事件
+- `agent_id` 参数加载员工配置（`content`/`acquisition`/`conversion`/`ops`）→ 验证不同 agent 身份下的响应风格
+- `expert_prompt` 通道：自定义专家 prompt → 验证优先于 agent_id
+- SSE 事件完整性：`status` 进度 → `text` 内容 → `done` 收尾，事件顺序正确
+- 工具调用：发送 "帮我搜索知识库中关于营销的内容" → 验证 `tool_call` + `tool_result` 事件
+- 本地 Ollama 回退：未配置火山引擎时回退到 Ollama 正常工作
+- `case-cards` 端点：`POST /api/hermes/case-cards` → 返回推荐案例列表，验证数据结构
 
-**Mock 设置：**
-```python
-# respx 拦截火山引擎 API，返回预设 tool_calls 或文本响应
-respx.post("https://ark.cn-beijing.volces.com/api/v3/chat/completions").mock(
-    return_value=httpx.Response(200, json=PREDEFINED_RESPONSE)
-)
-```
+**注意：** 此模块会产生 API 费用（火山引擎按 token 计费），但单次对话成本很低（~0.01-0.1 元）。建议测试时使用短 prompt。Ollama 回退测试零费用。
 
 ### 3.7 image_endpoint（~8 用例）
 
@@ -201,35 +197,54 @@ def make_content(title="测试内容", content_type="video", platform="douyin"):
     return {"title": title, "content_type": content_type, "platform": platform}
 ```
 
-### mock_llm.py
+### env_config.py
 
 ```python
-# 共享 LLM mock，所有需要 mock 火山引擎的测试共用
+# 从环境变量 / settings 读取 API 配置，供测试使用
 
-def setup_volcengine_mock():
-    """设置 respx mock 拦截火山引擎 API 调用"""
-    ...
+import os
+from szyg.config import get_settings
 
-PREDEFINED_TOOL_CALL_RESPONSE = {...}
-PREDEFINED_TEXT_RESPONSE = {...}
+def get_volcengine_api_key() -> str:
+    """从 VOLCENGINE_API_KEY 环境变量读取，不存在时跳过测试"""
+    key = os.environ.get("VOLCENGINE_API_KEY", "")
+    if not key:
+        pytest.skip("VOLCENGINE_API_KEY not set")
+    return key
+
+def get_ollama_base_url() -> str:
+    """Ollama 默认地址，可通过环境变量覆盖"""
+    return os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+
+def is_ollama_available() -> bool:
+    """检测本地 Ollama 是否可用"""
+    import httpx
+    try:
+        r = httpx.get(f"{get_ollama_base_url()}/api/tags", timeout=5)
+        return r.status_code == 200
+    except Exception:
+        return False
 ```
 
 ---
 
 ## 五、验收标准
 
-1. 7 个模块的测试文件全部创建，`pytest -m 'not integration'` 全部通过
-2. P0-1~6（除 image_endpoint）可在无网络环境下运行（全 mock/本地）
-3. P0-7（image_endpoint）在有 `VOLCENGINE_API_KEY` 环境下通过
-4. 每个测试文件包含正常路径 + 至少 1 个错误路径
-5. 测试数据不与生产数据冲突
-6. 测试间相互独立，可任意顺序执行或单独运行
+1. 7 个模块的测试文件全部创建
+2. P0-2~6（auth、conversation、data、staff、publisher）可在无网络环境下运行（纯本地），`pytest tests/acceptance/test_auth_api.py tests/acceptance/test_conversation_api.py tests/acceptance/test_data_api.py tests/acceptance/test_staff_api.py tests/acceptance/test_publisher_api.py` 通过
+3. P0-1（hermes_chat）需要火山引擎 API 或本地 Ollama 运行，`pytest tests/acceptance/test_hermes_chat_api.py` 通过
+4. P0-7（image_endpoint）需要 `VOLCENGINE_API_KEY`，`pytest tests/acceptance/test_image_api.py` 通过
+5. 每个测试文件包含正常路径 + 至少 1 个错误路径
+6. 测试数据不与生产数据冲突（使用独立测试账号 + 测试后清理）
+7. 测试间相互独立，可任意顺序执行或单独运行
+8. hermes_chat 和 image_endpoint 测试自动跳过（pytest.skip）当 API key 不可用时
 
 ---
 
 ## 六、技术约束
 
-- 使用已有依赖：pytest、pytest-asyncio、respx、httpx
+- 使用已有依赖：pytest、pytest-asyncio、httpx
 - 不引入新的测试框架
 - 遵守项目 `pyproject.toml` 中的 pytest 配置（`asyncio_mode = "auto"`、`addopts = "-m 'not integration' --timeout=30"`）
 - 每个测试文件使用 `tests/acceptance/conftest.py` 中已有的 `test_app` fixture
+- hermes_chat 和 image_endpoint 需通过 env_config 检测 API 可用性，不可用时自动 skip
