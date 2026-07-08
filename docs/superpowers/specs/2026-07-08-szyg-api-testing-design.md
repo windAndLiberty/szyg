@@ -16,6 +16,7 @@
 
 - **真实调用，不 mock LLM**：本地 Ollama + 火山引擎 API 均真实调用
 - 不做压力测试，不做视频生成测试
+- 发布到三方平台（抖音/小红书/快手等）需用户手动配合登录，自动化跳过
 - 使用项目已有技术栈：pytest + pytest-asyncio + httpx.AsyncClient
 - 测试数据与生产数据隔离（使用临时存储或独立 fixture）
 - Agency（`agency_routes`）已由用户手动验证，不在本次范围
@@ -128,7 +129,7 @@ server/tests/
 
 ### 3.5 publisher_routes（~20 用例）
 
-**端点覆盖：**
+**自动化测试（本地操作，无需平台登录）：**
 - `GET /api/publisher/contents` — 内容列表
 - `POST /api/publisher/contents` — 创建内容、必填字段校验
 - `PUT /api/publisher/contents/{id}` — 更新内容
@@ -142,8 +143,17 @@ server/tests/
 - `GET /api/publisher/materials` — 素材列表
 - `POST /api/publisher/materials` — 上传素材
 - `DELETE /api/publisher/materials/{id}` — 删除素材
+- `GET /api/publisher/copy-library` — 文案库
+- `GET /api/publisher/content-assets` — 内容资产
 
-**不测试：** 实际平台发布（`/publish`）、平台登录/会话管理（需要真实账号）。
+**需手动配合（第三方平台登录，自动化跳过）：**
+- `POST /api/publisher/contents/{id}/publish` — 实际发布到抖音/小红书等
+- `GET /api/publisher/platforms/{platform}/status` — 平台登录状态
+- `POST /api/publisher/platforms/{platform}/login` — 平台登录（扫码/验证码）
+- `GET /api/publisher/platforms/{platform}/sessions` — 会话管理
+- `DELETE /api/publisher/platforms/{platform}/sessions` — 登出
+
+> 手动测试流程：运行自动化测试验证 CRUD + 审核流 → 用户配合登录三方平台 → 手动验证发布功能。
 
 ### 3.6 hermes_chat_api（~15 用例）
 
