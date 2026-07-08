@@ -16,7 +16,7 @@
 
 - **真实调用，不 mock LLM**：本地 Ollama + 火山引擎 API 均真实调用
 - 不做压力测试，不做视频生成测试
-- 发布到三方平台（抖音/小红书/快手等）需用户手动配合登录，自动化跳过
+- 三方平台发布测试保留，用户配合登录；其余本地操作全自动化
 - 使用项目已有技术栈：pytest + pytest-asyncio + httpx.AsyncClient
 - 测试数据与生产数据隔离（使用临时存储或独立 fixture）
 - Agency（`agency_routes`）已由用户手动验证，不在本次范围
@@ -127,9 +127,12 @@ server/tests/
 - `PUT /api/staff/configs/{agent_id}` — 更新配置
 - `POST /api/staff/configs/{agent_id}/reset` — 重置配置
 
-### 3.5 publisher_routes（~20 用例）
+### 3.5 publisher_routes（~25 用例）
 
-**自动化测试（本地操作，无需平台登录）：**
+**阶段一：自动化测试（本地操作，无需平台登录，~15 用例）**
+
+测试顺序：内容创建 → 提交审核 → 审批通过 → 定时 → 统计
+
 - `GET /api/publisher/contents` — 内容列表
 - `POST /api/publisher/contents` — 创建内容、必填字段校验
 - `PUT /api/publisher/contents/{id}` — 更新内容
@@ -146,14 +149,17 @@ server/tests/
 - `GET /api/publisher/copy-library` — 文案库
 - `GET /api/publisher/content-assets` — 内容资产
 
-**需手动配合（第三方平台登录，自动化跳过）：**
-- `POST /api/publisher/contents/{id}/publish` — 实际发布到抖音/小红书等
-- `GET /api/publisher/platforms/{platform}/status` — 平台登录状态
-- `POST /api/publisher/platforms/{platform}/login` — 平台登录（扫码/验证码）
-- `GET /api/publisher/platforms/{platform}/sessions` — 会话管理
-- `DELETE /api/publisher/platforms/{platform}/sessions` — 登出
+**阶段二：平台发布联调（需用户配合登录，~10 用例）**
 
-> 手动测试流程：运行自动化测试验证 CRUD + 审核流 → 用户配合登录三方平台 → 手动验证发布功能。
+> 执行流程：自动化测试通过 → 用户手动登录各平台 → 运行平台联调测试 → 验证发布成功
+
+- `GET /api/publisher/platforms/{platform}/status` — 平台连接状态
+- `GET /api/publisher/platforms/{platform}/sessions` — 活跃会话
+- `POST /api/publisher/contents/{id}/publish` — 实际发布到指定平台
+- `GET /api/publisher/logs` — 发布日志验证
+- 多平台发布串行验证：抖音 → 小红书 → 快手 → B站
+- 发布失败场景：未登录时尝试发布 → 预期返回错误
+- 素材上传关联发布 → 端到端流程验证
 
 ### 3.6 hermes_chat_api（~15 用例）
 
