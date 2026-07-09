@@ -144,6 +144,13 @@ class XiaohongshuAdapter(BasePlatformAdapter):
                     except Exception:
                         pass
 
+                    # Persist account metadata for the frontend account card.
+                    if self._account_name:
+                        self._session.save_account_meta(Platform.XHS, {
+                            "nickname": self._account_name,
+                            "followers": 0,
+                        })
+
                     await self._close_browser_context()
                     logger.info(f"✓ 小红书登录成功! ({self._account_name or '未知账号'}) 浏览器已关闭")
                     return LoginStatus(
@@ -167,6 +174,81 @@ class XiaohongshuAdapter(BasePlatformAdapter):
             return LoginStatus(is_logged_in=False, message=f"登录失败: {str(e)[:100]}")
 
     # ── Publish ───────────────────────────────────────────
+
+    async def preflight_publish(self, request: PublishRequest) -> dict:
+        """Open the publish page and validate prerequisites without clicking publish."""
+        checks = {
+            "local_session": False,
+            "media_files": True,
+            "publish_page": False,
+            "logged_in": False,
+            "upload_input": False,
+        }
+        errors: list[str] = []
+
+        storage_state = self._session.load(Platform.XHS)
+        if not storage_state or not storage_state.get("cookies"):
+            errors.append("missing local xhs session")
+            return {
+                "ok": False,
+                "platform": Platform.XHS.value,
+                "content_type": request.content_type.value,
+                "checks": checks,
+                "errors": errors,
+            }
+        checks["local_session"] = True
+
+        if request.media_urls:
+            from pathlib import Path
+            missing = [
+                path for path in request.media_urls
+                if not path.startswith(("http://", "https://"))
+                and not Path(path).exists()
+            ]
+            if missing:
+                checks["media_files"] = False
+                errors.extend(f"media file not found: {path}" for path in missing)
+
+        try:
+            if not self._pool:
+                await self.initialize()
+
+            await self._close_browser_context()
+            await self._ensure_browser_context(storage_state=storage_state)
+            await self._page.goto(XHS_PUBLISH_URL, wait_until="domcontentloaded", timeout=30000)
+            await asyncio.sleep(3)
+            checks["publish_page"] = "creator.xiaohongshu.com" in self._page.url
+
+            if await self._is_on_login_page():
+                checks["logged_in"] = False
+                errors.append("xhs session expired or login page visible")
+            else:
+                checks["logged_in"] = True
+
+            upload_selector = 'input[type="file"]'
+            try:
+                upload = await self._page.wait_for_selector(
+                    upload_selector, state="attached", timeout=8000
+                )
+                checks["upload_input"] = upload is not None
+            except Exception:
+                errors.append("upload input not found on publish page")
+
+            await self._audit_screenshot("publish_preflight")
+            await self._close_browser_context()
+            self._state = AdapterState.READY
+        except Exception as e:
+            errors.append(str(e)[:200])
+            await self._close_browser_context()
+            self._state = AdapterState.ERROR
+
+        return {
+            "ok": all(checks.values()) and not errors,
+            "platform": Platform.XHS.value,
+            "content_type": request.content_type.value,
+            "checks": checks,
+            "errors": errors,
+        }
 
     async def publish(self, request: PublishRequest) -> PublishResult:
         """加载 Cookie → 打开浏览器 → 自动发布 → 关闭浏览器。"""

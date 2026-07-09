@@ -230,7 +230,14 @@ class DouyinAdapter(BasePlatformAdapter):
             if slider_detected:
                 logger.info("检测到滑块验证码 — 请手动完成验证")
 
-            visible = qr_canvas is not None or phone_input is not None or slider_detected
+            page_url = self._page.url.lower()
+            visible = (
+                phone_input is not None
+                or code_input is not None
+                or login_btn is not None
+                or slider_detected
+                or (qr_canvas is not None and "login" in page_url)
+            )
             if visible:
                 logger.debug("检测到登录浮层 (QR=%s, phone=%s, code=%s, btn=%s, slider=%s)",
                              qr_canvas is not None, phone_input is not None,
@@ -319,6 +326,12 @@ class DouyinAdapter(BasePlatformAdapter):
                         await asyncio.sleep(1)
                         await self._session.save(Platform.DOUYIN, self._context)
                         account = await self._get_account_name()
+                        # Persist account metadata for the frontend account card.
+                        if account:
+                            self._session.save_account_meta(Platform.DOUYIN, {
+                                "nickname": account,
+                                "followers": 0,  # Later refreshed via get_status.
+                            })
                         self._state = AdapterState.READY
 
                         # ── 关闭浏览器 ──
@@ -346,6 +359,87 @@ class DouyinAdapter(BasePlatformAdapter):
                 return LoginStatus(is_logged_in=False, message=f"登录失败: {str(e)[:100]}")
 
     # ── Publish ───────────────────────────────────────────
+
+    async def preflight_publish(self, request: PublishRequest) -> dict:
+        """Open the publish page and validate prerequisites without clicking publish."""
+        async with self._lock:
+            checks = {
+                "local_session": False,
+                "media_files": True,
+                "publish_page": False,
+                "logged_in": False,
+                "upload_input": False,
+            }
+            errors: list[str] = []
+
+            storage_state = self._session.load(Platform.DOUYIN)
+            if not storage_state or not storage_state.get("cookies"):
+                errors.append("missing local douyin session")
+                return {
+                    "ok": False,
+                    "platform": Platform.DOUYIN.value,
+                    "content_type": request.content_type.value,
+                    "checks": checks,
+                    "errors": errors,
+                }
+            checks["local_session"] = True
+
+            if request.media_urls:
+                from pathlib import Path
+                missing = [
+                    path for path in request.media_urls
+                    if not path.startswith(("http://", "https://"))
+                    and not Path(path).exists()
+                ]
+                if missing:
+                    checks["media_files"] = False
+                    errors.extend(f"media file not found: {path}" for path in missing)
+
+            try:
+                if not self._pool:
+                    await self.initialize()
+
+                await self._close_browser_context()
+                await self._ensure_browser_context(storage_state=storage_state)
+                await self._page.goto(DOUYIN_CREATOR_PUBLISH, wait_until="domcontentloaded", timeout=30000)
+                await asyncio.sleep(3)
+                checks["publish_page"] = "creator.douyin.com" in self._page.url
+
+                if await self._is_login_overlay_visible():
+                    checks["logged_in"] = False
+                    errors.append("douyin session expired or login overlay visible")
+                else:
+                    checks["logged_in"] = True
+
+                is_video = request.content_type == ContentType.VIDEO_SCRIPT
+                if not is_video:
+                    await self._switch_to_image_text_tab()
+                    await self._dismiss_tutorial()
+
+                upload_selector = SELECTOR_VIDEO_UPLOAD if is_video else SELECTOR_IMAGE_UPLOAD
+                try:
+                    upload = await self._page.wait_for_selector(
+                        upload_selector, state="attached", timeout=8000
+                    )
+                    checks["upload_input"] = upload is not None
+                except Exception:
+                    errors.append("upload input not found on publish page")
+
+                await self._audit_screenshot("publish_preflight")
+                await self._close_browser_context()
+                self._state = AdapterState.READY
+            except Exception as e:
+                errors.append(str(e)[:200])
+                await self._close_browser_context(invalidate=True)
+                self._state = AdapterState.ERROR
+
+            return {
+                "ok": all(checks.values()) and not errors,
+                "platform": Platform.DOUYIN.value,
+                "content_type": request.content_type.value,
+                "checks": checks,
+                "errors": errors,
+            }
 
     async def publish(self, request: PublishRequest) -> PublishResult:
         """

@@ -77,6 +77,15 @@ PLATFORM_META = {
 }
 
 
+def _parse_platform(platform: str) -> Platform:
+    aliases = {
+        "xiaohongshu": "xhs",
+        "redbook": "xhs",
+        "little-red-book": "xhs",
+    }
+    return Platform(aliases.get(platform, platform))
+
+
 @router.get("")
 async def platform_list():
     """列出所有已注册平台的状态"""
@@ -108,7 +117,7 @@ async def platform_list():
 async def platform_detail(platform: str):
     """获取单个平台详细信息"""
     try:
-        p = Platform(platform)
+        p = _parse_platform(platform)
     except ValueError:
         raise HTTPException(400, f"不支持的平台: {platform}")
 
@@ -154,7 +163,7 @@ async def platform_login(platform: str, timeout: int = 600):
         timeout: 登录等待超时秒数 (默认 600)
     """
     try:
-        p = Platform(platform)
+        p = _parse_platform(platform)
     except ValueError:
         raise HTTPException(400, f"不支持的平台: {platform}")
 
@@ -199,6 +208,48 @@ async def platform_login(platform: str, timeout: int = 600):
 
 
 
+@router.post("/{platform}/publish-preflight")
+async def platform_publish_preflight(
+    platform: str, title: str, body: str = "",
+    tags: str = "", media_urls: str = "",
+    content_type: str = "post"
+):
+    try:
+        p = _parse_platform(platform)
+    except ValueError:
+        raise HTTPException(400, f"Unsupported platform: {platform}")
+
+    allowed_types = {"post", "article", "video", "image", "video_script"}
+    if content_type not in allowed_types:
+        content_type = "post"
+
+    from szyg.publisher import ContentType
+    from szyg.platforms.base import PublishRequest
+    from szyg.platforms.registry import get_registry
+
+    ct_map = {
+        "post": ContentType.POST,
+        "article": ContentType.ARTICLE,
+        "video": ContentType.VIDEO_SCRIPT,
+        "video_script": ContentType.VIDEO_SCRIPT,
+        "image": ContentType.IMAGE_POST,
+    }
+    request = PublishRequest(
+        title=title,
+        body=body,
+        tags=[t.strip() for t in tags.split(",") if t.strip()],
+        media_urls=[u.strip() for u in media_urls.split(",") if u.strip()],
+        content_type=ct_map.get(content_type, ContentType.POST),
+    )
+
+    registry = get_registry()
+    if not registry.is_registered(p):
+        raise HTTPException(404, f"Platform not registered: {platform}")
+
+    adapter = await registry.get(p)
+    return await adapter.preflight_publish(request)
+
+
 @router.post("/{platform}/publish")
 async def platform_publish_direct(
     platform: str, title: str, body: str = "",
@@ -216,7 +267,7 @@ async def platform_publish_direct(
         content_type: 内容类型 (post/article/video/image)
     """
     try:
-        p = Platform(platform)
+        p = _parse_platform(platform)
     except ValueError:
         raise HTTPException(400, f"不支持的平台: {platform}")
 
@@ -265,7 +316,7 @@ async def platform_publish_direct(
 async def platform_post_status(platform: str, post_id: str):
     """查询已发布内容在平台上的实时数据（播放量/点赞/评论等）。"""
     try:
-        p = Platform(platform)
+        p = _parse_platform(platform)
     except ValueError:
         raise HTTPException(400, f"不支持的平台: {platform}")
 
@@ -326,7 +377,7 @@ async def platform_health():
 async def platform_url(platform: str):
     """获取平台登录/创作者中心 URL（供 Electron 内嵌浏览器使用）"""
     try:
-        p = Platform(platform)
+        p = _parse_platform(platform)
     except ValueError:
         raise HTTPException(400, f"不支持的平台: {platform}")
     url = PLATFORM_URLS.get(platform)
@@ -342,7 +393,7 @@ async def platform_sync_cookies(platform: str, payload: dict):
     这是 Electron 套壳浏览器与后端 Playwright 自动化之间的 Cookie 桥接接口。
     """
     try:
-        p = Platform(platform)
+        p = _parse_platform(platform)
     except ValueError:
         raise HTTPException(400, f"不支持的平台: {platform}")
 
@@ -399,7 +450,7 @@ async def platform_sync_cookies(platform: str, payload: dict):
 async def platform_unbind(platform: str):
     """删除平台登录态（解绑账号）"""
     try:
-        p = Platform(platform)
+        p = _parse_platform(platform)
     except ValueError:
         raise HTTPException(400, f"不支持的平台: {platform}")
 
@@ -407,6 +458,7 @@ async def platform_unbind(platform: str):
     mgr = get_session_manager()
 
     mgr.invalidate(p)
+    mgr.delete_account_meta(p)
     logger.info(f"[{platform}] 登录态已清除（解绑）")
 
     return {"ok": True, "platform": platform}

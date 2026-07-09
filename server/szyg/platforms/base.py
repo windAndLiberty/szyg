@@ -256,5 +256,20 @@ class BasePlatformAdapter(ABC):
         except Exception:
             return False
 
+    async def preflight_publish(self, request: PublishRequest) -> dict:
+        """Validate publish prerequisites without clicking publish."""
+        login = await self.check_login()
+        return {
+            "ok": False,
+            "platform": self.platform.value,
+            "logged_in": login.is_logged_in,
+            "checks": {
+                "logged_in": login.is_logged_in,
+                "publish_page": False,
+                "upload_input": False,
+            },
+            "errors": ["preflight not implemented"],
+        }
+
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__} platform={self.platform.value} state={self._state.value}>"

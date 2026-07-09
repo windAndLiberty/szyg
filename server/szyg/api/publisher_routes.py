@@ -8,6 +8,15 @@ from szyg.api.auth_routes import require_admin, optional_user
 router = APIRouter(prefix="/api/publisher", tags=["publisher"])
 
 
+def _parse_platform(platform: str) -> Platform:
+    aliases = {
+        "xiaohongshu": "xhs",
+        "redbook": "xhs",
+        "little-red-book": "xhs",
+    }
+    return Platform(aliases.get(platform, platform))
+
+
 @router.get("/contents", response_model=list[Content])
 async def list_contents(status: str = "", content_type: str = "", search: str = "", limit: int = 50):
     return get_publisher().list_contents(status, content_type, search, limit)
@@ -88,9 +97,9 @@ async def schedule_content(content_id: str, scheduled_at: str):
 # Publish
 @router.post("/contents/{content_id}/publish")
 async def publish_content(content_id: str, platform: str = ""):
-    p = Platform(platform) if platform else None
+    p = _parse_platform(platform) if platform else None
     try:
-        rec = get_publisher().publish_now(content_id, p)
+        rec = await get_publisher().publish_async(content_id, p)
         return {"ok": True, "record": rec}
     except ValueError as e:
         raise HTTPException(404, str(e))
@@ -137,9 +146,8 @@ async def platform_list():
 async def platform_status(platform: str):
     """查询指定平台的登录状态"""
     try:
-        from szyg.publisher import Platform
         from szyg.platforms.registry import get_adapter
-        p = Platform(platform)
+        p = _parse_platform(platform)
         adapter = await get_adapter(p)
         status = await adapter.check_login()
         return status.model_dump()
@@ -153,9 +161,8 @@ async def platform_status(platform: str):
 async def platform_login(platform: str):
     """触发平台登录 (打开浏览器等待扫码)"""
     try:
-        from szyg.publisher import Platform
         from szyg.platforms.registry import get_adapter
-        p = Platform(platform)
+        p = _parse_platform(platform)
         adapter = await get_adapter(p)
         status = await adapter.login()
         return status.model_dump()
@@ -169,9 +176,8 @@ async def platform_login(platform: str):
 async def platform_session_info(platform: str):
     """查询平台登录态详细信息"""
     try:
-        from szyg.publisher import Platform
         from szyg.platforms.session_manager import get_session_manager
-        p = Platform(platform)
+        p = _parse_platform(platform)
         mgr = get_session_manager()
         return mgr.get_info(p)
     except ValueError as e:
@@ -182,9 +188,8 @@ async def platform_session_info(platform: str):
 async def platform_logout(platform: str):
     """清除平台登录态"""
     try:
-        from szyg.publisher import Platform
         from szyg.platforms.session_manager import get_session_manager
-        p = Platform(platform)
+        p = _parse_platform(platform)
         mgr = get_session_manager()
         mgr.invalidate(p)
         return {"ok": True, "message": f"{platform} 登录态已清除"}
