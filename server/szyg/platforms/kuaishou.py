@@ -106,6 +106,18 @@ class KuaishouAdapter(BasePlatformAdapter):
                 if "creator.kuaishou.com" in self._page.url and "login" not in self._page.url.lower():
                     await self._session.save(Platform.KUAISHOU, self._context)
                     self._state = AdapterState.READY
+                    # 尝试提取账号名
+                    try:
+                        name_el = await self._page.query_selector(
+                            '.nickname, .user-name, [class*="name"]'
+                        )
+                        nickname = (await name_el.inner_text()).strip() if name_el else ""
+                        if nickname:
+                            self._session.save_account_meta(Platform.KUAISHOU, {
+                                "nickname": nickname, "followers": 0
+                            })
+                    except Exception:
+                        pass
                     await self._close_browser_context()
                     logger.info("✓ 快手登录成功! 浏览器已关闭")
                     return LoginStatus(is_logged_in=True, message="login success")

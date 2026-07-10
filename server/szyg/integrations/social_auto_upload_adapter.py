@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 import os
+import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -17,8 +18,25 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# ── sau 模块路径注入 ──────────────────────────────────────
-_SAU_DIR = Path(__file__).parent / "social_auto_upload"
+_REPO_ROOT = Path(__file__).parent.parent.parent.parent
+try:
+    from szyg.config.settings import get_settings
+    _SAU_CONFIG = get_settings().integrations.social_auto_upload
+except Exception:
+    _SAU_CONFIG = None
+
+_CONFIGURED_SAU_DIR = Path(getattr(_SAU_CONFIG, "project_dir", "") or "")
+if _CONFIGURED_SAU_DIR and not _CONFIGURED_SAU_DIR.is_absolute():
+    _CONFIGURED_SAU_DIR = (_REPO_ROOT / _CONFIGURED_SAU_DIR).resolve()
+_BUNDLED_SAU_DIR = Path(__file__).parent / "social_auto_upload"
+_DEFAULT_EXTERNAL_SAU_DIR = _REPO_ROOT / "external" / "social-auto-upload-main"
+_SAU_DIR = (
+    _CONFIGURED_SAU_DIR
+    if _CONFIGURED_SAU_DIR and _CONFIGURED_SAU_DIR.exists()
+    else _DEFAULT_EXTERNAL_SAU_DIR
+    if _DEFAULT_EXTERNAL_SAU_DIR.exists()
+    else _BUNDLED_SAU_DIR
+)
 if str(_SAU_DIR) not in sys.path:
     sys.path.insert(0, str(_SAU_DIR))
 
@@ -26,7 +44,7 @@ if str(_SAU_DIR) not in sys.path:
 # szyg: data/sessions/storage_state_{platform}.json
 # sau:  cookies/{platform}_uploader/account.json
 # 格式相同（Playwright storage_state），只需路径转换
-_DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
+_DATA_DIR = _REPO_ROOT / "data"
 _SESSIONS_DIR = _DATA_DIR / "sessions"
 _SAU_COOKIES_DIR = _SAU_DIR / "cookies"
 
@@ -107,6 +125,182 @@ class SocialAutoUploadAdapter:
         _SAU_COOKIES_DIR.mkdir(parents=True, exist_ok=True)
         _SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
 
+    def _account_name(self, platform: str) -> str:
+        accounts = getattr(_SAU_CONFIG, "accounts", {}) or {}
+        return accounts.get(platform, platform)
+
+    def _publish_timeout_seconds(self) -> int:
+        return int(getattr(_SAU_CONFIG, "publish_timeout_seconds", 900) or 900)
+
+    def _sync_douyin_session_to_external_sau(self) -> Path:
+        account_name = self._account_name("douyin")
+        source = _SESSIONS_DIR / "storage_state_douyin.json"
+        target = _SAU_COOKIES_DIR / f"douyin_{account_name}.json"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if source.exists():
+            shutil.copy2(source, target)
+        return target
+
+    def _sync_external_sau_to_douyin_session(self) -> None:
+        account_name = self._account_name("douyin")
+        source = _SAU_COOKIES_DIR / f"douyin_{account_name}.json"
+        target = _SESSIONS_DIR / "storage_state_douyin.json"
+        if source.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+
+    async def _run_external_sau(self, args: list[str], timeout_seconds: int = 900) -> dict:
+        sau_cli = _SAU_DIR / "sau_cli.py"
+        if not sau_cli.exists():
+            return {
+                "success": False,
+                "message": f"social-auto-upload CLI not found: {sau_cli}",
+                "stdout": "",
+                "stderr": "",
+            }
+
+        env = os.environ.copy()
+        env.setdefault("PYTHONIOENCODING", "utf-8")
+        process = await asyncio.create_subprocess_exec(
+            sys.executable,
+            str(sau_cli),
+            *args,
+            cwd=str(_SAU_DIR),
+            env=env,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        async def terminate_process_tree() -> None:
+            if process.returncode is not None:
+                return
+            if os.name == "nt":
+                killer = await asyncio.create_subprocess_exec(
+                    "taskkill",
+                    "/PID",
+                    str(process.pid),
+                    "/T",
+                    "/F",
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL,
+                )
+                await killer.communicate()
+            else:
+                process.kill()
+
+        try:
+            stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                process.communicate(),
+                timeout=timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            await terminate_process_tree()
+            stdout_bytes, stderr_bytes = await process.communicate()
+            return {
+                "success": False,
+                "message": f"social-auto-upload timed out after {timeout_seconds}s",
+                "stdout": stdout_bytes.decode("utf-8", errors="replace"),
+                "stderr": stderr_bytes.decode("utf-8", errors="replace"),
+            }
+        except asyncio.CancelledError:
+            await terminate_process_tree()
+            await process.communicate()
+            raise
+
+        stdout = stdout_bytes.decode("utf-8", errors="replace")
+        stderr = stderr_bytes.decode("utf-8", errors="replace")
+        message = (stderr or stdout).strip()
+        return {
+            "success": process.returncode == 0,
+            "returncode": process.returncode,
+            "message": message,
+            "stdout": stdout,
+            "stderr": stderr,
+        }
+
+    async def _external_douyin_upload_video(
+        self,
+        file_path: str,
+        title: str,
+        desc: str,
+        tags: list[str] | None,
+        thumbnail_path: str | None,
+        schedule: datetime | None,
+        headless: bool,
+    ) -> dict:
+        account_name = self._account_name("douyin")
+        account_file = self._sync_douyin_session_to_external_sau()
+        args = [
+            "douyin",
+            "upload-video",
+            "--account",
+            account_name,
+            "--file",
+            file_path,
+            "--title",
+            title,
+            "--desc",
+            desc or "",
+            "--tags",
+            ",".join(tags or []),
+            "--debug",
+            "--headless" if headless else "--headed",
+        ]
+        if thumbnail_path:
+            args.extend(["--thumbnail", thumbnail_path])
+        if schedule:
+            args.extend(["--schedule", schedule.strftime("%Y-%m-%d %H:%M")])
+
+        result = await self._run_external_sau(args, timeout_seconds=self._publish_timeout_seconds())
+        self._sync_external_sau_to_douyin_session()
+        result.update({
+            "platform": "douyin",
+            "title": title,
+            "file_path": file_path,
+            "account_file": str(account_file),
+            "engine": "external-social-auto-upload",
+        })
+        return result
+
+    async def _external_douyin_upload_note(
+        self,
+        image_paths: list[str],
+        title: str,
+        note: str,
+        tags: list[str] | None,
+        schedule: datetime | None,
+        headless: bool,
+    ) -> dict:
+        account_name = self._account_name("douyin")
+        account_file = self._sync_douyin_session_to_external_sau()
+        args = [
+            "douyin",
+            "upload-note",
+            "--account",
+            account_name,
+            "--images",
+            *image_paths,
+            "--title",
+            title,
+            "--note",
+            note or "",
+            "--tags",
+            ",".join(tags or []),
+            "--debug",
+            "--headless" if headless else "--headed",
+        ]
+        if schedule:
+            args.extend(["--schedule", schedule.strftime("%Y-%m-%d %H:%M")])
+
+        result = await self._run_external_sau(args, timeout_seconds=self._publish_timeout_seconds())
+        self._sync_external_sau_to_douyin_session()
+        result.update({
+            "platform": "douyin",
+            "title": title,
+            "account_file": str(account_file),
+            "engine": "external-social-auto-upload",
+        })
+        return result
+
     def _get_account_file(self, platform: str) -> str:
         """获取平台 cookie 文件路径。
 
@@ -166,6 +360,17 @@ class SocialAutoUploadAdapter:
         Returns:
             {"success": bool, "platform": str, "message": str}
         """
+        if platform == "douyin":
+            return await self._external_douyin_upload_video(
+                file_path=file_path,
+                title=title,
+                desc=desc,
+                tags=tags,
+                thumbnail_path=thumbnail_path,
+                schedule=schedule,
+                headless=headless,
+            )
+
         try:
             mod, cfg = self._import_uploader(platform)
             account = account_file or self._get_account_file(platform)
@@ -246,6 +451,16 @@ class SocialAutoUploadAdapter:
         Returns:
             {"success": bool, "platform": str, "message": str}
         """
+        if platform == "douyin":
+            return await self._external_douyin_upload_note(
+                image_paths=image_paths,
+                title=title,
+                note=note,
+                tags=tags,
+                schedule=schedule,
+                headless=headless,
+            )
+
         try:
             mod, cfg = self._import_uploader(platform)
             if not cfg["note_class"]:
@@ -303,6 +518,25 @@ class SocialAutoUploadAdapter:
         Returns:
             {"success": bool, "platform": str, "account_file": str, "message": str}
         """
+        if platform == "douyin":
+            account_name = self._account_name("douyin")
+            account_file = self._sync_douyin_session_to_external_sau()
+            result = await self._run_external_sau([
+                "douyin",
+                "login",
+                "--account",
+                account_name,
+                "--headless" if headless else "--headed",
+            ], timeout_seconds=600)
+            self._sync_external_sau_to_douyin_session()
+            return {
+                "success": result["success"],
+                "platform": platform,
+                "account_file": str(account_file),
+                "message": result.get("message", ""),
+                "engine": "external-social-auto-upload",
+            }
+
         try:
             mod, cfg = self._import_uploader(platform)
             account = self._get_account_file(platform)
@@ -364,6 +598,23 @@ class SocialAutoUploadAdapter:
         Returns:
             {"logged_in": bool, "platform": str, "account_file": str}
         """
+        if platform == "douyin":
+            account_name = self._account_name("douyin")
+            account_file = self._sync_douyin_session_to_external_sau()
+            result = await self._run_external_sau([
+                "douyin",
+                "check",
+                "--account",
+                account_name,
+            ], timeout_seconds=120)
+            return {
+                "logged_in": result["success"],
+                "platform": platform,
+                "account_file": str(account_file),
+                "message": result.get("message", ""),
+                "engine": "external-social-auto-upload",
+            }
+
         try:
             mod, cfg = self._import_uploader(platform)
             account = self._get_account_file(platform)

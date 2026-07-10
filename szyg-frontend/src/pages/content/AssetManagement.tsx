@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Image as AssetManagementIcon,
@@ -16,6 +16,8 @@ import {
   Loader2,
   FolderOpen,
 } from 'lucide-react'
+import { deleteGeneratedMedia } from '@/lib/api'
+import { downloadGeneratedAsset, resolveGeneratedAssetUrl } from '@/lib/generatedAssets'
 
 type AssetType = 'all' | 'image' | 'video' | 'audio' | 'text'
 
@@ -23,7 +25,8 @@ interface Asset {
   id: string
   name: string
   type: 'image' | 'video' | 'audio' | 'text'
-  url: string
+  url?: string
+  path?: string
   size: number
   created_at: string
 }
@@ -44,9 +47,14 @@ const TYPE_ICONS: Record<string, typeof FileImage> = {
 }
 
 function formatFileSize(bytes: number): string {
+  if (!bytes) return '-'
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function assetUrl(asset: Asset): string {
+  return resolveGeneratedAssetUrl(asset.url || '', asset.path || '')
 }
 
 export default function AssetManagement() {
@@ -61,31 +69,24 @@ export default function AssetManagement() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Load assets
-  useEffect(() => {
-    loadAssets()
-  }, [])
-
-  const loadAssets = async () => {
+  const loadAssets = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/materials')
-      if (res.ok) {
-        const data = await res.json()
-        setAssets(data.items || [])
-      }
+      const res = await fetch('/api/publisher/materials')
+      if (!res.ok) throw new Error('素材加载失败')
+      const data = await res.json()
+      setAssets(data.items || data.materials || [])
     } catch {
-      // Use mock data for demo
-      setAssets([
-        { id: '1', name: '产品图-001.png', type: 'image', url: '/api/files/sample.png', size: 2048000, created_at: '2026-07-06T10:00:00Z' },
-        { id: '2', name: '宣传视频.mp4', type: 'video', url: '/api/files/sample.mp4', size: 15728640, created_at: '2026-07-06T09:30:00Z' },
-        { id: '3', name: '配音素材.wav', type: 'audio', url: '/api/files/sample.wav', size: 524288, created_at: '2026-07-06T09:00:00Z' },
-        { id: '4', name: '朋友圈文案.txt', type: 'text', url: '', size: 1024, created_at: '2026-07-05T15:00:00Z' },
-      ])
+      setError('素材加载失败')
+      setAssets([])
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadAssets()
+  }, [loadAssets])
 
   const handleUpload = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return
@@ -96,7 +97,7 @@ export default function AssetManagement() {
       for (const file of Array.from(files)) {
         const formData = new FormData()
         formData.append('file', file)
-        const res = await fetch('/api/materials/upload', {
+        const res = await fetch('/api/publisher/materials/upload', {
           method: 'POST',
           body: formData,
         })
@@ -108,13 +109,18 @@ export default function AssetManagement() {
     } finally {
       setUploading(false)
     }
-  }, [])
+  }, [loadAssets])
 
   const handleDelete = useCallback(async (id: string) => {
     if (!confirm('确定删除此素材？')) return
     try {
-      await fetch(`/api/materials/${id}`, { method: 'DELETE' })
-      setAssets((prev) => prev.filter((a) => a.id !== id))
+      const asset = assets.find((item) => item.id === id)
+      if (asset?.id.startsWith('generated:')) {
+        await deleteGeneratedMedia({ path: asset.path, url: asset.url })
+      } else {
+        await fetch(`/api/publisher/materials/${encodeURIComponent(id)}`, { method: 'DELETE' })
+      }
+      setAssets((prev) => prev.filter((item) => item.id !== id))
       setSelectedIds((prev) => {
         const next = new Set(prev)
         next.delete(id)
@@ -123,28 +129,34 @@ export default function AssetManagement() {
     } catch {
       setError('删除失败')
     }
-  }, [])
+  }, [assets])
 
   const handleBulkDelete = useCallback(async () => {
     if (selectedIds.size === 0) return
     if (!confirm(`确定删除 ${selectedIds.size} 个素材？`)) return
     try {
       for (const id of selectedIds) {
-        await fetch(`/api/materials/${id}`, { method: 'DELETE' })
+        const asset = assets.find((item) => item.id === id)
+        if (asset?.id.startsWith('generated:')) {
+          await deleteGeneratedMedia({ path: asset.path, url: asset.url })
+        } else {
+          await fetch(`/api/publisher/materials/${encodeURIComponent(id)}`, { method: 'DELETE' })
+        }
       }
-      setAssets((prev) => prev.filter((a) => !selectedIds.has(a.id)))
+      setAssets((prev) => prev.filter((item) => !selectedIds.has(item.id)))
       setSelectedIds(new Set())
     } catch {
       setError('批量删除失败')
     }
-  }, [selectedIds])
+  }, [assets, selectedIds])
 
-  const handleDownload = useCallback((asset: Asset) => {
-    if (!asset.url) return
-    const a = document.createElement('a')
-    a.href = asset.url
-    a.download = asset.name
-    a.click()
+  const handleDownload = useCallback(async (asset: Asset) => {
+    if (!asset.url && !asset.path) return
+    try {
+      await downloadGeneratedAsset({ url: asset.url || '', path: asset.path }, asset.name)
+    } catch {
+      setError('下载失败')
+    }
   }, [])
 
   const toggleSelect = useCallback((id: string) => {
@@ -156,11 +168,40 @@ export default function AssetManagement() {
     })
   }, [])
 
-  const filteredAssets = assets.filter((a) => {
-    if (filter !== 'all' && a.type !== filter) return false
-    if (search && !a.name.toLowerCase().includes(search.toLowerCase())) return false
+  const filteredAssets = assets.filter((asset) => {
+    if (filter !== 'all' && asset.type !== filter) return false
+    if (search && !asset.name.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
+
+  const renderAssetMedia = (asset: Asset, mode: 'card' | 'preview') => {
+    const url = assetUrl(asset)
+    const Icon = TYPE_ICONS[asset.type] || FileImage
+    const previewClass = 'max-w-full max-h-[60vh] mx-auto rounded-lg'
+
+    if (!url) {
+      return <Icon className={mode === 'card' ? 'w-12 h-12 text-[#334155]' : 'w-16 h-16 text-[#334155] mx-auto'} />
+    }
+    if (asset.type === 'image') {
+      return <img src={url} alt={asset.name} className={mode === 'card' ? 'w-full h-full object-cover' : previewClass} />
+    }
+    if (asset.type === 'video') {
+      return <video src={url} controls={mode === 'preview'} preload="metadata" muted={mode === 'card'} className={mode === 'card' ? 'w-full h-full object-cover' : previewClass} />
+    }
+    if (asset.type === 'audio') {
+      return (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-4">
+          <Icon className="w-12 h-12 text-[#6366F1]" />
+          <audio src={url} controls className="w-full" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )
+    }
+    return (
+      <div className="bg-[#0B0F1A] rounded-lg p-4 min-h-[200px]">
+        <p className="text-body-md text-[#F1F5F9] whitespace-pre-wrap">文案内容加载中...</p>
+      </div>
+    )
+  }
 
   return (
     <motion.div
@@ -169,7 +210,6 @@ export default function AssetManagement() {
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
       className="flex flex-col h-full"
     >
-      {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-[#1E293B]">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#6366F1] to-[#8B5CF6] flex items-center justify-center">
@@ -177,7 +217,7 @@ export default function AssetManagement() {
           </div>
           <div>
             <h1 className="text-display-sm text-[#F1F5F9]">素材管理</h1>
-            <p className="text-body-sm text-[#64748B]">管理所有上传和AI生成的素材</p>
+            <p className="text-body-sm text-[#64748B]">管理所有上传和 AI 生成的素材</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -195,11 +235,7 @@ export default function AssetManagement() {
             disabled={uploading}
             className="flex items-center gap-2 px-4 py-2 bg-[#6366F1] hover:bg-[#5558E6] disabled:opacity-50 rounded-lg text-body-sm text-white transition-colors"
           >
-            {uploading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Upload className="w-4 h-4" />
-            )}
+            {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
             上传
           </button>
           <input
@@ -208,44 +244,40 @@ export default function AssetManagement() {
             multiple
             accept="image/*,video/*,audio/*,.txt,.md"
             className="hidden"
-            onChange={(e) => handleUpload(e.target.files)}
+            onChange={(event) => handleUpload(event.target.files)}
           />
         </div>
       </div>
 
-      {/* Toolbar */}
       <div className="flex items-center gap-4 px-6 py-3 border-b border-[#1E293B]">
-        {/* Search */}
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => setSearch(event.target.value)}
             placeholder="搜索素材..."
             className="w-full pl-9 pr-4 py-2 bg-[#0B0F1A] border border-[#1E293B] rounded-lg text-body-sm text-[#F1F5F9] placeholder:text-[#475569] focus:outline-none focus:border-[#6366F1]"
           />
         </div>
 
-        {/* Type Filter */}
         <div className="flex gap-1">
-          {ASSET_TYPE_FILTERS.map((f) => (
+          {ASSET_TYPE_FILTERS.map((item) => (
             <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
+              key={item.key}
+              onClick={() => setFilter(item.key)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-body-xs transition-all ${
-                filter === f.key
+                filter === item.key
                   ? 'bg-[#6366F1]/20 text-[#6366F1] border border-[#6366F1]/30'
                   : 'text-[#94A3B8] hover:bg-[#1E293B]'
               }`}
             >
-              <f.icon className="w-3.5 h-3.5" />
-              {f.label}
+              <item.icon className="w-3.5 h-3.5" />
+              {item.label}
             </button>
           ))}
         </div>
 
-        {/* View Mode */}
         <div className="flex gap-1 border-l border-[#1E293B] pl-4">
           <button
             onClick={() => setViewMode('grid')}
@@ -266,9 +298,7 @@ export default function AssetManagement() {
         </div>
       </div>
 
-      {/* Content */}
       <div className="flex-1 overflow-auto p-6">
-        {/* Error */}
         {error && (
           <div className="mb-4 glass-card rounded-card-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-4 text-[#EF4444] text-body-sm flex items-center justify-between">
             <span>{error}</span>
@@ -278,13 +308,11 @@ export default function AssetManagement() {
           </div>
         )}
 
-        {/* Loading */}
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <Loader2 className="w-8 h-8 text-[#6366F1] animate-spin" />
           </div>
         ) : filteredAssets.length === 0 ? (
-          /* Empty State */
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <FolderOpen className="w-16 h-16 text-[#334155] mb-4" />
             <p className="text-body-lg text-[#94A3B8] mb-2">暂无素材</p>
@@ -298,10 +326,8 @@ export default function AssetManagement() {
             </button>
           </div>
         ) : viewMode === 'grid' ? (
-          /* Grid View */
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {filteredAssets.map((asset) => {
-              const Icon = TYPE_ICONS[asset.type] || FileImage
               return (
                 <div
                   key={asset.id}
@@ -310,17 +336,11 @@ export default function AssetManagement() {
                   }`}
                   onClick={() => setPreviewAsset(asset)}
                 >
-                  {/* Thumbnail */}
                   <div className="aspect-square bg-[#0B0F1A] flex items-center justify-center relative">
-                    {asset.type === 'image' && asset.url ? (
-                      <img src={asset.url} alt={asset.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <Icon className="w-12 h-12 text-[#334155]" />
-                    )}
-                    {/* Select checkbox */}
+                    {renderAssetMedia(asset, 'card')}
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation()
+                      onClick={(event) => {
+                        event.stopPropagation()
                         toggleSelect(asset.id)
                       }}
                       className={`absolute top-2 left-2 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
@@ -337,7 +357,6 @@ export default function AssetManagement() {
                     </button>
                   </div>
 
-                  {/* Info */}
                   <div className="p-3">
                     <p className="text-body-sm text-[#F1F5F9] truncate">{asset.name}</p>
                     <p className="text-body-xs text-[#64748B] mt-1">{formatFileSize(asset.size)}</p>
@@ -347,7 +366,6 @@ export default function AssetManagement() {
             })}
           </div>
         ) : (
-          /* List View */
           <div className="space-y-2">
             {filteredAssets.map((asset) => {
               const Icon = TYPE_ICONS[asset.type] || FileImage
@@ -359,16 +377,13 @@ export default function AssetManagement() {
                   }`}
                   onClick={() => setPreviewAsset(asset)}
                 >
-                  {/* Select */}
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation()
+                    onClick={(event) => {
+                      event.stopPropagation()
                       toggleSelect(asset.id)
                     }}
                     className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                      selectedIds.has(asset.id)
-                        ? 'bg-[#6366F1] border-[#6366F1]'
-                        : 'border-[#475569]'
+                      selectedIds.has(asset.id) ? 'bg-[#6366F1] border-[#6366F1]' : 'border-[#475569]'
                     }`}
                   >
                     {selectedIds.has(asset.id) && (
@@ -378,22 +393,19 @@ export default function AssetManagement() {
                     )}
                   </button>
 
-                  {/* Icon */}
                   <div className="w-10 h-10 rounded-lg bg-[#1E293B] flex items-center justify-center">
                     <Icon className="w-5 h-5 text-[#64748B]" />
                   </div>
 
-                  {/* Info */}
                   <div className="flex-1 min-w-0">
                     <p className="text-body-sm text-[#F1F5F9] truncate">{asset.name}</p>
                     <p className="text-body-xs text-[#64748B]">{formatFileSize(asset.size)}</p>
                   </div>
 
-                  {/* Actions */}
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation()
+                      onClick={(event) => {
+                        event.stopPropagation()
                         handleDownload(asset)
                       }}
                       className="p-2 rounded-lg hover:bg-[#1E293B] text-[#64748B] hover:text-[#F1F5F9] transition-colors"
@@ -401,8 +413,8 @@ export default function AssetManagement() {
                       <Download className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation()
+                      onClick={(event) => {
+                        event.stopPropagation()
                         handleDelete(asset.id)
                       }}
                       className="p-2 rounded-lg hover:bg-[#EF4444]/20 text-[#64748B] hover:text-[#EF4444] transition-colors"
@@ -417,7 +429,6 @@ export default function AssetManagement() {
         )}
       </div>
 
-      {/* Preview Modal */}
       {previewAsset && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
@@ -425,9 +436,8 @@ export default function AssetManagement() {
         >
           <div
             className="glass-card rounded-card-xl border border-[#1E293B] max-w-4xl max-h-[90vh] overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
           >
-            {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#1E293B]">
               <div className="flex items-center gap-3">
                 {(() => {
@@ -449,25 +459,10 @@ export default function AssetManagement() {
               </button>
             </div>
 
-            {/* Content */}
             <div className="p-6">
-              {previewAsset.type === 'image' && previewAsset.url && (
-                <img src={previewAsset.url} alt={previewAsset.name} className="max-w-full max-h-[60vh] mx-auto rounded-lg" />
-              )}
-              {previewAsset.type === 'video' && previewAsset.url && (
-                <video src={previewAsset.url} controls className="max-w-full max-h-[60vh] mx-auto rounded-lg" />
-              )}
-              {previewAsset.type === 'audio' && previewAsset.url && (
-                <audio src={previewAsset.url} controls className="w-full" />
-              )}
-              {previewAsset.type === 'text' && (
-                <div className="bg-[#0B0F1A] rounded-lg p-4 min-h-[200px]">
-                  <p className="text-body-md text-[#F1F5F9] whitespace-pre-wrap">文案内容加载中...</p>
-                </div>
-              )}
+              {renderAssetMedia(previewAsset, 'preview')}
             </div>
 
-            {/* Footer */}
             <div className="flex justify-end gap-2 px-6 py-4 border-t border-[#1E293B]">
               <button
                 onClick={() => handleDownload(previewAsset)}

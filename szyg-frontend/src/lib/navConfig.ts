@@ -6,7 +6,6 @@
  */
 import {
   Bot,
-  Video,
   BrainCircuit,
   ListChecks,
   Package,
@@ -19,6 +18,7 @@ import {
   Repeat2,
   Users,
   Send,
+  MonitorCog,
   KeyRound,
   CalendarDays,
   Workflow,
@@ -71,20 +71,23 @@ export const navGroups: NavGroup[] = [
     defaultChild: '/',
     children: [
       { path: '/', label: '超级员工', icon: BrainCircuit, module: 'hermes', implemented: true },
-      { path: '/ai-staff/video', label: 'AI视频', icon: Video, module: 'video' },
       { path: '/ai-staff/market', label: 'AI人才市场', icon: Bot, module: 'agents' },
       { path: '/ai-staff/tasks', label: '任务看板', icon: ListChecks, module: 'staff' },
     ],
   },
   {
-    id: 'content',
-    label: '内容创作',
+    id: 'content-publish',
+    label: '内容发布',
     icon: Package,
     basePath: '/content',
     defaultChild: '/content/production',
     children: [
       { path: '/content/production', label: '内容生产', icon: PenLine, module: 'image' },
       { path: '/content/assets', label: '素材管理', icon: ImageIcon, module: 'materials' },
+      { path: '/publish/center', label: '发布中心', icon: Send, module: 'publisher' },
+      { path: '/publish/workspace', label: '平台工作台', icon: MonitorCog, module: 'publisher', implemented: true },
+      { path: '/publish/accounts', label: '账号管理', icon: KeyRound, module: 'platforms' },
+      { path: '/publish/calendar', label: '内容日历', icon: CalendarDays, module: 'scheduler' },
       { path: '/content/digital-human', label: '数字人', icon: PersonStanding, module: 'digital-human', implemented: true },
     ],
   },
@@ -99,18 +102,6 @@ export const navGroups: NavGroup[] = [
       { path: '/marketing/listen', label: '舆情监听', icon: Radar, module: 'listen' },
       { path: '/marketing/conversion', label: '客户转化', icon: Repeat2, module: 'convert' },
       { path: '/marketing/customers', label: '客户资产', icon: Users, module: 'customers' },
-    ],
-  },
-  {
-    id: 'publish',
-    label: '发布管理',
-    icon: Send,
-    basePath: '/publish',
-    defaultChild: '/publish/center',
-    children: [
-      { path: '/publish/center', label: '发布中心', icon: Send, module: 'publisher' },
-      { path: '/publish/accounts', label: '账号管理', icon: KeyRound, module: 'platforms' },
-      { path: '/publish/calendar', label: '内容日历', icon: CalendarDays, module: 'scheduler' },
     ],
   },
   {
@@ -192,7 +183,7 @@ export const legacyRedirects: { from: string; to: string }[] = [
   { from: '/dashboard', to: '/insights/dashboard' },
   { from: '/digital-human', to: '/content/digital-human' },
   { from: '/agents', to: '/ai-staff/market' },
-  { from: '/video', to: '/ai-staff/video' },
+  { from: '/video', to: '/content/production' },
   { from: '/image', to: '/content/production' },
   { from: '/publisher', to: '/publish/center' },
   { from: '/publish', to: '/publish/center' },
@@ -231,4 +222,3 @@ export const legacyRedirects: { from: string; to: string }[] = [
   { from: '/accounts', to: '/publish/accounts' },
   { from: '/academy', to: '/knowledge/academy' },
 ]
-

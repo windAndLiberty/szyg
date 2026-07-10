@@ -110,12 +110,23 @@ class FFmpegConfig(BaseModel):
     templates_dir: str = Field(default="./data/ffmpeg_templates")
 
 
+class SocialAutoUploadConfig(BaseModel):
+    """social-auto-upload integration config."""
+
+    enabled: bool = Field(default=True)
+    project_dir: str = Field(default="./external/social-auto-upload-main")
+    default_headless: bool = Field(default=True)
+    publish_timeout_seconds: int = Field(default=900, ge=60)
+    accounts: dict[str, str] = Field(default_factory=lambda: {"douyin": "szyg"})
+
+
 class IntegrationsConfig(BaseModel):
     """集成配置聚合。"""
 
     whisper: WhisperConfig = Field(default_factory=WhisperConfig)
     comfyui: ComfyUIConfig = Field(default_factory=ComfyUIConfig)
     ffmpeg: FFmpegConfig = Field(default_factory=FFmpegConfig)
+    social_auto_upload: SocialAutoUploadConfig = Field(default_factory=SocialAutoUploadConfig)
 
 
 class APIConfig(BaseModel):

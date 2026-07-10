@@ -221,6 +221,38 @@ class SessionManager:
                 continue
         return result
 
+    # ── 账号元数据 ─────────────────────────────────────────
+
+    def _meta_path(self, platform: Platform) -> Path:
+        return self._dir / f"account_meta_{platform.value}.json"
+
+    def save_account_meta(self, platform: Platform, meta: dict) -> None:
+        """保存账号元数据（昵称、粉丝数等）"""
+        meta["_updated_at"] = datetime.now().isoformat()
+        path = self._meta_path(platform)
+        path.write_text(
+            json.dumps(meta, ensure_ascii=False, indent=2),
+            encoding="utf-8"
+        )
+        logger.debug(f"[{platform.value}] 账号元数据已保存: {meta.get('nickname', '')}")
+
+    def get_account_meta(self, platform: Platform) -> dict:
+        """获取账号元数据"""
+        path = self._meta_path(platform)
+        if not path.exists():
+            return {}
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, IOError):
+            return {}
+
+    def delete_account_meta(self, platform: Platform) -> None:
+        """删除账号元数据"""
+        path = self._meta_path(platform)
+        if path.exists():
+            path.unlink()
+            logger.debug(f"[{platform.value}] 账号元数据已删除")
+
 
 # ── 全局单例 ────────────────────────────────────────────────
 

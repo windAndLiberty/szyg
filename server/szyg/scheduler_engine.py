@@ -598,6 +598,26 @@ class Scheduler:
             "recent_executions": len([h for h in history if h.get("started_at","") > (datetime.now()-timedelta(hours=24)).isoformat()]),
         }
 
+    # --- Retry & Cancel ---
+    def retry_job(self, job_id: str) -> JobExecution | None:
+        """Retry a failed job — reset to ACTIVE and re-execute."""
+        job = self.get_job(job_id)
+        if not job:
+            raise ValueError(f"Job {job_id} not found")
+        # Reset failed/paused status back to active so the job can run again
+        self.update_job(job_id, status=JobStatus.ACTIVE.value,
+                        updated_at=datetime.now().isoformat())
+        return self.execute_job(job_id)
+
+    def cancel_job(self, job_id: str) -> ScheduleJob | None:
+        """Cancel a running/pending job."""
+        job = self.get_job(job_id)
+        if not job:
+            raise ValueError(f"Job {job_id} not found")
+        # Mark as paused so it won't be picked up by the tick loop
+        return self.update_job(job_id, status=JobStatus.PAUSED.value,
+                               updated_at=datetime.now().isoformat())
+
     # --- Seed demo jobs ---
     def seed_demo_jobs(self):
         existing = _read(SCHEDULER_DB)
@@ -659,12 +679,193 @@ class Scheduler:
         items = [j.model_dump() for j in demos]
         _write(SCHEDULER_DB, items)
 
+    def seed_demo_tasks(self) -> None:
+        """Seed demo tasks with varied statuses for the task board.
+        Creates jobs AND execution history so the board shows realistic data.
+        Idempotent — skips if history already exists.
+        """
+        existing_history = _read(SCHEDULER_HISTORY)
+        if existing_history:
+            return
+
+        now = datetime.now()
+
+        # ── Running tasks (进行中) ──
+        running_jobs = [
+            ScheduleJob(
+                name="抖音短视频批量发布", description="发布3条产品展示短视频到抖音",
+                trigger_type=TriggerType.MANUAL, trigger_config={},
+                action=JobAction.PUBLISH_CONTENT,
+                action_config={"content_id": "ctx_demo_001", "platform": "douyin"},
+                priority=9, status=JobStatus.RUNNING,
+                tags=["urgent", "douyin"],
+                created_at=(now - timedelta(hours=2)).isoformat(),
+                last_run_at=(now - timedelta(minutes=30)).isoformat(),
+            ),
+            ScheduleJob(
+                name="小红书评论区截流", description="监控竞品笔记评论区，自动回复引流",
+                trigger_type=TriggerType.INTERVAL,
+                trigger_config={"minutes": 30},
+                action=JobAction.EXECUTE_TOOL,
+                action_config={"tool": "intercept_engine", "platform": "xiaohongshu", "keywords": "护肤,面膜"},
+                priority=8, status=JobStatus.RUNNING,
+                tags=["intercept", "xiaohongshu"],
+                created_at=(now - timedelta(hours=5)).isoformat(),
+                last_run_at=(now - timedelta(minutes=5)).isoformat(),
+            ),
+            ScheduleJob(
+                name="B站品牌舆情监听", description="实时监控B站品牌相关弹幕和评论",
+                trigger_type=TriggerType.INTERVAL,
+                trigger_config={"minutes": 15},
+                action=JobAction.PLATFORM_HEALTH_CHECK,
+                action_config={"platform": "bilibili", "brand": "玉灵科技"},
+                priority=7, status=JobStatus.RUNNING,
+                tags=["listen", "bilibili"],
+                created_at=(now - timedelta(hours=8)).isoformat(),
+                last_run_at=(now - timedelta(minutes=10)).isoformat(),
+            ),
+        ]
+
+        # ── Completed tasks (已完成) ──
+        completed_jobs = [
+            ScheduleJob(
+                name="快手品牌宣传片发布", description="发布品牌宣传片到快手",
+                trigger_type=TriggerType.ONCE,
+                trigger_config={"at": (now - timedelta(hours=4)).isoformat()},
+                action=JobAction.PUBLISH_CONTENT,
+                action_config={"content_id": "ctx_demo_002", "platform": "kuaishou"},
+                priority=9, status=JobStatus.COMPLETED,
+                tags=["brand", "kuaishou"],
+                created_at=(now - timedelta(hours=6)).isoformat(),
+                last_run_at=(now - timedelta(hours=4)).isoformat(),
+            ),
+            ScheduleJob(
+                name="AI营销文案周报生成", description="生成本周营销文案数据报告",
+                trigger_type=TriggerType.CRON,
+                trigger_config={"cron": "0 17 * * 5"},
+                action=JobAction.GENERATE_CONTENT,
+                action_config={"topic": "本周营销数据汇总", "agent_id": "copywriter", "content_type": "report"},
+                priority=6, status=JobStatus.COMPLETED,
+                tags=["report", "ai"],
+                created_at=(now - timedelta(days=3)).isoformat(),
+                last_run_at=(now - timedelta(hours=6)).isoformat(),
+            ),
+            ScheduleJob(
+                name="微信公众号文章发布", description="发布一篇品牌故事文章到微信公众号",
+                trigger_type=TriggerType.MANUAL, trigger_config={},
+                action=JobAction.PUBLISH_CONTENT,
+                action_config={"content_id": "ctx_demo_003", "platform": "weixin"},
+                priority=8, status=JobStatus.COMPLETED,
+                tags=["brand", "weixin"],
+                created_at=(now - timedelta(days=1)).isoformat(),
+                last_run_at=(now - timedelta(hours=12)).isoformat(),
+            ),
+            ScheduleJob(
+                name="全平台账号登录巡检", description="检查所有平台账号登录状态",
+                trigger_type=TriggerType.INTERVAL,
+                trigger_config={"minutes": 360},
+                action=JobAction.PLATFORM_LOGIN_CHECK,
+                action_config={"platform": "all"},
+                priority=5, status=JobStatus.COMPLETED,
+                tags=["health", "all"],
+                created_at=(now - timedelta(days=2)).isoformat(),
+                last_run_at=(now - timedelta(hours=1)).isoformat(),
+            ),
+        ]
+
+        # ── Failed tasks (失败) ──
+        failed_jobs = [
+            ScheduleJob(
+                name="抖音直播引流视频发布", description="发布直播预热视频到抖音",
+                trigger_type=TriggerType.ONCE,
+                trigger_config={"at": (now - timedelta(hours=3)).isoformat()},
+                action=JobAction.PUBLISH_CONTENT,
+                action_config={"content_id": "ctx_demo_004", "platform": "douyin"},
+                priority=10, status=JobStatus.FAILED,
+                tags=["urgent", "douyin"],
+                created_at=(now - timedelta(hours=5)).isoformat(),
+                last_run_at=(now - timedelta(hours=3)).isoformat(),
+            ),
+            ScheduleJob(
+                name="微博热搜话题截流", description="自动评论微博热搜话题引流",
+                trigger_type=TriggerType.MANUAL, trigger_config={},
+                action=JobAction.EXECUTE_TOOL,
+                action_config={"tool": "intercept_engine", "platform": "weibo", "keywords": "AI创业"},
+                priority=9, status=JobStatus.FAILED,
+                tags=["intercept", "weibo"],
+                created_at=(now - timedelta(hours=4)).isoformat(),
+                last_run_at=(now - timedelta(hours=2)).isoformat(),
+            ),
+        ]
+
+        jobs = running_jobs + completed_jobs + failed_jobs
+        # Append to existing jobs (don't overwrite seed_demo_jobs data)
+        existing_db = _read(SCHEDULER_DB)
+        existing_ids = {j["id"] for j in existing_db}
+        new_items = [j.model_dump() for j in jobs if j.id not in existing_ids]
+        existing_db.extend(new_items)
+        _write(SCHEDULER_DB, existing_db)
+
+        # ── Execution history ──
+        history: list[dict] = []
+
+        # Running task executions
+        for j in running_jobs:
+            exec_id = str(uuid.uuid4())[:8]
+            started = j.last_run_at or (now - timedelta(minutes=30)).isoformat()
+            history.append(JobExecution(
+                id=exec_id, job_id=j.id, job_name=j.name,
+                status="running", started_at=started,
+                result=f"执行中… {j.action_config.get('platform', '')} {j.action_config.get('tool', '')}",
+            ).model_dump())
+
+        # Completed task executions
+        completed_results = [
+            ("发布成功，播放量 12,834，点赞 856，评论 234", 125000),
+            ("生成报告完成：本周发布 23 条内容，总曝光 45.2 万", 85000),
+            ("发布成功，阅读量 3,421，分享 89 次", 32000),
+            ("巡检完成：6/6 平台登录正常", 15000),
+        ]
+        for j, (result, duration_ms) in zip(completed_jobs, completed_results):
+            started = j.last_run_at or (now - timedelta(hours=4)).isoformat()
+            finished_dt = datetime.fromisoformat(started) + timedelta(milliseconds=duration_ms)
+            history.append(JobExecution(
+                id=str(uuid.uuid4())[:8], job_id=j.id, job_name=j.name,
+                status="success", started_at=started,
+                finished_at=finished_dt.isoformat(),
+                duration_ms=duration_ms, result=result,
+            ).model_dump())
+
+        # Failed task executions
+        failed_results = [
+            ("抖音API限流：发布频率过高，请等待 30 分钟后再试。当前账号今日已发布 15 条，超过单日上限 20 条，建议错峰发布或升级企业账号提升额度。",
+             (now - timedelta(hours=3)).isoformat()),
+            ("微博登录态过期：cookie 已失效，需要重新扫码登录。请在账号管理页面重新授权微博账号，或检查账号风控状态是否正常。",
+             (now - timedelta(hours=2)).isoformat()),
+        ]
+        for j, (error, started) in zip(failed_jobs, failed_results):
+            finished_dt = datetime.fromisoformat(started) + timedelta(seconds=45)
+            history.append(JobExecution(
+                id=str(uuid.uuid4())[:8], job_id=j.id, job_name=j.name,
+                status="failed", started_at=started,
+                finished_at=finished_dt.isoformat(),
+                duration_ms=45000, error=error,
+            ).model_dump())
+
+        _write(SCHEDULER_HISTORY, history)
+
 
 # Singleton
 _scheduler: Scheduler | None = None
+def _demo_seed_enabled() -> bool:
+    return os.environ.get("SZYG_SEED_DEMO_DATA", "").lower() in {"1", "true", "yes"} or os.environ.get("SZYG_DEMO_MODE", "").lower() in {"1", "true", "yes"}
+
+
 def get_scheduler() -> Scheduler:
     global _scheduler
     if _scheduler is None:
         _scheduler = Scheduler()
-        _scheduler.seed_demo_jobs()
+        if _demo_seed_enabled():
+            _scheduler.seed_demo_jobs()
+            _scheduler.seed_demo_tasks()
     return _scheduler

@@ -112,6 +112,13 @@ def create_app() -> FastAPI:
     except Exception as e:
         logger.warning(f"Skipped video_endpoint: {e}")
 
+    try:
+        from szyg.api.tts_routes import router as tts_router
+        app.include_router(tts_router)
+        logger.info("TTS routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped tts_routes: {e}")
+
     # Acquisition — 流量引擎 + 客户转化
     try:
         from szyg.api.acquisition_routes import router as acquisition_router
@@ -162,6 +169,22 @@ def create_app() -> FastAPI:
     except Exception as e:
         logger.warning(f"Skipped sau_routes: {e}")
 
+    # Execution Kernel — observable automation run state
+    try:
+        from szyg.api.execution_routes import router as execution_router
+        app.include_router(execution_router)
+        logger.info("Execution routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped execution_routes: {e}")
+
+    # Media storage — Windows user folders for generated assets
+    try:
+        from szyg.api.media_routes import router as media_router
+        app.include_router(media_router)
+        logger.info("Media storage routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped media_routes: {e}")
+
     # AI Staff — 员工状态、任务管理、配置持久化
     try:
         from szyg.api.staff_routes import router as staff_router
@@ -169,6 +192,14 @@ def create_app() -> FastAPI:
         logger.info("Staff routes loaded")
     except Exception as e:
         logger.warning(f"Skipped staff_routes: {e}")
+
+    # Task Board — 任务看板
+    try:
+        from szyg.api.task_routes import router as task_router
+        app.include_router(task_router)
+        logger.info("Task board routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped task_routes: {e}")
 
     # Conversation persistence — 超级员工对话历史
     try:
@@ -214,6 +245,13 @@ def create_app() -> FastAPI:
     if not os.path.isdir(volc_output):
         os.makedirs(volc_output, exist_ok=True)
     app.mount("/api/files/volcengine_output", StaticFiles(directory=volc_output), name="volcengine_output")
+    legacy_volc_output = os.path.join(os.path.dirname(__file__), "..", "..", "data", "volcengine_output")
+    if os.path.isdir(legacy_volc_output):
+        app.mount(
+            "/api/files/server_volcengine_output",
+            StaticFiles(directory=legacy_volc_output),
+            name="server_volcengine_output",
+        )
 
     # Serve built SPA (static files + client-side routing fallback)
     spa_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "szyg-frontend", "dist")

@@ -1,153 +1,8 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, WebContentsView } = require('electron')
+const { app, BrowserWindow, Tray, Menu, nativeImage } = require('electron')
 const { spawn } = require('child_process')
 const path = require('path')
 const http = require('http')
 const net = require('net')
-
-// ── Platform BrowserView Manager ──
-// Maps platform id → WebContentsView instance for in-app login/publishing
-const platformViews = new Map()
-const PLATFORM_VIEW_BOUNDS = { x: 360, y: 80, width: 900, height: 640 }
-
-// ── Anti-detect configuration for embedded browser views ──
-const STEALTH_USER_AGENT = (
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
-  'AppleWebKit/537.36 (KHTML, like Gecko) ' +
-  'Chrome/131.0.0.0 Safari/537.36'
-)
-
-const STEALTH_INJECTION = `
-(function() {
-  'use strict';
-  // 1. navigator.webdriver
-  Object.defineProperty(navigator, 'webdriver', { get: () => false });
-  // 2. chrome runtime
-  window.chrome = { runtime: {}, loadTimes: function(){}, csi: function(){}, app: {} };
-  // 3. plugins
-  Object.defineProperty(navigator, 'plugins', { get: () => [1,2,3,4,5] });
-  // 4. languages
-  Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN','zh','en'] });
-  // 5. Permissions
-  const origQuery = window.navigator.permissions.query;
-  window.navigator.permissions.query = (p) => (
-    p.name === 'notifications' ? Promise.resolve({ state: Notification.permission }) : origQuery(p)
-  );
-  // 6. hardwareConcurrency / deviceMemory / platform
-  Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });
-  Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
-  Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
-  // 7. Remove Electron traces from userAgentData if present
-  if (navigator.userAgentData) {
-    Object.defineProperty(navigator, 'userAgentData', {
-      get: () => ({
-        brands: [
-          { brand: 'Chromium', version: '131' },
-          { brand: 'Google Chrome', version: '131' },
-          { brand: 'Not_A Brand', version: '24' }
-        ],
-        mobile: false,
-        platform: 'Windows',
-      })
-    });
-  }
-})();
-`
-
-function setupAntiDetect(view) {
-  const wc = view.webContents
-  // Override User-Agent before any request
-  wc.setUserAgent(STEALTH_USER_AGENT)
-  // Override Accept-Language header
-  wc.session.webRequest.onBeforeSendHeaders((details, callback) => {
-    details.requestHeaders['Accept-Language'] = 'zh-CN,zh;q=0.9,en;q=0.8'
-    callback({ requestHeaders: details.requestHeaders })
-  })
-  // Inject stealth script on every page load
-  wc.on('dom-ready', () => {
-    wc.executeJavaScript(STEALTH_INJECTION, false).catch(() => {})
-  })
-}
-
-function openPlatformView(platform, url) {
-  if (!mainWindow) return null
-  closePlatformView(platform)
-
-  const view = new WebContentsView({
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      // Use persistent partition so cookies survive within Electron session
-      partition: `persist:platform_${platform}`,
-    }
-  })
-
-  // Apply anti-detect measures
-  setupAntiDetect(view)
-
-  // Position inside main window (right side)
-  const bounds = getPlatformViewBounds()
-  view.setBounds(bounds)
-  view.webContents.loadURL(url)
-
-  mainWindow.contentView.addChildView(view)
-  platformViews.set(platform, view)
-
-  // Notify renderer of page title changes (used to detect login success)
-  view.webContents.on('page-title-updated', (e, title) => {
-    mainWindow.webContents.send('platform-title-changed', { platform, title })
-  })
-
-  // Notify renderer of navigation (used to detect login redirect)
-  view.webContents.on('did-navigate', (e, url) => {
-    mainWindow.webContents.send('platform-navigated', { platform, url })
-  })
-
-  console.log(`[BrowserView] Opened ${platform} → ${url}`)
-  return view
-}
-
-function closePlatformView(platform) {
-  const view = platformViews.get(platform)
-  if (!view) return
-  if (mainWindow) {
-    try { mainWindow.contentView.removeChildView(view) } catch (_) {}
-  }
-  try { view.webContents.close() } catch (_) {}
-  platformViews.delete(platform)
-  console.log(`[BrowserView] Closed ${platform}`)
-}
-
-function closeAllPlatformViews() {
-  for (const [platform, view] of platformViews) {
-    if (mainWindow) {
-      try { mainWindow.contentView.removeChildView(view) } catch (_) {}
-    }
-    try { view.webContents.close() } catch (_) {}
-  }
-  platformViews.clear()
-}
-
-function getPlatformViewBounds() {
-  if (!mainWindow) return PLATFORM_VIEW_BOUNDS
-  const size = mainWindow.getContentSize()
-  // Right panel: fixed left margin, fill remaining width/height
-  const leftMargin = 360
-  const topMargin = 80
-  return {
-    x: leftMargin,
-    y: topMargin,
-    width: Math.max(600, size[0] - leftMargin - 20),
-    height: Math.max(400, size[1] - topMargin - 20),
-  }
-}
-
-function resizePlatformViews() {
-  if (!mainWindow) return
-  const bounds = getPlatformViewBounds()
-  for (const view of platformViews.values()) {
-    view.setBounds(bounds)
-  }
-}
 
 // Disable GPU acceleration for RDP/VM compatibility
 // Falls back to software rendering — works everywhere
@@ -412,9 +267,6 @@ function createWindow() {
   })
 
   mainWindow.on('closed', () => { mainWindow = null })
-
-  // Resize embedded platform views when main window resizes
-  mainWindow.on('resize', () => resizePlatformViews())
 }
 
 // ── Tray ──
@@ -449,42 +301,6 @@ ipcMain.on('window-close', () => mainWindow?.close())
 ipcMain.handle('window-is-maximized', () => mainWindow?.isMaximized() ?? false)
 ipcMain.handle('get-version', () => app.getVersion())
 
-// ── Platform BrowserView IPC handlers ──
-ipcMain.handle('platform-open', (event, platform, url) => {
-  const view = openPlatformView(platform, url)
-  return { success: !!view, webContentsId: view?.webContents.id ?? null }
-})
-ipcMain.on('platform-close', (event, platform) => closePlatformView(platform))
-ipcMain.handle('platform-cookies', async (event, platform, filterUrl) => {
-  const view = platformViews.get(platform)
-  if (!view) return []
-  try {
-    const cookies = await view.webContents.session.cookies.get(filterUrl ? { url: filterUrl } : {})
-    return cookies
-  } catch (e) {
-    console.error(`[BrowserView] Failed to get cookies for ${platform}:`, e)
-    return []
-  }
-})
-ipcMain.handle('platform-inject', async (event, platform, script) => {
-  const view = platformViews.get(platform)
-  if (!view) return { success: false, error: 'View not found' }
-  try {
-    const result = await view.webContents.executeJavaScript(script, true)
-    return { success: true, result }
-  } catch (e) {
-    console.error(`[BrowserView] Inject failed for ${platform}:`, e)
-    return { success: false, error: e.message }
-  }
-})
-ipcMain.handle('platform-get-url', (event, platform) => {
-  const view = platformViews.get(platform)
-  return view ? view.webContents.getURL() : ''
-})
-ipcMain.handle('platform-list', () => {
-  return Array.from(platformViews.keys())
-})
-
 // ── App lifecycle ──
 app.whenReady().then(async () => {
   createTray()
@@ -507,7 +323,6 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   isQuitting = true
-  closeAllPlatformViews()
   stopBackend()
   stopComfyUI()
 })

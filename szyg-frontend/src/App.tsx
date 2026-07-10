@@ -13,7 +13,6 @@ import DigitalHuman from './pages/DigitalHuman'
 import Settings from './pages/Settings'
 
 // 占位页面 — AI员工
-import AIVideo from './pages/ai-staff/AIVideo'
 import AIMarket from './pages/ai-staff/AIMarket'
 import TaskBoard from './pages/ai-staff/TaskBoard'
 // 占位页面 — 内容创作
@@ -28,6 +27,7 @@ import Customers from './pages/marketing/Customers'
 import PublishCenter from './pages/publish/PublishCenter'
 import Accounts from './pages/publish/Accounts'
 import ContentCalendar from './pages/publish/ContentCalendar'
+import PlatformWorkspace from './pages/publish/PlatformWorkspace'
 // 占位页面 — 工作流
 import Pipeline from './pages/workflow/Pipeline'
 import Scheduler from './pages/workflow/Scheduler'
@@ -94,7 +94,6 @@ export default function App() {
       {/* ── 标准 Layout 路由（Sidebar + TopBar + Content + Footer）── */}
       <Route element={<Layout />}>
         {/* AI员工 */}
-        <Route path="/ai-staff/video" element={<AIVideo />} />
         <Route path="/ai-staff/market" element={<AIMarket />} />
         <Route path="/ai-staff/tasks" element={<TaskBoard />} />
 
@@ -113,6 +112,7 @@ export default function App() {
         <Route path="/publish/center" element={<PublishCenter />} />
         <Route path="/publish/accounts" element={<Accounts />} />
         <Route path="/publish/calendar" element={<ContentCalendar />} />
+        <Route path="/publish/workspace" element={<PlatformWorkspace />} />
 
         {/* 工作流 */}
         <Route path="/workflow/pipeline" element={<Pipeline />} />
@@ -149,4 +149,3 @@ export default function App() {
     </Routes>
   )
 }
-

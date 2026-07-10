@@ -202,6 +202,8 @@ async def platform_logout(platform: str):
 import json
 from pathlib import Path
 from szyg.data_path import DATA_DIR
+from fastapi import File, UploadFile
+from szyg.media_storage import get_media_output_dir, infer_media_kind, media_url_for_path
 
 _MATERIALS_FILE = DATA_DIR / "materials.json"
 
@@ -217,14 +219,47 @@ def _save_materials(data: list):
     _MATERIALS_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _material_type_for_kind(kind: str) -> str:
+    return "text" if kind == "document" else kind
+
+
+def _scan_generated_materials() -> list[dict]:
+    items: list[dict] = []
+    for kind in ("image", "video", "audio", "document"):
+        root = get_media_output_dir(kind)  # type: ignore[arg-type]
+        if not root.exists():
+            continue
+        for path in root.iterdir():
+            if not path.is_file():
+                continue
+            actual_kind = infer_media_kind(path)
+            if kind != "document" and actual_kind != kind:
+                continue
+            stat = path.stat()
+            items.append({
+                "id": f"generated:{kind}:{path.name}",
+                "name": path.name,
+                "type": _material_type_for_kind(actual_kind),
+                "tags": ["AI生成"],
+                "platform": "all",
+                "url": media_url_for_path(path),
+                "path": str(path.resolve()),
+                "size": stat.st_size,
+                "created_at": __import__("datetime").datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                "source": "generated",
+            })
+    return items
+
+
 @router.get("/materials")
 async def list_materials(mtype: str = "", platform: str = ""):
-    items = _load_materials()
+    items = [*(_load_materials()), *_scan_generated_materials()]
     if mtype:
         items = [m for m in items if m.get("type") == mtype]
     if platform and platform != "all":
         items = [m for m in items if m.get("platform") in (platform, "all")]
-    return {"materials": items, "total": len(items)}
+    items.sort(key=lambda item: item.get("created_at", item.get("createdAt", "")), reverse=True)
+    return {"items": items, "materials": items, "total": len(items)}
 
 
 @router.post("/materials")
@@ -243,6 +278,36 @@ async def create_material(body: dict):
     items.append(item)
     _save_materials(items)
     return item
+
+
+@router.post("/materials/upload")
+async def upload_material(file: UploadFile = File(...)):
+    if not file.filename:
+        raise HTTPException(400, "No file provided")
+    filename = Path(file.filename).name
+    kind = infer_media_kind(filename)
+    output_dir = get_media_output_dir(kind)
+    path = output_dir / filename
+    if path.exists():
+        stem = path.stem
+        suffix = path.suffix
+        stamp = __import__("datetime").datetime.now().strftime("%Y%m%d_%H%M%S")
+        path = output_dir / f"{stem}_{stamp}{suffix}"
+    content = await file.read()
+    path.write_bytes(content)
+    item = {
+        "id": f"generated:{kind}:{path.name}",
+        "name": path.name,
+        "type": _material_type_for_kind(kind),
+        "tags": ["上传"],
+        "platform": "all",
+        "url": media_url_for_path(path),
+        "path": str(path.resolve()),
+        "size": path.stat().st_size,
+        "created_at": __import__("datetime").datetime.now().isoformat(),
+        "source": "upload",
+    }
+    return {"ok": True, "material": item}
 
 
 @router.delete("/materials/{material_id}")

@@ -203,6 +203,13 @@ class DouyinAdapter(BasePlatformAdapter):
         if not self._page:
             return True
         try:
+            # A publish-page file input is a stronger signal than generic overlays.
+            upload_input = await self._page.query_selector(
+                f"{SELECTOR_VIDEO_UPLOAD}, {SELECTOR_IMAGE_UPLOAD}"
+            )
+            if upload_input is not None:
+                return False
+
             # QR 码 canvas
             qr_canvas = await self._page.query_selector(
                 'canvas[class*="qrcode"], canvas[class*="main-animation"], '
@@ -403,6 +410,11 @@ class DouyinAdapter(BasePlatformAdapter):
                 await self._ensure_browser_context(storage_state=storage_state)
                 await self._page.goto(DOUYIN_CREATOR_PUBLISH, wait_until="domcontentloaded", timeout=30000)
                 await asyncio.sleep(3)
+                await self._resume_draft_if_present()
+                try:
+                    await self._page.wait_for_load_state("networkidle", timeout=15000)
+                except Exception:
+                    pass
                 checks["publish_page"] = "creator.douyin.com" in self._page.url
 
                 if await self._is_login_overlay_visible():
@@ -419,7 +431,7 @@ class DouyinAdapter(BasePlatformAdapter):
                 upload_selector = SELECTOR_VIDEO_UPLOAD if is_video else SELECTOR_IMAGE_UPLOAD
                 try:
                     upload = await self._page.wait_for_selector(
-                        upload_selector, state="attached", timeout=8000
+                        upload_selector, state="attached", timeout=45000
                     )
                     checks["upload_input"] = upload is not None
                 except Exception:
@@ -459,6 +471,76 @@ class DouyinAdapter(BasePlatformAdapter):
 
         Thread-safe: 使用 asyncio.Lock 防止并发 login/publish 冲突。
         """
+        async with self._lock:
+            return await self._publish_with_social_auto_upload(request)
+
+    async def _publish_with_social_auto_upload(self, request: PublishRequest) -> PublishResult:
+        """Publish through the external social-auto-upload project."""
+        storage_state = self._session.load(Platform.DOUYIN)
+        if not storage_state or not storage_state.get("cookies"):
+            return PublishResult(
+                success=False,
+                platform=Platform.DOUYIN.value,
+                error_msg="Douyin is not logged in. Please scan and log in from platform management first.",
+            )
+
+        if not request.media_urls:
+            return PublishResult(
+                success=False,
+                platform=Platform.DOUYIN.value,
+                error_msg="Douyin publishing through social-auto-upload requires at least one local media file.",
+            )
+
+        from szyg.integrations.social_auto_upload_adapter import get_sau_adapter
+
+        sau = get_sau_adapter()
+        first_media = request.media_urls[0]
+        video_exts = {".mp4", ".mov", ".avi", ".mkv", ".m4v", ".webm", ".flv"}
+        is_video = request.content_type == ContentType.VIDEO_SCRIPT or any(
+            first_media.lower().endswith(ext) for ext in video_exts
+        )
+
+        self._state = AdapterState.PUBLISHING
+        headless = bool(request.extra.get("headless", True))
+        try:
+            if is_video:
+                result = await sau.upload_video(
+                    platform="douyin",
+                    file_path=first_media,
+                    title=request.title[:DOUYIN_MAX_TITLE_LEN],
+                    desc=request.to_plain_text() if request.body else "",
+                    tags=request.tags[:DOUYIN_MAX_TAG_COUNT],
+                    headless=headless,
+                )
+            else:
+                result = await sau.upload_note(
+                    platform="douyin",
+                    image_paths=request.media_urls,
+                    title=request.title[:DOUYIN_MAX_TITLE_LEN],
+                    note=request.to_plain_text() if request.body else "",
+                    tags=request.tags[:DOUYIN_MAX_TAG_COUNT],
+                    headless=headless,
+                )
+
+            self._state = AdapterState.READY if result.get("success") else AdapterState.ERROR
+            return PublishResult(
+                success=bool(result.get("success")),
+                platform=Platform.DOUYIN.value,
+                platform_post_id="",
+                platform_post_url="",
+                error_msg="" if result.get("success") else result.get("message", "social-auto-upload failed"),
+                extra=result,
+            )
+        except Exception as e:
+            logger.error("Douyin social-auto-upload publish failed: %s", e, exc_info=True)
+            self._state = AdapterState.ERROR
+            return PublishResult(
+                success=False,
+                platform=Platform.DOUYIN.value,
+                error_msg=str(e),
+            )
+
+    async def _publish_with_native_playwright(self, request: PublishRequest) -> PublishResult:
         async with self._lock:
             from szyg.platforms.anti_detect import HumanBehavior
 
@@ -545,6 +627,7 @@ class DouyinAdapter(BasePlatformAdapter):
 
                 # ── 10. 等待发布结果 ──
                 await asyncio.sleep(3)
+                await self._audit_screenshot("after_publish_click")
                 await self._wait_for_publish_complete()
                 success, post_id, msg = await self._check_publish_result()
 
@@ -719,7 +802,26 @@ class DouyinAdapter(BasePlatformAdapter):
         """点击发布按钮，返回是否成功。视觉优先，CSS 回退。"""
         from szyg.platforms.anti_detect import HumanBehavior
 
-        # Tier 1: Vision-based button finding
+        await self._scroll_to_publish_controls()
+
+        # Tier 1: Final publish controls near the bottom of the form.
+        bottom_selectors = [
+            'button:has-text("高清发布")',
+            'button:has-text("发布"):not(:has-text("发布视频")):not(:has-text("发布图文"))',
+            '[class*="primary"]:has-text("发布")',
+            '[class*="button"]:has-text("高清发布")',
+        ]
+        for sel in bottom_selectors:
+            try:
+                btn = await self._page.wait_for_selector(sel, state="visible", timeout=5000)
+                if btn:
+                    await HumanBehavior.move_and_click(self._page, sel)
+                    logger.info(f"publish button clicked: {sel}")
+                    return True
+            except Exception:
+                continue
+
+        # Tier 2: Vision-based button finding
         if self._vg is None:
             self._vg = get_vision_grounding()
         clicked = await self._vg.find_and_click(self._page, "发布按钮")
@@ -752,6 +854,35 @@ class DouyinAdapter(BasePlatformAdapter):
         except Exception:
             pass
         return False
+
+    async def _resume_draft_if_present(self) -> bool:
+        """Continue editing an unfinished Douyin draft when the banner appears."""
+        selectors = [
+            'text=继续编辑',
+            'button:has-text("继续编辑")',
+            'a:has-text("继续编辑")',
+        ]
+        for sel in selectors:
+            try:
+                el = await self._page.wait_for_selector(sel, state="visible", timeout=3000)
+                if el:
+                    await el.click()
+                    await asyncio.sleep(5)
+                    logger.info("continued editing an unfinished Douyin draft")
+                    return True
+            except Exception:
+                continue
+        return False
+
+    async def _scroll_to_publish_controls(self) -> None:
+        """Move the viewport to the bottom area where Douyin renders final publish controls."""
+        try:
+            await self._page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            await asyncio.sleep(1)
+            await self._page.mouse.wheel(0, 5000)
+            await asyncio.sleep(1)
+        except Exception as e:
+            logger.debug("failed to scroll to publish controls: %s", e)
 
     async def _wait_for_publish_complete(self):
         """等待发布完成（loading 消失）。"""
@@ -1077,7 +1208,7 @@ class DouyinAdapter(BasePlatformAdapter):
 
             # 超时 — 最后检查一次
             current_url = self._page.url
-            if "content" in current_url or "work" in current_url.lower():
+            if False and ("content" in current_url or "work" in current_url.lower()):
                 return True, post_id, f"发布完成但未能提取 post_id (url={current_url[:120]})"
             return False, "", "等待发布结果超时"
 

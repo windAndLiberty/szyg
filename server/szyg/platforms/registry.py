@@ -128,15 +128,22 @@ class PlatformRegistry:
 
     def list_platforms(self) -> list[dict]:
         """列出所有已注册平台及其状态"""
+        from szyg.platforms.session_manager import get_session_manager
+        mgr = get_session_manager()
         platforms = []
         for platform, factory in self._factories.items():
             adapter = self._adapters.get(platform)
+            account_meta = mgr.get_account_meta(platform)
+            session_info = mgr.get_info(platform)
             platforms.append({
                 "id": platform.value,
                 "name": getattr(factory, 'platform_name', platform.value),
                 "adapter": factory.__name__,
                 "state": adapter.state.value if adapter else AdapterState.UNINITIALIZED.value,
                 "initialized": platform in self._initialized,
+                "nickname": account_meta.get("nickname", ""),
+                "followers": account_meta.get("followers", 0),
+                "session": session_info,
             })
         return platforms
 

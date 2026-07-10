@@ -62,6 +62,7 @@ class Content(BaseModel):
     review_comment: str = ""        # 审核意见
     scheduled_at: str = ""          # 定时发布时间 ISO format
     published_at: str = ""
+    extra: dict = Field(default_factory=dict)
     created_by: str = "admin"
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
@@ -240,6 +241,7 @@ class Publisher:
             media_urls=content.media_urls,
             tags=content.tags,
             scheduled_at=content.scheduled_at,
+            extra=content.extra,
         )
 
         # 并发发布到所有平台
@@ -272,6 +274,7 @@ class Publisher:
                                 title=content.title,
                                 desc=content.body,
                                 tags=content.tags,
+                                headless=content.extra.get("headless", True),
                             )
                         else:
                             sau_result = await sau.upload_note(
@@ -280,6 +283,7 @@ class Publisher:
                                 title=content.title,
                                 note=content.body,
                                 tags=content.tags,
+                                headless=content.extra.get("headless", True),
                             )
 
                         if sau_result.get("success"):
@@ -300,6 +304,19 @@ class Publisher:
                         logger.info(f"[sau] {plat.value} 异常, fallback到原生适配器: {sau_err}")
 
                 # ── 原生适配器 fallback ──
+                if plat == Platform.DOUYIN and content.media_urls:
+                    return {
+                        "id": str(uuid.uuid4())[:8],
+                        "content_id": content_id,
+                        "platform": plat.value,
+                        "status": "failed",
+                        "published_at": datetime.now().isoformat(),
+                        "error_msg": "social-auto-upload did not complete; native Douyin fallback is disabled",
+                        "platform_post_id": "",
+                        "platform_post_url": "",
+                        "published_via": "social-auto-upload",
+                    }
+
                 try:
                     adapter = await registry.get(plat)
                     result = await adapter.safe_publish(request)

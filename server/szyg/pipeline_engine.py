@@ -30,6 +30,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable
 
+from szyg.media_storage import get_media_output_dir
+
 logger = logging.getLogger(__name__)
 
 
@@ -470,7 +472,8 @@ class PipelineExecutor:
                 if status.get("video_url"):
                     path = await self.client.download_video(
                         status["video_url"],
-                        output_name=f"pipeline_{ctx.pipeline_id}_{node.id}.mp4"
+                        output_name=f"pipeline_{ctx.pipeline_id}_{node.id}.mp4",
+                        output_dir=str(get_media_output_dir("video")),
                     )
                     ctx.set_artifacts(node.output_key, [path])
                     return {"path": path, "task_id": task_id, "status": "succeed"}
@@ -491,7 +494,8 @@ class PipelineExecutor:
             emotion=params.get("emotion", "neutral"),
             speed=params.get("speed", 1.0),
             pitch=params.get("pitch", 0),
-            output_name=f"pipeline_{ctx.pipeline_id}_{node.id}.mp3"
+            output_name=f"pipeline_{ctx.pipeline_id}_{node.id}.mp3",
+            output_dir=str(get_media_output_dir("audio")),
         )
         ctx.set_artifacts(node.output_key, [path])
         return {"path": path, "type": "audio"}

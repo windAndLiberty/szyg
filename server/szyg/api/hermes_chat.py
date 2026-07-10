@@ -1059,6 +1059,7 @@ async def _execute_volcengine_aigc(name: str, args: dict) -> str:
     声音克隆和向量嵌入。使用 VolcEngineClient 直接调用火山方舟API。
     """
     from szyg.integrations.volcengine_client import VolcEngineClient
+    from szyg.media_storage import get_media_output_dir, media_url_for_path
 
     client = VolcEngineClient(
         api_key=VOLCENGINE_API_KEY,
@@ -1080,13 +1081,10 @@ async def _execute_volcengine_aigc(name: str, args: dict) -> str:
                 size=args.get("size", "1920x1920"),
                 model=args.get("model", "doubao-image"),
             )
-            # Convert local path to accessible URL
-            fname = Path(path).name
-            url = f"/api/files/volcengine_output/{fname}"
             return json.dumps({
                 "ok": True,
                 "type": "image",
-                "url": url,
+                "url": media_url_for_path(path),
                 "path": path,
                 "model": args.get("model", "doubao-image"),
                 "prompt": args.get("prompt", ""),
@@ -1143,8 +1141,12 @@ async def _execute_volcengine_aigc(name: str, args: dict) -> str:
             )
             # 如果已完成，下载视频到本地
             if result.get("status") == "succeed" and result.get("video_url"):
-                path = await client.download_video(result["video_url"])
+                path = await client.download_video(
+                    result["video_url"],
+                    output_dir=str(get_media_output_dir("video")),
+                )
                 result["local_path"] = path
+                result["url"] = media_url_for_path(path)
             return json.dumps(result, ensure_ascii=False)
 
         elif name == "ai_tts_advanced":
@@ -1161,13 +1163,12 @@ async def _execute_volcengine_aigc(name: str, args: dict) -> str:
                 emotion=args.get("emotion", "neutral"),
                 speed=args.get("speed", 1.0),
                 pitch=args.get("pitch", 0),
+                output_dir=str(get_media_output_dir("audio")),
             )
-            fname = Path(path).name
-            url = f"/api/files/volcengine_output/{fname}"
             return json.dumps({
                 "ok": True,
                 "type": "audio",
-                "url": url,
+                "url": media_url_for_path(path),
                 "path": path,
                 "voice_id": args.get("voice_id", "zh_female_xiaoyi"),
                 "emotion": args.get("emotion", "neutral"),
@@ -1198,10 +1199,12 @@ async def _execute_volcengine_aigc(name: str, args: dict) -> str:
                 audio_sample_path=safe,
                 text=args.get("text", ""),
                 emotion=args.get("emotion", "neutral"),
+                output_dir=str(get_media_output_dir("audio")),
             )
             return json.dumps({
                 "ok": True,
                 "type": "audio",
+                "url": media_url_for_path(path),
                 "path": path,
                 "emotion": args.get("emotion", "neutral"),
                 "text": args.get("text", "")[:50] + "...",

@@ -254,7 +254,8 @@ async def platform_publish_preflight(
 async def platform_publish_direct(
     platform: str, title: str, body: str = "",
     tags: str = "", media_urls: str = "",
-    content_type: str = "post"
+    content_type: str = "post",
+    headless: bool = True,
 ):
     """直接在平台发布内容 (一步: 创建+审核+发布)。
 
@@ -294,6 +295,7 @@ async def platform_publish_direct(
         title=title, body=body, platforms=[p],
         tags=tag_list, media_urls=url_list,
         content_type=ct_map.get(content_type, ContentType.POST),
+        extra={"headless": headless},
     )
     pub.submit_review(content.id)
     pub.approve(content.id)

@@ -217,6 +217,10 @@ class XiaohongshuAdapter(BasePlatformAdapter):
             await self._ensure_browser_context(storage_state=storage_state)
             await self._page.goto(XHS_PUBLISH_URL, wait_until="domcontentloaded", timeout=30000)
             await asyncio.sleep(3)
+            try:
+                await self._page.wait_for_load_state("networkidle", timeout=15000)
+            except Exception:
+                pass
             checks["publish_page"] = "creator.xiaohongshu.com" in self._page.url
 
             if await self._is_on_login_page():
@@ -228,7 +232,7 @@ class XiaohongshuAdapter(BasePlatformAdapter):
             upload_selector = 'input[type="file"]'
             try:
                 upload = await self._page.wait_for_selector(
-                    upload_selector, state="attached", timeout=8000
+                    upload_selector, state="attached", timeout=45000
                 )
                 checks["upload_input"] = upload is not None
             except Exception:

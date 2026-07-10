@@ -1,16 +1,14 @@
 """AI 视频生成 API — 火山引擎 doubao-video 直连。"""
 
 import uuid
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/api/video", tags=["video"])
+from szyg.media_storage import get_media_output_dir, media_url_for_path, resolve_media_file
 
-VOLC_OUTPUT = Path("data/volcengine_output")
-VOLC_OUTPUT.mkdir(parents=True, exist_ok=True)
+router = APIRouter(prefix="/api/video", tags=["video"])
 
 
 class CreateRequest(BaseModel):
@@ -36,7 +34,7 @@ async def create_video(req: CreateRequest):
 
     try:
         from szyg.integrations.volcengine_client import VolcEngineClient
-        client = VolcEngineClient()
+        client = VolcEngineClient(output_dir=str(get_media_output_dir("video")))
         result = await client.generate_video(
             prompt=req.prompt.strip(),
             image_url=req.image_url or None,
@@ -64,7 +62,7 @@ async def video_task_status(task_id: str, model: str = "doubao-video"):
     """
     try:
         from szyg.integrations.volcengine_client import VolcEngineClient
-        client = VolcEngineClient()
+        client = VolcEngineClient(output_dir=str(get_media_output_dir("video")))
         result = await client.get_video_task(task_id=task_id, model=model)
 
         # 如果已完成且有视频URL，下载到本地
@@ -73,10 +71,9 @@ async def video_task_status(task_id: str, model: str = "doubao-video"):
                 result["video_url"],
                 output_name=f"ai_video_{task_id[:8]}_{uuid.uuid4().hex[:6]}.mp4"
             )
-            filename = Path(local_path).name
             result["local_path"] = local_path
-            result["video_url"] = f"/api/files/volcengine_output/{filename}"
-            result["download_url"] = f"/api/video/download/{filename}"
+            result["video_url"] = media_url_for_path(local_path)
+            result["download_url"] = media_url_for_path(local_path)
 
         await client.close()
         return result
@@ -87,11 +84,10 @@ async def video_task_status(task_id: str, model: str = "doubao-video"):
 @router.get("/download/{filename}")
 async def download_video(filename: str):
     """下载/播放生成的视频文件。"""
-    if "/" in filename or "\\" in filename or ".." in filename:
-        raise HTTPException(400, "非法文件名")
-    path = (VOLC_OUTPUT / filename).resolve()
-    if not str(path).startswith(str(VOLC_OUTPUT.resolve())):
-        raise HTTPException(400, "非法文件路径")
+    try:
+        path, _media_type = resolve_media_file("video", filename)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
     if not path.exists():
         raise HTTPException(404, "视频文件不存在")
     return FileResponse(str(path), media_type="video/mp4", filename=filename)

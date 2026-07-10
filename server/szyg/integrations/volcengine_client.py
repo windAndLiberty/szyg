@@ -114,7 +114,7 @@ class VolcEngineClient(BaseLLMClient):
         endpoints: dict | None = None,
         timeout: float = 120.0,
         max_retries: int = 3,
-        output_dir: str = "./data/volcengine_output",
+        output_dir: str | None = None,
     ):
         super().__init__(
             base_url=base_url, default_model="doubao-pro-128k", timeout=timeout,
@@ -131,6 +131,9 @@ class VolcEngineClient(BaseLLMClient):
         }
         self.timeout = timeout
         self.max_retries = max_retries
+        if output_dir is None:
+            from szyg.media_storage import get_media_output_dir
+            output_dir = str(get_media_output_dir("image"))
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -183,6 +186,7 @@ class VolcEngineClient(BaseLLMClient):
             self._httpx = httpx.AsyncClient(
                 timeout=httpx.Timeout(self.timeout),
                 headers={"Authorization": f"Bearer {self.api_key}"},
+                trust_env=False,
             )
         return self._httpx
 
@@ -438,14 +442,20 @@ class VolcEngineClient(BaseLLMClient):
                 raise IntegrationError("VolcEngine image generation returned empty URL")
 
             # 下载图像
-            async with httpx.AsyncClient(timeout=60) as c:
+            async with httpx.AsyncClient(timeout=60, trust_env=False) as c:
                 img_resp = await c.get(image_url)
                 img_resp.raise_for_status()
 
             out = Path(output_dir) if output_dir else self.output_dir
             out.mkdir(parents=True, exist_ok=True)
             ts = int(time.time())
-            suffix = ".png"
+            content_type = img_resp.headers.get("content-type", "").lower()
+            if "jpeg" in content_type or "jpg" in content_type:
+                suffix = ".jpg"
+            elif "webp" in content_type:
+                suffix = ".webp"
+            else:
+                suffix = ".png"
             path = out / f"volc_image_{model.replace('-', '_')}_{ts}_{uuid.uuid4().hex[:6]}{suffix}"
             path.write_bytes(img_resp.content)
             return str(path)
@@ -546,7 +556,7 @@ class VolcEngineClient(BaseLLMClient):
         except Exception as e:
             raise IntegrationError(f"VolcEngine video task query failed: {e}")
 
-    async def download_video(self, video_url: str, output_name: str = "") -> str:
+    async def download_video(self, video_url: str, output_name: str = "", output_dir: str | None = None) -> str:
         """下载已完成的视频到本地。"""
         try:
             async with httpx.AsyncClient(timeout=120) as c:
@@ -556,7 +566,13 @@ class VolcEngineClient(BaseLLMClient):
             if not output_name:
                 ts = int(time.time())
                 output_name = f"volc_video_{ts}_{uuid.uuid4().hex[:6]}.mp4"
-            path = self.output_dir / output_name
+            if output_dir is None:
+                from szyg.media_storage import get_media_output_dir
+                output_path = get_media_output_dir("video")
+            else:
+                output_path = Path(output_dir)
+                output_path.mkdir(parents=True, exist_ok=True)
+            path = output_path / output_name
             path.write_bytes(r.content)
             return str(path)
         except Exception as e:
@@ -594,6 +610,7 @@ class VolcEngineClient(BaseLLMClient):
         speed: float = 1.0,
         pitch: int = 0,
         output_name: str = "",
+        output_dir: str | None = None,
     ) -> str:
         """情感语音合成，返回本地音频文件路径。
 
@@ -632,7 +649,13 @@ class VolcEngineClient(BaseLLMClient):
             if not output_name:
                 ts = int(time.time())
                 output_name = f"volc_tts_{emotion}_{ts}_{uuid.uuid4().hex[:6]}.mp3"
-            path = self.output_dir / output_name
+            if output_dir is None:
+                from szyg.media_storage import get_media_output_dir
+                output_path = get_media_output_dir("audio")
+            else:
+                output_path = Path(output_dir)
+                output_path.mkdir(parents=True, exist_ok=True)
+            path = output_path / output_name
             path.write_bytes(response.content)
             return str(path)
 
@@ -649,6 +672,7 @@ class VolcEngineClient(BaseLLMClient):
         text: str,
         emotion: str = "neutral",
         output_name: str = "",
+        output_dir: str | None = None,
     ) -> str:
         """声音克隆 + 语音合成。
 
@@ -705,7 +729,13 @@ class VolcEngineClient(BaseLLMClient):
             if not output_name:
                 ts = int(time.time())
                 output_name = f"volc_clone_{emotion}_{ts}_{uuid.uuid4().hex[:6]}.mp3"
-            path = self.output_dir / output_name
+            if output_dir is None:
+                from szyg.media_storage import get_media_output_dir
+                output_path = get_media_output_dir("audio")
+            else:
+                output_path = Path(output_dir)
+                output_path.mkdir(parents=True, exist_ok=True)
+            path = output_path / output_name
             path.write_bytes(tts_r.content)
             return str(path)
 
