@@ -19,6 +19,7 @@ import {
   Database,
   Code,
   Sparkles,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,7 +29,19 @@ import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useAsync } from '@/lib/hooks'
-import { apiGet, apiPut, apiDel, getCurrentUser } from '@/lib/api'
+import {
+  apiGet,
+  apiPut,
+  apiDel,
+  getCurrentUser,
+  fetchLocalLlmStatus,
+  startLocalLlm,
+  stopLocalLlm,
+  chatLocalLlm,
+  downloadLocalLlm8b,
+  deleteLocalLlm8b,
+  type LocalLlmStatus,
+} from '@/lib/api'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -112,6 +125,51 @@ export default function SettingsPage() {
   const [customApiKey, setCustomApiKey] = useState('')
   const [aiTemperature, setAiTemperature] = useState(0.5)
   const [maxTokens, setMaxTokens] = useState(4000)
+  const [localStatus, setLocalStatus] = useState<LocalLlmStatus | null>(null)
+  const [localBusy, setLocalBusy] = useState(false)
+  const [localPrompt, setLocalPrompt] = useState('请把这句话改写得更自然：我们已经收到您的需求，会尽快处理。')
+  const [localResult, setLocalResult] = useState('')
+  const [localError, setLocalError] = useState('')
+  const [showLocalAdvanced, setShowLocalAdvanced] = useState(false)
+
+  async function loadLocalStatus() {
+    try {
+      setLocalStatus(await fetchLocalLlmStatus())
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : '本地小模型状态读取失败')
+    }
+  }
+
+  useEffect(() => {
+    loadLocalStatus()
+    const timer = window.setInterval(loadLocalStatus, 8000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  async function runLocalAction(action: 'start' | 'stop' | 'test' | 'download' | 'delete') {
+    setLocalBusy(true)
+    setLocalError('')
+    try {
+      if (action === 'start') {
+        await startLocalLlm()
+      } else if (action === 'stop') {
+        await stopLocalLlm()
+      } else if (action === 'download') {
+        await downloadLocalLlm8b()
+      } else if (action === 'delete') {
+        await deleteLocalLlm8b()
+      } else {
+        const result = await chatLocalLlm(localPrompt)
+        if (!result.success) throw new Error(result.message || '测试失败')
+        setLocalResult(result.message)
+      }
+      await loadLocalStatus()
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : '操作失败')
+    } finally {
+      setLocalBusy(false)
+    }
+  }
 
   /* Digital Agents */
   const { data: agentsData, reload: reloadAgents } = useAsync<{ data: { id: string; name: string; emoji: string; color: string; enabled: boolean }[] }>(
@@ -209,7 +267,6 @@ export default function SettingsPage() {
     >
       {/* Page Header */}
       <motion.div variants={cardVariant} className="mb-8">
-        <h1 className="text-display-md font-display text-[#F1F5F9] mb-2">系统设置</h1>
         <p className="text-body-lg text-[#94A3B8]">
           配置你的超级数字员工系统参数
         </p>
@@ -516,6 +573,119 @@ export default function SettingsPage() {
                     <span>8,000</span>
                   </div>
                 </div>
+              </div>
+            </motion.div>
+
+            <motion.div variants={cardVariant}>
+              <h2 className="text-heading-sm text-[#F1F5F9] mb-1">本地小模型</h2>
+              <p className="text-body-sm text-[#64748B] mb-4">
+                用于摘要、分类、改写等简单任务，主力对话仍由云端 API 模型完成。
+              </p>
+              <div className="glass-card rounded-[16px] border border-[#1E293B] p-5 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={localStatus?.runtime_ready ? 'success' : 'warning'}>
+                        {localStatus?.runtime_ready ? '已就绪' : '未启动'}
+                      </Badge>
+                      <span className="text-body-sm text-[#94A3B8]">
+                        {localStatus?.server?.available ? '本地运行组件已安装' : '本地运行组件未安装'}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-body-sm text-[#64748B]">
+                      轻量模型：{localStatus?.models?.['qwen3-4b']?.installed ? '已安装' : '未安装'}
+                      <span className="mx-2 text-[#334155]">/</span>
+                      增强模型：{localStatus?.models?.['qwen3-8b']?.installed ? '已安装' : localStatus?.download?.running ? `下载中 ${localStatus.download.percent || 0}%` : '未安装'}
+                    </div>
+                    <div className="mt-1 text-body-sm text-[#64748B]">
+                      运行方式：{localStatus?.server?.backend === 'vulkan' ? '显卡加速' : localStatus?.server?.backend === 'cpu' ? '基础模式' : '自动选择'}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => runLocalAction('start')} disabled={localBusy || localStatus?.runtime_ready}>
+                      {localBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      启用
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => runLocalAction('stop')} disabled={localBusy || !localStatus?.runtime_ready}>
+                      停止
+                    </Button>
+                  </div>
+                </div>
+
+                {localError && (
+                  <div className="rounded-[10px] border border-[#7F1D1D] bg-[#450A0A]/40 px-3 py-2 text-body-sm text-[#FCA5A5]">
+                    {localError}
+                  </div>
+                )}
+
+                <Separator className="bg-[#1E293B]" />
+
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 max-md:grid-cols-1">
+                  <Input
+                    value={localPrompt}
+                    onChange={(event) => setLocalPrompt(event.target.value)}
+                    placeholder="输入一句话测试本地小模型"
+                    className="bg-[#0D1321] border-[#1E293B] text-[#F1F5F9]"
+                  />
+                  <Button variant="outline" onClick={() => runLocalAction('test')} disabled={localBusy || !localPrompt.trim()}>
+                    测试一句话
+                  </Button>
+                </div>
+                {localResult && (
+                  <div className="rounded-[10px] border border-[#1E293B] bg-[#0D1321] px-3 py-2 text-body-sm leading-6 text-[#CBD5E1]">
+                    {localResult}
+                  </div>
+                )}
+
+                <Separator className="bg-[#1E293B]" />
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-heading-sm text-[#F1F5F9]">增强模型</div>
+                    <p className="mt-1 text-body-sm text-[#64748B]">
+                      适合更长文本和更复杂的分类、改写任务，可按需下载。
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => runLocalAction('download')}
+                      disabled={localBusy || localStatus?.models?.['qwen3-8b']?.installed || localStatus?.download?.running}
+                    >
+                      {localStatus?.download?.running ? '下载中' : '下载增强模型'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => runLocalAction('delete')}
+                      disabled={localBusy || !localStatus?.models?.['qwen3-8b']?.installed}
+                    >
+                      删除增强模型
+                    </Button>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowLocalAdvanced((value) => !value)}
+                  className="text-body-sm text-[#64748B] hover:text-[#CBD5E1]"
+                >
+                  {showLocalAdvanced ? '收起高级信息' : '查看高级信息'}
+                </button>
+                {showLocalAdvanced && (
+                  <div className="space-y-2 rounded-[10px] border border-[#1E293B] bg-[#0D1321] p-3 text-body-sm text-[#94A3B8]">
+                    <div>服务地址：{localStatus?.base_url || '-'}</div>
+                    <div>当前运行方式：{localStatus?.server?.backend || '-'}</div>
+                    <div>运行组件：{localStatus?.server?.path || '-'}</div>
+                    <div>CPU 组件：{localStatus?.runtimes?.cpu?.path || '-'}</div>
+                    <div>显卡加速组件：{localStatus?.runtimes?.vulkan?.path || '-'}</div>
+                    <div>显卡加速可用：{localStatus?.acceleration?.vulkan?.available ? '是' : '否'}</div>
+                    <div>日志路径：{localStatus?.server?.log_path || '-'}</div>
+                    <div className="break-all">轻量模型：{localStatus?.models?.['qwen3-4b']?.path || '-'}</div>
+                    <div className="break-all">增强模型：{localStatus?.models?.['qwen3-8b']?.path || '-'}</div>
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>

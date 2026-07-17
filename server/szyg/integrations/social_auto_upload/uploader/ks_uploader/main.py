@@ -81,6 +81,24 @@ async def _is_ks_cookie_invalid(page: Page, timeout: int = 5000) -> bool:
         return False
 
 
+async def _goto_ks_upload_page(page: Page, attempts: int = 3) -> None:
+    last_error: Exception | None = None
+    for index in range(attempts):
+        try:
+            await page.goto(KUAISHOU_UPLOAD_URL, wait_until="domcontentloaded", timeout=90000)
+            try:
+                await page.wait_for_url(KUAISHOU_UPLOAD_URL_PATTERN, timeout=15000)
+            except Exception:
+                if not page.url.startswith(KUAISHOU_UPLOAD_URL):
+                    raise
+            return
+        except Exception as exc:
+            last_error = exc
+            kuaishou_logger.warning(_msg("😵", f"快手发布页打开失败，准备重试 {index + 1}/{attempts}: {exc}"))
+            await asyncio.sleep(3 + index * 2)
+    raise last_error or RuntimeError("快手发布页打开失败")
+
+
 async def _extract_ks_qrcode_src(page: Page) -> str:
     login_form = page.locator("main#login-form").first
     await login_form.wait_for(state="visible", timeout=30000)
@@ -160,7 +178,7 @@ async def cookie_auth(account_file):
             context = await browser.new_context(storage_state=account_file)
             context = await set_init_script(context)
             page = await context.new_page()
-            await page.goto(KUAISHOU_UPLOAD_URL)
+            await _goto_ks_upload_page(page)
             if await _is_ks_cookie_invalid(page):
                 kuaishou_logger.info(_msg("🥹", "cookie 已失效，得重新登录一下"))
                 return False
@@ -193,7 +211,7 @@ async def get_ks_cookie(
     qrcode_callback=None,
     headless: bool = LOCAL_CHROME_HEADLESS,
     poll_interval: int = 3,
-    max_checks: int = 100,
+    max_checks: int = 300,
     cdp_url: str | None = None,
 ):
     if headless:
@@ -469,10 +487,9 @@ class KSVideo(KSBaseUploader):
         upload_success = False
         try:
             page = await context.new_page()
-            await page.goto(KUAISHOU_UPLOAD_URL)
             kuaishou_logger.info(_msg("🏃", f"小人开始搬运视频: {self.title}.mp4"))
             kuaishou_logger.info(_msg("🧭", "小人正在赶往快手上传主页"))
-            await page.wait_for_url(KUAISHOU_UPLOAD_URL_PATTERN)
+            await _goto_ks_upload_page(page)
 
             upload_button = page.locator("button[class^='_upload-btn']")
             await upload_button.wait_for(state="visible", timeout=10000)
@@ -715,9 +732,8 @@ class KSNote(KSBaseUploader):
         upload_success = False
         try:
             page = await context.new_page()
-            await page.goto(KUAISHOU_UPLOAD_URL)
             kuaishou_logger.info(_msg("🧭", "小人正在赶往快手图文发布页"))
-            await page.wait_for_url(KUAISHOU_UPLOAD_URL_PATTERN)
+            await _goto_ks_upload_page(page)
 
             await self.upload_note_content(page)
             upload_success = True

@@ -34,15 +34,19 @@ from szyg.platforms.base import (
     BasePlatformAdapter, PublishRequest, PublishResult,
     LoginStatus, AdapterState,
 )
+from szyg.integrations.wxauto_bridge import WxautoBridge
 
 logger = logging.getLogger(__name__)
 
 # ── Constants ────────────────────────────────────────────────
 
 WECHAT_EXE_PATHS = [
+    r"C:\Program Files\Tencent\Weixin\Weixin.exe",
     r"C:\Program Files\Tencent\WeChat\WeChat.exe",
     r"C:\Program Files (x86)\Tencent\WeChat\WeChat.exe",
+    r"C:\Program Files (x86)\Tencent\Weixin\Weixin.exe",
     r"D:\Program Files\Tencent\WeChat\WeChat.exe",
+    r"D:\Program Files\Tencent\Weixin\Weixin.exe",
 ]
 
 WECHAT_MOMENTS_MAX_TEXT = 2000    # 朋友圈文字上限
@@ -79,6 +83,7 @@ class WeChatDesktopAdapter(BasePlatformAdapter):
         self._uia = None
         self._wechat_window = None
         self._wechat_control = None
+        self._wxauto = WxautoBridge()
 
     # ── Lifecycle ─────────────────────────────────────────
 
@@ -87,6 +92,10 @@ class WeChatDesktopAdapter(BasePlatformAdapter):
         try:
             import uiautomation
             self._uia = uiautomation
+            if self._wxauto.is_available():
+                logger.info("WeChatDesktopAdapter: wxauto bridge available")
+            else:
+                logger.info("WeChatDesktopAdapter: wxauto bridge unavailable; using UIAutomation only")
             logger.info("WeChatDesktopAdapter: UIAutomation 就绪")
             self._state = AdapterState.READY
             return True
@@ -134,6 +143,14 @@ class WeChatDesktopAdapter(BasePlatformAdapter):
             if wechat.Exists(maxSearchSeconds=1):
                 return wechat
 
+            # Newer desktop Weixin client.
+            wechat = self._uia.WindowControl(
+                ClassName='mmui::MainWindow',
+                searchDepth=1
+            )
+            if wechat.Exists(maxSearchSeconds=1):
+                return wechat
+
         except Exception as e:
             logger.warning(f"查找微信窗口失败: {e}")
 
@@ -145,7 +162,8 @@ class WeChatDesktopAdapter(BasePlatformAdapter):
             import psutil
             for proc in psutil.process_iter(['name']):
                 try:
-                    if proc.info['name'] and 'wechat' in proc.info['name'].lower():
+                    name = (proc.info['name'] or '').lower()
+                    if 'wechat' in name or 'weixin' in name:
                         return True
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     continue
@@ -185,6 +203,14 @@ class WeChatDesktopAdapter(BasePlatformAdapter):
             if window:
                 self._wechat_window = window
                 try:
+                    wxauto_status = self._wxauto.current_account()
+                    if wxauto_status.connected:
+                        return LoginStatus(
+                            is_logged_in=True,
+                            account_name=wxauto_status.nickname,
+                            message="微信已登录",
+                        )
+
                     title = window.Name
                     # 如果窗口标题显示"微信" (非"登录") → 已登录
                     if "登录" not in title:
@@ -494,6 +520,9 @@ class WeChatDesktopAdapter(BasePlatformAdapter):
             return False
 
         try:
+            if self._wxauto.write_and_send_message(contact, text):
+                return True
+
             wechat = self._find_wechat_window()
             if not wechat:
                 return False

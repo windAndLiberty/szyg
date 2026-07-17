@@ -6,6 +6,7 @@ from typing import Any
 from datetime import datetime
 import re
 import os
+import subprocess
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
@@ -34,6 +35,12 @@ class DocumentSaveRequest(BaseModel):
     title: str = "content"
     content: str
     extension: str = "md"
+
+
+class DocumentUpdateRequest(BaseModel):
+    path: str = ""
+    url: str = ""
+    content: str
 
 
 class MediaFileActionRequest(BaseModel):
@@ -97,6 +104,35 @@ async def save_document(req: DocumentSaveRequest) -> dict[str, Any]:
     }
 
 
+@router.post("/documents/update")
+async def update_document(req: DocumentUpdateRequest) -> dict[str, Any]:
+    content = req.content.strip()
+    if not content:
+        raise HTTPException(400, "content is required")
+    try:
+        path = resolve_managed_media_path(req.path or req.url)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    if path.suffix.lower() not in {".md", ".txt"}:
+        raise HTTPException(400, "Unsupported document extension")
+    if not path.exists() or not path.is_file():
+        raise HTTPException(404, "File not found")
+    path.write_text(content, encoding="utf-8")
+    updated_at = datetime.now().isoformat()
+    try:
+        from szyg.api.publisher_routes import touch_generation_history
+        touch_generation_history(str(path.resolve()), updated_at)
+    except Exception:
+        pass
+    return {
+        "ok": True,
+        "path": str(path.resolve()),
+        "url": media_url_for_path(path),
+        "filename": path.name,
+        "updated_at": updated_at,
+    }
+
+
 @router.post("/files/open")
 async def open_media_file(req: MediaFileActionRequest) -> dict[str, Any]:
     try:
@@ -110,6 +146,21 @@ async def open_media_file(req: MediaFileActionRequest) -> dict[str, Any]:
     except Exception as exc:
         raise HTTPException(500, f"Failed to open file: {exc}")
     return {"ok": True, "path": str(path)}
+
+
+@router.post("/files/reveal")
+async def reveal_media_file(req: MediaFileActionRequest) -> dict[str, Any]:
+    try:
+        path = resolve_managed_media_path(req.path or req.url)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    if not path.exists() or not path.is_file():
+        raise HTTPException(404, "File not found")
+    try:
+        subprocess.Popen(["explorer.exe", f"/select,{path}"])
+    except Exception as exc:
+        raise HTTPException(500, f"Failed to reveal file: {exc}")
+    return {"ok": True, "path": str(path), "directory": str(path.parent)}
 
 
 @router.post("/files/delete")

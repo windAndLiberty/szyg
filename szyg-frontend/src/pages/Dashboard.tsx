@@ -160,7 +160,6 @@ export default function Dashboard() {
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
       <motion.div variants={cardVariants}>
-        <h1 className="text-display-md font-display text-[#F1F5F9] mb-2">运营仪表盘</h1>
         <p className="text-body-lg text-[#94A3B8]">实时掌握数字员工运营状态与业务指标</p>
       </motion.div>
 

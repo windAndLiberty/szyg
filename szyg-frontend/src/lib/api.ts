@@ -43,8 +43,11 @@ export async function autoLogin(): Promise<string | null> {
 }
 
 export function getErrorMessage(err: unknown, fallback = '请求失败'): string {
-  const any = err as { response?: { data?: { detail?: string } }; message?: string }
-  return any?.response?.data?.detail || any?.message || fallback
+  const any = err as { response?: { data?: { detail?: unknown } }; message?: string }
+  const detail = any?.response?.data?.detail
+  if (typeof detail === 'string') return detail
+  if (detail && typeof detail === 'object' && 'message' in detail) return String((detail as { message: unknown }).message)
+  return any?.message || fallback
 }
 
 async function request<T>(method: string, url: string, body?: unknown, _retry = false): Promise<T> {
@@ -65,14 +68,17 @@ async function request<T>(method: string, url: string, body?: unknown, _retry = 
   }
 
   if (!res.ok) {
-    let detail = `${res.status} ${res.statusText}`
+    let detail: unknown = `${res.status} ${res.statusText}`
     try {
       const data = await res.json()
       detail = data.detail || detail
     } catch {
       /* ignore */
     }
-    throw new Error(detail)
+    if (detail && typeof detail === 'object' && 'message' in detail) {
+      throw new Error(String((detail as { message: unknown }).message))
+    }
+    throw new Error(String(detail))
   }
   if (res.status === 204) return undefined as T
   const text = await res.text()
@@ -102,34 +108,452 @@ export async function generateImage(prompt: string, size = '1920x1920', count = 
   return apiPost<ImageGenResult>('/api/image/generate', { prompt, size, count, style })
 }
 
+export interface AdoptMaterialResult {
+  ok: boolean
+  material: Record<string, unknown>
+  existed: boolean
+}
+
+export async function adoptMaterial(payload: {
+  path?: string
+  url?: string
+  name?: string
+  tags?: string[]
+  source?: string
+}): Promise<AdoptMaterialResult> {
+  return apiPost<AdoptMaterialResult>('/api/publisher/materials/adopt', payload)
+}
+
+export async function unadoptMaterial(payload: {
+  path?: string
+  url?: string
+  material_id?: string
+}): Promise<{ ok: boolean; removed: number; path: string }> {
+  return apiPost<{ ok: boolean; removed: number; path: string }>('/api/publisher/materials/unadopt', payload)
+}
+
+export type GenerationHistoryType = 'image' | 'video' | 'audio' | 'text'
+
+export interface GenerationHistoryItem {
+  id: string
+  type: GenerationHistoryType
+  title: string
+  prompt: string
+  summary: string
+  url: string
+  path: string
+  filename: string
+  size: number
+  created_at: string
+  updated_at?: string
+  adopted: boolean
+  material_id?: string
+  meta?: Record<string, unknown>
+}
+
+export async function fetchGenerationHistory(kind?: GenerationHistoryType): Promise<{
+  items: GenerationHistoryItem[]
+  total: number
+  limits: Record<string, number>
+}> {
+  return apiGet(`/api/publisher/generation-history${kind ? `?kind=${encodeURIComponent(kind)}` : ''}`)
+}
+
+export async function recordGenerationHistory(payload: {
+  type: GenerationHistoryType
+  path?: string
+  url?: string
+  title?: string
+  prompt?: string
+  summary?: string
+  meta?: Record<string, unknown>
+}): Promise<{ ok: boolean; item: GenerationHistoryItem; limits: Record<string, number> }> {
+  return apiPost('/api/publisher/generation-history', payload)
+}
+
 export interface VideoCreateResult {
   ok: boolean
   task_id: string
+  tasks?: Array<{
+    task_id: string
+    status: string
+    model: string
+    prompt: string
+    duration: number
+    size: string
+    ratio: string
+  }>
   status: string
   model: string
   prompt: string
+  final_prompt?: string
+  duration?: number
+  size?: string
+  ratio?: string
+  count?: number
+  unsupported_features?: string[]
 }
 
 export interface VideoTaskResult {
   status: string
   video_url?: string
   download_url?: string
+  local_path?: string
   progress?: number
   error?: string
 }
 
-export async function createVideo(prompt: string, opts?: { duration?: number; size?: string; model?: string; image_url?: string }): Promise<VideoCreateResult> {
+export interface VideoPromptOptimizeResult {
+  final_prompt: string
+  negative_prompt: string
+  audio_prompt: string
+  summary: string
+  optimized_by: string
+}
+
+export interface VideoStoryboardShot {
+  id: string
+  title: string
+  duration: number
+  scene: string
+  camera: string
+  shot_size: string
+  narration: string
+  audio: string
+  prompt: string
+}
+
+export interface VideoStoryboardCharacterLock {
+  enabled: boolean
+  character_name: string
+  identity: string
+  age_range: string
+  gender: string
+  appearance: string
+  hairstyle: string
+  outfit: string
+  temperament: string
+  consistency_prompt: string
+}
+
+export interface VideoStoryboardResult {
+  character_lock: VideoStoryboardCharacterLock[]
+  shots: VideoStoryboardShot[]
+  final_prompt: string
+  summary: string
+  generated_by: string
+}
+
+export async function optimizeVideoPrompt(payload: {
+  prompt: string
+  duration: number
+  ratio: string
+  native_audio: boolean
+  model?: string
+  style?: string
+}): Promise<VideoPromptOptimizeResult> {
+  return apiPost<VideoPromptOptimizeResult>('/api/video/optimize-prompt', payload)
+}
+
+export async function createVideoStoryboard(payload: {
+  prompt: string
+  duration: number
+  ratio: string
+  native_audio: boolean
+  model?: string
+  shot_count?: number
+}): Promise<VideoStoryboardResult> {
+  return apiPost<VideoStoryboardResult>('/api/video/storyboard', payload)
+}
+
+export async function createVideo(prompt: string, opts?: {
+  duration?: number
+  size?: string
+  ratio?: string
+  count?: number
+  native_audio?: boolean
+  prompt_optimize?: boolean
+  final_prompt?: string
+  model?: string
+  image_url?: string
+}): Promise<VideoCreateResult> {
   return apiPost<VideoCreateResult>('/api/video/create', {
     prompt,
-    duration: opts?.duration ?? 5,
+    duration: opts?.duration ?? 6,
     size: opts?.size ?? '720p',
-    model: opts?.model ?? 'doubao-video',
+    ratio: opts?.ratio ?? '9:16',
+    count: opts?.count ?? 1,
+    native_audio: opts?.native_audio ?? false,
+    prompt_optimize: opts?.prompt_optimize ?? true,
+    final_prompt: opts?.final_prompt ?? '',
+    model: opts?.model ?? 'doubao-seedance-2.0-fast',
     image_url: opts?.image_url ?? '',
   })
 }
 
-export async function pollVideoTask(taskId: string, model = 'doubao-video'): Promise<VideoTaskResult> {
+export async function pollVideoTask(taskId: string, model = 'doubao-seedance-2.0-fast'): Promise<VideoTaskResult> {
   return apiGet<VideoTaskResult>(`/api/video/task/${taskId}?model=${encodeURIComponent(model)}`)
+}
+
+export interface ComposeAssetRef {
+  id: string
+  name: string
+  type: 'image' | 'video' | 'audio' | 'text'
+  url?: string
+  path?: string
+}
+
+export interface ComposeQuestion {
+  id: string
+  question: string
+  type: string
+  options: Array<{ label: string; value: string }>
+  recommended?: string
+}
+
+export interface ComposeAssetAnalysis {
+  id: string
+  name: string
+  type: 'image' | 'video' | 'audio' | 'text'
+  role: string
+  summary: string
+  status: string
+  provider_ref?: string
+  provider_type?: string
+  error?: string
+}
+
+export interface ComposeAnalyzeResult {
+  ok: boolean
+  model: string
+  assets: ComposeAssetAnalysis[]
+  questions: ComposeQuestion[]
+  summary: string
+  warnings: string[]
+}
+
+export interface ComposeVideoParams {
+  platform: string
+  scenario: string
+  duration: number
+  size: string
+  ratio: string
+  native_audio: boolean
+  count: number
+  user_instruction?: string
+  model: string
+}
+
+export interface VideoModelConfig {
+  id: string
+  provider_model: string
+  label: string
+  sizes: string[]
+  min_duration: number
+  max_duration: number
+  native_audio: boolean
+}
+
+export interface VideoConfigResult {
+  ok: boolean
+  default_model: string
+  compose_default_model: string
+  defaults: {
+    duration: number
+    size: string
+    ratio: string
+    native_audio: boolean
+    count: number
+  }
+  models: VideoModelConfig[]
+}
+
+export async function getVideoConfig(): Promise<VideoConfigResult> {
+  return apiGet<VideoConfigResult>('/api/video/config')
+}
+
+export interface ComposePrepareResult {
+  ok: boolean
+  storyboard: VideoStoryboardShot[]
+  final_prompt: string
+  used_assets: ComposeAssetAnalysis[]
+  unsupported_features: string[]
+  warnings: string[]
+  summary: string
+}
+
+export interface ComposeCreateResult extends VideoCreateResult {
+  used_assets?: ComposeAssetAnalysis[]
+  unsupported_features?: string[]
+}
+
+export async function analyzeVideoComposition(assets: ComposeAssetRef[]): Promise<ComposeAnalyzeResult> {
+  return apiPost<ComposeAnalyzeResult>('/api/video/compose/analyze', { assets })
+}
+
+export async function prepareVideoComposition(payload: {
+  analysis: ComposeAnalyzeResult
+  answers: Array<{ question_id: string; answer: string }>
+  params: ComposeVideoParams
+}): Promise<ComposePrepareResult> {
+  return apiPost<ComposePrepareResult>('/api/video/compose/prepare', payload)
+}
+
+export async function createVideoComposition(payload: {
+  prepared: ComposePrepareResult
+  params: ComposeVideoParams
+}): Promise<ComposeCreateResult> {
+  return apiPost<ComposeCreateResult>('/api/video/compose/create', payload)
+}
+
+export interface GraphicAnalyzeResult {
+  ok: boolean
+  model: string
+  assets: ComposeAssetAnalysis[]
+  questions: ComposeQuestion[]
+  summary: string
+  warnings: string[]
+}
+
+export interface GraphicDraft {
+  title: string
+  body: string
+  tags: string[]
+  platform_suggestion: string[]
+  image_order: string[]
+  image_anchors?: Array<{
+    asset_id: string
+    anchor_after_paragraph: number
+    caption?: string
+  }>
+  material_summary: string
+  publish_notes: string
+}
+
+export interface GraphicPrepareResult {
+  ok: boolean
+  draft: GraphicDraft
+  used_assets: ComposeAssetAnalysis[]
+  warnings: string[]
+  summary: string
+}
+
+export interface GraphicSaveResult {
+  ok: boolean
+  id: string
+  name: string
+  type: string
+  url: string
+  path: string
+  size: number
+  created_at: string
+  source: string
+}
+
+export async function analyzeGraphicComposition(assets: ComposeAssetRef[], userInstruction = ''): Promise<GraphicAnalyzeResult> {
+  return apiPost<GraphicAnalyzeResult>('/api/content/graphic/analyze', { assets, user_instruction: userInstruction })
+}
+
+export async function prepareGraphicComposition(payload: {
+  analysis: GraphicAnalyzeResult
+  answers: Array<{ question_id: string; answer: string }>
+  user_instruction?: string
+}): Promise<GraphicPrepareResult> {
+  return apiPost<GraphicPrepareResult>('/api/content/graphic/prepare', payload)
+}
+
+export async function saveGraphicComposition(payload: {
+  draft: GraphicDraft
+  used_assets: ComposeAssetAnalysis[]
+  filename?: string
+}): Promise<GraphicSaveResult> {
+  return apiPost<GraphicSaveResult>('/api/content/graphic/save', payload)
+}
+
+export interface CopyGenerateResult {
+  ok: boolean
+  copies: string[]
+  char_counts?: number[]
+  within_range?: boolean[]
+  raw_text?: string
+}
+
+export async function generateCopy(payload: {
+  prompt: string
+  copy_type: string
+  count: number
+  min_words: number
+  max_words: number
+}): Promise<CopyGenerateResult> {
+  return apiPost<CopyGenerateResult>('/api/content/copy/generate', payload)
+}
+
+export interface TtsVoice {
+  id: string
+  name: string
+  provider_voice: string
+  gender: string
+  tags: string[]
+  scene: string
+  description: string
+  demo_text: string
+}
+
+export interface TtsResult {
+  ok: boolean
+  url: string
+  path: string
+  filename: string
+  voice: string
+  emotion: string
+  speed: number
+  pitch: number
+  preview: boolean
+  estimated_duration: number
+}
+
+export interface InterpretVoiceResult {
+  voice: string
+  emotion: string
+  speed: number
+  pitch: number
+  summary: string
+  interpreted_by: string
+}
+
+export interface TtsPayload {
+  text: string
+  voice: string
+  voice_prompt?: string
+  scene?: string
+  emotion?: string
+  speed?: number
+  pitch?: number
+  format?: 'mp3'
+  preview?: boolean
+}
+
+export async function fetchTtsVoices(): Promise<{ voices: TtsVoice[] }> {
+  return apiGet<{ voices: TtsVoice[] }>('/api/tts/voices')
+}
+
+export async function previewTts(payload: TtsPayload): Promise<TtsResult> {
+  return apiPost<TtsResult>('/api/tts/preview', payload)
+}
+
+export async function synthesizeTts(payload: TtsPayload): Promise<TtsResult> {
+  return apiPost<TtsResult>('/api/tts/synthesize', payload)
+}
+
+export async function interpretVoicePrompt(payload: {
+  voice_prompt: string
+  voice: string
+  scene: string
+  emotion: string
+  speed: number
+  pitch: number
+}): Promise<InterpretVoiceResult> {
+  return apiPost<InterpretVoiceResult>('/api/tts/interpret-voice', payload)
 }
 
 export interface MediaStorageLocation {
@@ -162,14 +586,23 @@ export interface SaveDocumentResult {
   path: string
   url: string
   filename: string
+  updated_at?: string
 }
 
 export async function saveGeneratedDocument(title: string, content: string, extension = 'md'): Promise<SaveDocumentResult> {
   return apiPost<SaveDocumentResult>('/api/media/documents/save', { title, content, extension })
 }
 
+export async function updateGeneratedDocument(asset: { path?: string; url?: string; content: string }): Promise<SaveDocumentResult> {
+  return apiPost<SaveDocumentResult>('/api/media/documents/update', asset)
+}
+
 export async function openGeneratedMedia(asset: { path?: string; url?: string }): Promise<{ ok: boolean; path: string }> {
   return apiPost<{ ok: boolean; path: string }>('/api/media/files/open', asset)
+}
+
+export async function revealGeneratedMedia(asset: { path?: string; url?: string }): Promise<{ ok: boolean; path: string; directory: string }> {
+  return apiPost<{ ok: boolean; path: string; directory: string }>('/api/media/files/reveal', asset)
 }
 
 export async function deleteGeneratedMedia(asset: { path?: string; url?: string }): Promise<{ ok: boolean; deleted: boolean; path: string }> {
@@ -247,8 +680,145 @@ export interface LoginTriggerResponse {
   login_url: string
 }
 
+export interface ChannelAccount {
+  id: string
+  platform: string
+  platform_label?: string
+  label: string
+  nickname?: string
+  avatar_url?: string
+  profile_url?: string
+  platform_user_id?: string
+  followers?: number
+  following?: number
+  works_count?: number
+  likes_count?: number
+  sync_status?: string
+  sync_message?: string
+  last_profile_sync_at?: string
+  status: string
+  session_path: string
+  sau_account_name?: string
+  created_at: string
+  updated_at?: string
+  last_login_at?: string
+  last_publish_at?: string
+  enabled?: boolean
+  is_default?: boolean
+  session: PlatformInfo['session'] & { path?: string }
+}
+
+export interface PlatformAccountsResponse {
+  ok: boolean
+  accounts: ChannelAccount[]
+  total: number
+  limits: {
+    per_platform: number
+    total: number
+  }
+}
+
+export interface PublishingProfile {
+  id: string
+  name: string
+  description?: string
+  account_ids: string[]
+  accounts?: ChannelAccount[]
+  created_at: string
+  updated_at: string
+}
+
+export interface PublishingProfilesResponse {
+  ok: boolean
+  profiles: PublishingProfile[]
+}
+
 export async function fetchPlatforms(): Promise<PlatformListResponse> {
   return apiGet<PlatformListResponse>('/api/platforms')
+}
+
+export async function fetchPlatformAccounts(platform = ''): Promise<PlatformAccountsResponse> {
+  const query = platform ? `?platform=${encodeURIComponent(platform)}` : ''
+  return apiGet<PlatformAccountsResponse>(`/api/platform-accounts${query}`)
+}
+
+export async function createPlatformAccount(payload: { platform: string; label?: string }): Promise<{ ok: boolean; account: ChannelAccount }> {
+  return apiPost('/api/platform-accounts', payload)
+}
+
+export async function loginPlatformAccount(accountId: string, timeout = 900): Promise<{ ok: boolean; account: ChannelAccount; message: string; result: Record<string, unknown> }> {
+  return apiPost(`/api/platform-accounts/${encodeURIComponent(accountId)}/login?timeout=${timeout}`)
+}
+
+export interface OpenPlatformAccountPublishPayload {
+  title?: string
+  desc?: string
+  tags?: string[]
+  file_path?: string
+  asset_paths?: string[]
+  mode?: 'video' | 'note' | string
+  auto_publish?: boolean
+}
+
+export async function openPlatformAccountPublish(
+  accountId: string,
+  payload: OpenPlatformAccountPublishPayload = {},
+): Promise<{ ok: boolean; account: ChannelAccount; url: string; message: string; task_id?: string; execution_id?: string; run?: ExecutionRun }> {
+  return apiPost(`/api/platform-accounts/${encodeURIComponent(accountId)}/open-publish`, payload)
+}
+
+export async function syncPlatformAccountProfile(accountId: string): Promise<{ ok: boolean; account: ChannelAccount; message: string }> {
+  return apiPost(`/api/platform-accounts/${encodeURIComponent(accountId)}/sync-profile`)
+}
+
+export async function deletePlatformAccountSession(accountId: string): Promise<{ ok: boolean; account: ChannelAccount }> {
+  return apiDel(`/api/platform-accounts/${encodeURIComponent(accountId)}/session`)
+}
+
+export interface WechatDesktopOpenResult {
+  ok: boolean
+  focused?: boolean
+  message: string
+  user_prompt: string
+  window?: Record<string, unknown>
+  safe_actions?: Record<string, boolean>
+}
+
+export async function openWechatDesktop(): Promise<WechatDesktopOpenResult> {
+  return apiPost<WechatDesktopOpenResult>('/api/wechat/desktop/open')
+}
+
+export interface WechatDesktopCaptureResult {
+  ok: boolean
+  message: string
+  calibration: Record<string, unknown>
+  validation: Record<string, unknown>
+  account?: ChannelAccount | null
+  click?: { x: number; y: number }
+  window?: Record<string, unknown>
+  safe_actions?: Record<string, boolean>
+}
+
+export async function captureWechatInputClick(timeoutSeconds = 15, accountId = ''): Promise<WechatDesktopCaptureResult> {
+  const query = new URLSearchParams({ timeout_seconds: String(timeoutSeconds) })
+  if (accountId) query.set('account_id', accountId)
+  return apiPost<WechatDesktopCaptureResult>(`/api/wechat/desktop/capture-input-click?${query.toString()}`)
+}
+
+export async function fetchPublishingProfiles(): Promise<PublishingProfilesResponse> {
+  return apiGet('/api/publishing-profiles')
+}
+
+export async function createPublishingProfile(payload: { name: string; account_ids: string[]; description?: string }): Promise<{ ok: boolean; profile: PublishingProfile }> {
+  return apiPost('/api/publishing-profiles', payload)
+}
+
+export async function updatePublishingProfile(profileId: string, payload: { name: string; account_ids: string[]; description?: string }): Promise<{ ok: boolean; profile: PublishingProfile }> {
+  return apiPut(`/api/publishing-profiles/${encodeURIComponent(profileId)}`, payload)
+}
+
+export async function deletePublishingProfile(profileId: string): Promise<{ ok: boolean; profile_id: string }> {
+  return apiDel(`/api/publishing-profiles/${encodeURIComponent(profileId)}`)
 }
 
 export async function getPlatformDetail(platform: string): Promise<{
@@ -263,7 +833,7 @@ export async function getPlatformDetail(platform: string): Promise<{
   return apiGet(`/api/platforms/${platform}`)
 }
 
-export async function triggerPlatformLogin(platform: string, timeout = 600): Promise<LoginTriggerResponse> {
+export async function triggerPlatformLogin(platform: string, timeout = 900): Promise<LoginTriggerResponse> {
   return apiPost<LoginTriggerResponse>(`/api/platforms/${platform}/login?timeout=${timeout}`)
 }
 
@@ -272,6 +842,10 @@ export interface SauTask {
   execution_id?: string
   kind: string
   platform: string
+  account_id?: string
+  account_label?: string
+  profile_id?: string
+  batch_id?: string
   title: string
   status: 'queued' | 'running' | 'success' | 'failed' | string
   progress: string
@@ -303,6 +877,10 @@ export interface SauCreateResponse {
   ok: boolean
   task_id: string
   execution_id: string
+  batch_id?: string
+  execution_ids?: string[]
+  tasks?: SauTask[]
+  runs?: ExecutionRun[]
   task: SauTask
   run: ExecutionRun
 }
@@ -316,6 +894,9 @@ export interface CreateSauVideoPayload {
   thumbnail_path?: string
   schedule?: string
   headless?: boolean
+  account_id?: string
+  target_account_ids?: string[]
+  profile_id?: string
 }
 
 export interface CreateSauNotePayload {
@@ -326,6 +907,9 @@ export interface CreateSauNotePayload {
   tags?: string[]
   schedule?: string
   headless?: boolean
+  account_id?: string
+  target_account_ids?: string[]
+  profile_id?: string
 }
 
 export async function createSauVideoTask(payload: CreateSauVideoPayload): Promise<SauCreateResponse> {
@@ -334,6 +918,51 @@ export async function createSauVideoTask(payload: CreateSauVideoPayload): Promis
 
 export async function createSauNoteTask(payload: CreateSauNotePayload): Promise<SauCreateResponse> {
   return apiPost<SauCreateResponse>('/api/sau/upload-note-async', payload)
+}
+
+export interface GeneratePublishTitlePayload {
+  platform: string
+  kind?: 'note' | 'video'
+  content?: string
+  current_title?: string
+  tags?: string[]
+}
+
+export interface GeneratePublishTitleResponse {
+  ok: boolean
+  title: string
+  candidates: string[]
+  limit: number
+  platform: string
+  kind: string
+  model: string
+  reason?: string
+}
+
+export async function generatePublishTitle(payload: GeneratePublishTitlePayload): Promise<GeneratePublishTitleResponse> {
+  return apiPost<GeneratePublishTitleResponse>('/api/sau/generate-title', payload)
+}
+
+export interface GeneratePublishCopyPayload extends GeneratePublishTitlePayload {
+  assets?: ComposeAssetRef[]
+  current_body?: string
+}
+
+export interface GeneratePublishCopyResponse extends GeneratePublishTitleResponse {
+  body: string
+  tags: string[]
+  image_anchors?: Array<{
+    asset_id: string
+    anchor_after_paragraph: number
+    caption?: string
+  }>
+  visual_model?: string
+  visual_summary?: string
+  asset_summaries?: Array<{ id?: string; role?: string; summary?: string }>
+}
+
+export async function generatePublishCopy(payload: GeneratePublishCopyPayload): Promise<GeneratePublishCopyResponse> {
+  return apiPost<GeneratePublishCopyResponse>('/api/sau/generate-publish-copy', payload)
 }
 
 export async function deletePlatformSession(platform: string): Promise<{ ok: boolean; platform: string }> {
@@ -405,6 +1034,10 @@ export interface ExecutionRun {
   task_type: string
   title: string
   platform: string
+  account_id?: string
+  account_label?: string
+  profile_id?: string
+  batch_id?: string
   executor_type: 'browser' | 'desktop' | 'mobile' | 'api' | string
   status: 'queued' | 'running' | 'success' | 'failed' | 'paused' | 'needs_human' | 'cancelled' | string
   current_step_id: string
@@ -418,6 +1051,14 @@ export interface ExecutionRun {
   started_at: string
   finished_at: string
   duration_ms: number
+  archived?: boolean
+}
+
+export interface ExecutionArchiveInfo {
+  active_publish_records: number
+  archived_publish_records: number
+  active_limit: number
+  archive_limit: number
 }
 
 export interface ExecutionStep {
@@ -460,8 +1101,30 @@ export interface Observation {
   created_at: string
 }
 
-export async function fetchExecutions(limit = 100): Promise<{ runs: ExecutionRun[] }> {
-  return apiGet<{ runs: ExecutionRun[] }>(`/api/executions?limit=${limit}`)
+export interface FetchExecutionsOptions {
+  limit?: number
+  status?: string
+  platform?: string
+  task_type?: string
+  keyword?: string
+  sort_by?: string
+  sort_dir?: 'asc' | 'desc'
+  include_archived?: boolean
+}
+
+export async function fetchExecutions(options: number | FetchExecutionsOptions = 100): Promise<{ runs: ExecutionRun[]; archive?: ExecutionArchiveInfo }> {
+  const params = new URLSearchParams()
+  if (typeof options === 'number') {
+    params.set('limit', String(options))
+  } else {
+    params.set('limit', String(options.limit ?? 100))
+    Object.entries(options).forEach(([key, value]) => {
+      if (key === 'limit') return
+      if (value === undefined || value === null || value === '') return
+      params.set(key, String(value))
+    })
+  }
+  return apiGet<{ runs: ExecutionRun[]; archive?: ExecutionArchiveInfo }>(`/api/executions?${params.toString()}`)
 }
 
 export async function getExecution(runId: string): Promise<ExecutionRun & {
@@ -482,6 +1145,164 @@ export async function resumeExecution(runId: string): Promise<{ ok: boolean; run
 
 export async function cancelExecution(runId: string): Promise<{ ok: boolean; run: ExecutionRun }> {
   return apiPost(`/api/executions/${runId}/cancel`)
+}
+
+// ── 电脑使用 API ──────────────────────────────────────────────
+
+export interface ComputerUseHealth {
+  ok: boolean
+  backend: string
+  available: boolean
+  windows_only: boolean
+  platform: string
+  terminator: {
+    available: boolean
+    command: boolean
+    npx: boolean
+    node: boolean
+    python_package: boolean
+  }
+  vision_fallback: {
+    enabled: boolean
+    backend: string
+  }
+  providers?: ComputerUseProviders
+  message: string
+}
+
+export interface ComputerUseProviderStatus {
+  available: boolean
+  message?: string
+  source_available?: boolean
+  source_dir?: string
+  url?: string
+  python?: string
+  python_available?: boolean
+  weights_ready?: boolean
+  missing_weights?: string[]
+  service_ready?: boolean
+  process_running?: boolean
+}
+
+export interface ComputerUseProviders {
+  terminator?: ComputerUseProviderStatus
+  playwright?: ComputerUseProviderStatus
+  omniparser?: ComputerUseProviderStatus
+  [key: string]: ComputerUseProviderStatus | undefined
+}
+
+export interface ComputerUseWindow {
+  pid?: number
+  process?: string
+  title?: string
+}
+
+export interface ComputerUseElement {
+  id?: string | number | null
+  index?: string
+  source?: string
+  role?: string
+  name?: string
+  selector?: string
+  bounds?: Record<string, unknown>
+  confidence?: number
+  actionable?: boolean
+}
+
+export interface ComputerUseObservation {
+  ok: boolean
+  health?: ComputerUseHealth
+  providers?: ComputerUseProviders
+  primary_provider?: string
+  active_window?: ComputerUseWindow
+  windows?: ComputerUseWindow[]
+  screenshot?: {
+    ok: boolean
+    path: string
+    message?: string
+    created_at?: string
+  }
+  elements?: ComputerUseElement[]
+  tree?: Record<string, unknown>
+  formatted?: string
+  element_count?: number
+  source_counts?: Record<string, number>
+  vision?: {
+    ok: boolean
+    message?: string
+    element_count?: number
+  }
+  summary: string
+  created_at: string
+}
+
+export interface ComputerUseStatus {
+  ok: boolean
+  health: ComputerUseHealth
+  active_window: ComputerUseWindow
+  windows: ComputerUseWindow[]
+  providers?: ComputerUseProviders
+  backend_version: string
+  vision_fallback_enabled: boolean
+}
+
+export interface CreateComputerUseTaskPayload {
+  instruction: string
+  target_app?: string
+  url?: string
+  mode?: 'observe_only' | 'assisted' | 'execute'
+  expected_result?: string
+  target_selector?: string
+  files?: string[]
+  steps?: Array<{ action: string; target?: string; selector?: string; text?: string; file_path?: string; value?: string; url?: string; provider?: string }>
+  max_steps?: number
+  require_confirmation?: boolean
+  allowed_actions?: string[]
+  sensitive_policy?: string
+  text?: string
+}
+
+export interface ComputerUseCreateResponse {
+  ok: boolean
+  task_id: string
+  execution_id: string
+  run: ExecutionRun
+}
+
+export async function fetchComputerUseStatus(): Promise<ComputerUseStatus> {
+  return apiGet<ComputerUseStatus>('/api/computer-use/status')
+}
+
+export async function observeComputerUse(): Promise<ComputerUseObservation> {
+  return apiPost<ComputerUseObservation>('/api/computer-use/observe')
+}
+
+export async function openComputerUseBrowser(url: string): Promise<ComputerUseObservation> {
+  return apiPost<ComputerUseObservation>('/api/computer-use/browser/open', { url })
+}
+
+export async function fetchComputerUseTree(payload: {
+  process?: string
+  title?: string
+  include_ocr?: boolean
+  include_browser_dom?: boolean
+  include_omniparser?: boolean
+  include_gemini_vision?: boolean
+} = {}): Promise<ComputerUseObservation> {
+  return apiPost<ComputerUseObservation>('/api/computer-use/tree', payload)
+}
+
+export async function createComputerUseTask(payload: CreateComputerUseTaskPayload): Promise<ComputerUseCreateResponse> {
+  return apiPost<ComputerUseCreateResponse>('/api/computer-use/tasks', payload)
+}
+
+export async function getComputerUseTask(taskId: string): Promise<ExecutionRun & {
+  steps: ExecutionStep[]
+  audit: AuditEvent[]
+  observations: Observation[]
+  debug_screenshot: string
+}> {
+  return apiGet(`/api/computer-use/tasks/${taskId}`)
 }
 
 export interface TaskListResponse {
@@ -564,6 +1385,9 @@ export interface PreflightResult {
   ok?: boolean
   risk_level?: string
   risk?: string
+  decision?: string
+  status?: string
+  risk_codes?: string[]
   score?: number
   message?: string
   risks?: string[]
@@ -579,11 +1403,19 @@ export interface CommentQueueItem {
   status?: string
   text?: string
   comment?: string
+  comment_text?: string
+  original_text?: string
+  repaired_text?: string
+  risk_codes?: string[]
+  decision?: string
+  repair_attempts?: number
+  next_run_at?: string
   target_url?: string
   video_title?: string
   created_at?: string
   updated_at?: string
   error?: string
+  error_msg?: string
   [key: string]: unknown
 }
 
@@ -788,6 +1620,142 @@ export async function acquisitionMessages(customerId = ''): Promise<{ messages: 
 
 export async function acquisitionReplyTemplates(): Promise<{ templates: ReplyTemplateItem[]; total: number }> {
   return apiGet('/api/acquisition/reply-templates')
+}
+
+export interface PrivateDomainOverview {
+  ok: boolean
+  metrics: {
+    pending: number
+    high_intent: number
+    followed_today: number
+    overdue: number
+  }
+  wechat: {
+    state: 'not_connected' | 'connected' | 'calibrated' | string
+    connected: boolean
+    calibrated: boolean
+    label: string
+    window?: Record<string, unknown>
+    calibration?: Record<string, unknown>
+    validation?: Record<string, unknown>
+  }
+}
+
+export interface PrivateDomainQueueResponse {
+  ok: boolean
+  items: LeadItem[]
+  total: number
+}
+
+export async function privateDomainOverview(): Promise<PrivateDomainOverview> {
+  return apiGet('/api/private-domain/overview')
+}
+
+export async function privateDomainQueue(limit = 50): Promise<PrivateDomainQueueResponse> {
+  return apiGet(`/api/private-domain/queue?limit=${encodeURIComponent(String(limit))}`)
+}
+
+export async function privateDomainCreateFollowup(payload: {
+  lead_id?: string
+  customer_id?: string
+  customer_name?: string
+  platform?: string
+  action?: string
+  reply_text?: string
+  next_reminder_at?: string
+  notes?: string
+}): Promise<{ ok: boolean; followup: Record<string, unknown> }> {
+  return apiPost('/api/private-domain/followups', payload)
+}
+
+export async function privateDomainCreateWechatDraft(payload: {
+  lead_id?: string
+  customer_id?: string
+  customer_name?: string
+  message: string
+  source?: string
+}): Promise<{ ok: boolean; draft: MessageItem; message: string; wechat: PrivateDomainOverview['wechat'] }> {
+  return apiPost('/api/private-domain/wechat/draft', payload)
+}
+
+// ── 本地小模型 API ──────────────────────────────────────────────
+
+export interface LocalLlmModelStatus {
+  id: string
+  label: string
+  installed: boolean
+  valid: boolean
+  bundled: boolean
+  required: boolean
+  path: string
+  size_bytes: number
+}
+
+export interface LocalLlmStatus {
+  ok: boolean
+  enabled: boolean
+  base_url: string
+  runtime_ready: boolean
+  current_model: string
+  server: {
+    available: boolean
+    path: string
+    backend?: string
+    selection_mode?: string
+    process_running: boolean
+    pid?: number | null
+    log_path: string
+  }
+  runtimes?: Record<string, {
+    backend: string
+    available: boolean
+    path: string
+    root: string
+  }>
+  acceleration?: {
+    mode: string
+    selected_backend: string
+    vulkan?: {
+      available: boolean
+      loader_exists: boolean
+      loader_path: string
+      gpus: Array<{ Name?: string; AdapterRAM?: number; DriverVersion?: string; VideoProcessor?: string }>
+    }
+  }
+  models: Record<string, LocalLlmModelStatus>
+  download: {
+    running?: boolean
+    status?: string
+    model?: string
+    received?: number
+    total?: number
+    percent?: number
+    error?: string
+  }
+}
+
+export async function fetchLocalLlmStatus(): Promise<LocalLlmStatus> {
+  return apiGet<LocalLlmStatus>('/api/local-llm/status')
+}
+
+export async function startLocalLlm(model = 'qwen3-4b'): Promise<{ success: boolean; message: string; status?: LocalLlmStatus }> {
+  return apiPost(`/api/local-llm/start?model=${encodeURIComponent(model)}`)
+}
+
+export async function stopLocalLlm(): Promise<{ success: boolean; message: string; status?: LocalLlmStatus }> {
+  return apiPost('/api/local-llm/stop')
+}
+
+export async function chatLocalLlm(prompt: string): Promise<{ success: boolean; message: string; model?: string }> {
+  return apiPost('/api/local-llm/chat', { prompt })
+}
+
+export async function downloadLocalLlm8b(): Promise<{ success: boolean; message: string }> {
+  return apiPost('/api/local-llm/models/qwen3-8b/download')
+}
+
+export async function deleteLocalLlm8b(): Promise<{ success: boolean; message: string; status?: LocalLlmStatus }> {
+  return apiDel('/api/local-llm/models/qwen3-8b')
 }
 
 export async function streamHermesChat(opts: StreamChatOpts): Promise<void> {

@@ -157,14 +157,15 @@ def _format_execution_task(run: dict) -> dict:
     error = run.get("error_message", "")
     if run.get("error_code"):
         error = f"{run.get('error_code')}: {error}".strip(": ")
+    is_computer_use = run.get("task_type") == "computer_use"
     return {
         "id": run.get("id", ""),
         "name": run.get("title") or f"{run.get('platform', '')} {run.get('task_type', '')}".strip() or "ExecutionRun",
         "description": f"{run.get('executor_type', '')} · {run.get('task_type', '')}".strip(" ·"),
-        "type": "publish" if run.get("task_type") == "publish_video" else "workflow",
-        "type_label": "自动化执行",
-        "type_icon": "⚙️",
-        "platform": run.get("platform", ""),
+        "type": "tool" if is_computer_use else "publish" if run.get("task_type") == "publish_video" else "workflow",
+        "type_label": "电脑使用" if is_computer_use else "自动化执行",
+        "type_icon": "🖥️" if is_computer_use else "⚙️",
+        "platform": "Windows" if is_computer_use else run.get("platform", ""),
         "status": board_status,
         "priority": 9,
         "tags": ["execution-kernel", run.get("executor_type", "")],

@@ -7,7 +7,7 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
-    "httpx>=0.27.0",
+    "httpx[socks]>=0.27.0",
     "pydantic>=2.9.0",
     "pydantic-settings>=2.6.0",
     "pyyaml>=6.0.2",
@@ -35,7 +35,9 @@ dev = [
 platforms = [
     "playwright>=1.48.0",        # 浏览器自动化 (抖音/小红书)
     "uiautomation>=2.0",         # Windows UI Automation (微信桌面版)
+    "comtypes>=1.4.0",           # UIAutomation COM bindings
     "pywin32>=306",              # Windows API (剪贴板操作)
+    "pyperclip>=1.9.0",          # wxauto clipboard support
     "py-mini-racer>=0.6.0",      # V8 JS引擎 (反爬签名)
     "psutil>=5.9.0",             # 进程管理
 ]

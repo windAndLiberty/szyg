@@ -6,10 +6,12 @@ import {
   Bell,
   ChevronDown,
   LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
   User,
 } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { pageTitleMap } from '@/lib/navConfig'
+import { allNavChildren, pageTitleMap } from '@/lib/navConfig'
 import { useLayout } from '@/lib/layout'
 
 export default function TopBar() {
@@ -18,10 +20,20 @@ export default function TopBar() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchValue, setSearchValue] = useState('')
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [superAgentHistoryCollapsed, setSuperAgentHistoryCollapsed] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   // 从 navConfig 派生标题（支持全部路由）
   const pageTitle = pageTitleMap[location.pathname] || 'szyg'
+  const pageNavItem = allNavChildren.find((item) => item.path === location.pathname)
+  const PageIcon = pageNavItem?.icon
+  const isSuperAgent = location.pathname === '/'
+
+  const toggleSuperAgentHistory = () => {
+    const next = !superAgentHistoryCollapsed
+    setSuperAgentHistoryCollapsed(next)
+    window.dispatchEvent(new CustomEvent('szyg:toggle-super-agent-history', { detail: { collapsed: next } }))
+  }
 
   // Close user menu on outside click
   useEffect(() => {
@@ -37,16 +49,42 @@ export default function TopBar() {
   return (
     <header className="fixed top-0 right-0 left-0 h-16 bg-[#111827]/95 backdrop-blur-md border-b border-[#1E293B] z-30" style={{ paddingLeft: sidebarWidth }}>
       <div className="h-full flex items-center justify-between px-6">
-        {/* Left: Page Title */}
-        <motion.h1
-          key={pageTitle}
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
-          className="text-lg font-semibold text-[#F1F5F9]"
-        >
-          {pageTitle}
-        </motion.h1>
+        {/* Left: Page Title / Super Agent history toggle */}
+        {isSuperAgent ? (
+          <motion.div
+            key="super-agent-history-toggle"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
+            className="flex items-center gap-2"
+          >
+            <h1 className="text-lg font-semibold text-[#F1F5F9]">超级员工</h1>
+            <button
+              type="button"
+              onClick={toggleSuperAgentHistory}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#1E293B] bg-[#0B0F1A] text-[#94A3B8] transition-colors hover:border-[#6366F1]/50 hover:text-[#F1F5F9]"
+              aria-label={superAgentHistoryCollapsed ? '展开历史对话' : '折叠历史对话'}
+              title={superAgentHistoryCollapsed ? '展开历史对话' : '折叠历史对话'}
+            >
+              {superAgentHistoryCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+            </button>
+          </motion.div>
+        ) : (
+          <motion.div
+            key={pageTitle}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
+            className="flex items-center gap-2"
+          >
+            {PageIcon && (
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#6366F1]/15 text-[#A5B4FC]">
+                <PageIcon className="h-4 w-4" />
+              </span>
+            )}
+            <h1 className="text-lg font-semibold text-[#F1F5F9]">{pageTitle}</h1>
+          </motion.div>
+        )}
 
         {/* Center: Search */}
         <div className="flex-1 max-w-md mx-8">

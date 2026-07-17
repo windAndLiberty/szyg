@@ -39,6 +39,9 @@ export interface QueueMetrics {
   sent: number
   failed: number
   skipped: number
+  autoRepaired: number
+  delayed: number
+  retrying: number
   needsHuman: number
 }
 
@@ -65,7 +68,10 @@ export function normalizeQueueMetrics(stats: Record<string, unknown> | undefined
     sent: value('total_sent', 'sent'),
     failed,
     skipped,
-    needsHuman: value('needs_human', 'needsHuman') || failed + skipped,
+    autoRepaired: value('total_auto_repaired', 'auto_repaired', 'autoRepaired'),
+    delayed: value('total_delayed', 'delayed'),
+    retrying: value('total_retrying', 'retrying'),
+    needsHuman: value('total_needs_human', 'needs_human', 'needsHuman'),
   }
 }
 
@@ -130,6 +136,18 @@ export function statusTone(status?: string): { label: string; className: string;
   if (['running', 'sending', 'processing'].includes(normalized)) {
     return { label: '执行中', className: 'text-[#3B82F6] bg-[#3B82F6]/10 border-[#3B82F6]/25', icon: Loader2 }
   }
+  if (['auto_repaired'].includes(normalized)) {
+    return { label: '已自动修复', className: 'text-[#38BDF8] bg-[#38BDF8]/10 border-[#38BDF8]/25', icon: CheckCircle2 }
+  }
+  if (['delayed'].includes(normalized)) {
+    return { label: '延后发送', className: 'text-[#A78BFA] bg-[#A78BFA]/10 border-[#A78BFA]/25', icon: Clock }
+  }
+  if (['retrying'].includes(normalized)) {
+    return { label: '自动重试', className: 'text-[#3B82F6] bg-[#3B82F6]/10 border-[#3B82F6]/25', icon: Loader2 }
+  }
+  if (['skipped'].includes(normalized)) {
+    return { label: '已跳过', className: 'text-[#94A3B8] bg-[#64748B]/10 border-[#64748B]/25', icon: Clock }
+  }
   if (['needs_human', 'review', 'pending_review'].includes(normalized)) {
     return { label: '需人工', className: 'text-[#F59E0B] bg-[#F59E0B]/10 border-[#F59E0B]/25', icon: AlertTriangle }
   }
@@ -140,9 +158,7 @@ export function statusTone(status?: string): { label: string; className: string;
 }
 
 export function PageShell({
-  title,
   subtitle,
-  icon: Icon,
   children,
 }: {
   title: string
@@ -154,12 +170,8 @@ export function PageShell({
     <div className="flex h-full flex-col overflow-auto bg-[#0B0F1A]">
       <div className="border-b border-[#1E293B] px-6 py-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#6366F1]/15 text-[#818CF8]">
-            <Icon className="h-5 w-5" />
-          </div>
           <div>
-            <h1 className="text-xl font-semibold text-[#F1F5F9]">{title}</h1>
-            <p className="mt-1 text-sm text-[#64748B]">{subtitle}</p>
+            <p className="text-sm text-[#94A3B8]">{subtitle}</p>
           </div>
         </div>
       </div>

@@ -200,12 +200,21 @@ async def platform_logout(platform: str):
 # ── Materials (素材库) ───────────────────────────────────────
 
 import json
+import uuid
+from datetime import datetime
 from pathlib import Path
 from szyg.data_path import DATA_DIR
 from fastapi import File, UploadFile
-from szyg.media_storage import get_media_output_dir, infer_media_kind, media_url_for_path
+from szyg.media_storage import get_media_output_dir, infer_media_kind, media_url_for_path, resolve_managed_media_path
 
 _MATERIALS_FILE = DATA_DIR / "materials.json"
+_GENERATION_HISTORY_FILE = DATA_DIR / "generation_history.json"
+_HISTORY_LIMITS = {
+    "image": 100,
+    "video": 50,
+    "audio": 100,
+    "text": 100,
+}
 
 
 def _load_materials() -> list:
@@ -217,6 +226,128 @@ def _load_materials() -> list:
 def _save_materials(data: list):
     _MATERIALS_FILE.parent.mkdir(parents=True, exist_ok=True)
     _MATERIALS_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _load_generation_history() -> list[dict]:
+    if _GENERATION_HISTORY_FILE.exists():
+        return json.loads(_GENERATION_HISTORY_FILE.read_text(encoding="utf-8"))
+    return []
+
+
+def _save_generation_history(data: list[dict]):
+    _GENERATION_HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _GENERATION_HISTORY_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _normalize_history_type(value: str) -> str:
+    aliases = {"voice": "audio", "copy": "text", "document": "text"}
+    normalized = aliases.get(str(value or "").strip(), str(value or "").strip())
+    if normalized not in _HISTORY_LIMITS:
+        raise HTTPException(400, "Unsupported history type")
+    return normalized
+
+
+def _history_limit_for(kind: str) -> int:
+    return _HISTORY_LIMITS.get(kind, 100)
+
+
+def _history_key(item: dict) -> str:
+    return str(item.get("path") or item.get("url") or item.get("id") or "")
+
+
+def _history_time(item: dict) -> str:
+    return str(item.get("updated_at") or item.get("created_at") or "")
+
+
+def _sync_history_adoption(path: str, adopted: bool, material_id: str = ""):
+    if not path:
+        return
+    history = _load_generation_history()
+    changed = False
+    for item in history:
+        if str(item.get("path") or "") == path:
+            item["adopted"] = adopted
+            item["material_id"] = material_id if adopted else ""
+            changed = True
+    if changed:
+        _save_generation_history(history)
+
+
+def touch_generation_history(path: str, updated_at: str | None = None) -> bool:
+    if not path:
+        return False
+    stamp = updated_at or datetime.now().isoformat()
+    try:
+        resolved = str(resolve_managed_media_path(path).resolve())
+    except Exception:
+        resolved = str(path)
+    history = _load_generation_history()
+    changed = False
+    for item in history:
+        same_path = str(item.get("path") or "") == resolved or str(item.get("path") or "") == path
+        same_url = str(item.get("url") or "") == path
+        if same_path or same_url:
+            item["updated_at"] = stamp
+            changed = True
+    if changed:
+        _save_generation_history(history)
+    return changed
+
+
+def _trim_generation_history(items: list[dict]) -> list[dict]:
+    grouped: dict[str, list[dict]] = {}
+    for item in items:
+        kind = str(item.get("type") or "")
+        grouped.setdefault(kind, []).append(item)
+    trimmed: list[dict] = []
+    for kind, values in grouped.items():
+        values.sort(key=_history_time, reverse=True)
+        trimmed.extend(values[:_history_limit_for(kind)])
+    trimmed.sort(key=_history_time, reverse=True)
+    return trimmed
+
+
+def _valid_history_items(kind: str = "") -> list[dict]:
+    history = _load_generation_history()
+    materials = _load_materials()
+    materials_by_path = {str(item.get("path") or ""): item for item in materials if item.get("path")}
+    valid: list[dict] = []
+    changed = False
+    for item in history:
+        item_type = str(item.get("type") or "")
+        if item_type not in _HISTORY_LIMITS:
+            changed = True
+            continue
+        if kind and item_type != kind:
+            valid.append(item)
+            continue
+        try:
+            path = resolve_managed_media_path(str(item.get("path") or item.get("url") or ""))
+        except Exception:
+            changed = True
+            continue
+        if not path.exists() or not path.is_file():
+            changed = True
+            continue
+        resolved = str(path.resolve())
+        material = materials_by_path.get(resolved)
+        next_item = {
+            **item,
+            "path": resolved,
+            "url": media_url_for_path(path),
+            "filename": item.get("filename") or path.name,
+            "size": path.stat().st_size,
+            "updated_at": item.get("updated_at") or item.get("created_at") or datetime.fromtimestamp(path.stat().st_mtime).isoformat(),
+            "adopted": bool(material),
+            "material_id": material.get("id", "") if material else "",
+        }
+        if next_item != item:
+            changed = True
+        valid.append(next_item)
+    valid = _trim_generation_history(valid)
+    if changed or len(valid) != len(history):
+        _save_generation_history(valid)
+    return [item for item in valid if not kind or item.get("type") == kind]
 
 
 def _material_type_for_kind(kind: str) -> str:
@@ -253,7 +384,25 @@ def _scan_generated_materials() -> list[dict]:
 
 @router.get("/materials")
 async def list_materials(mtype: str = "", platform: str = ""):
-    items = [*(_load_materials()), *_scan_generated_materials()]
+    items = _load_materials()
+    deduped = []
+    seen = set()
+    changed = False
+    for item in items:
+        key = str(item.get("path") or item.get("url") or item.get("id") or "")
+        if key and key in seen:
+            changed = True
+            continue
+        if key:
+            seen.add(key)
+        if item.get("path") and not Path(str(item.get("path"))).exists():
+            _sync_history_adoption(str(item.get("path") or ""), False, "")
+            changed = True
+            continue
+        deduped.append(item)
+    if changed:
+        _save_materials(deduped)
+    items = deduped
     if mtype:
         items = [m for m in items if m.get("type") == mtype]
     if platform and platform != "all":
@@ -265,7 +414,6 @@ async def list_materials(mtype: str = "", platform: str = ""):
 @router.post("/materials")
 async def create_material(body: dict):
     items = _load_materials()
-    import uuid
     item = {
         "id": str(uuid.uuid4())[:8],
         "name": body.get("name", ""),
@@ -278,6 +426,119 @@ async def create_material(body: dict):
     items.append(item)
     _save_materials(items)
     return item
+
+
+@router.post("/materials/adopt")
+async def adopt_material(body: dict):
+    value = str(body.get("path") or body.get("url") or "").strip()
+    if not value:
+        raise HTTPException(400, "path or url is required")
+    try:
+        path = resolve_managed_media_path(value)
+    except Exception as e:
+        raise HTTPException(400, f"素材文件不可用: {e}")
+    if not path.exists() or not path.is_file():
+        raise HTTPException(404, "素材文件不存在")
+
+    kind = infer_media_kind(path)
+    items = _load_materials()
+    resolved = str(path.resolve())
+    existing = next((item for item in items if str(item.get("path") or "") == resolved), None)
+    if existing:
+        _sync_history_adoption(resolved, True, str(existing.get("id") or ""))
+        return {"ok": True, "material": existing, "existed": True}
+
+    item = {
+        "id": f"adopted:{str(uuid.uuid4())[:8]}",
+        "name": str(body.get("name") or path.name),
+        "type": _material_type_for_kind(kind),
+        "tags": body.get("tags") or ["采纳素材"],
+        "platform": body.get("platform", "all"),
+        "url": media_url_for_path(path),
+        "path": resolved,
+        "size": path.stat().st_size,
+        "created_at": __import__("datetime").datetime.now().isoformat(),
+        "source": body.get("source") or "adopted",
+    }
+    items.append(item)
+    _save_materials(items)
+    _sync_history_adoption(resolved, True, item["id"])
+    return {"ok": True, "material": item, "existed": False}
+
+
+@router.post("/materials/unadopt")
+async def unadopt_material(body: dict):
+    value = str(body.get("path") or body.get("url") or "").strip()
+    material_id = str(body.get("material_id") or "").strip()
+    if not value and not material_id:
+        raise HTTPException(400, "path, url or material_id is required")
+    resolved = ""
+    if value:
+        try:
+            path = resolve_managed_media_path(value)
+            resolved = str(path.resolve())
+        except Exception as e:
+            raise HTTPException(400, f"素材文件不可用: {e}")
+    items = _load_materials()
+    before = len(items)
+    next_items = []
+    for item in items:
+        same_id = material_id and str(item.get("id") or "") == material_id
+        same_path = resolved and str(item.get("path") or "") == resolved
+        if same_id or same_path:
+            resolved = resolved or str(item.get("path") or "")
+            continue
+        next_items.append(item)
+    _save_materials(next_items)
+    _sync_history_adoption(resolved, False, "")
+    return {"ok": True, "removed": before - len(next_items), "path": resolved}
+
+
+@router.get("/generation-history")
+async def list_generation_history(kind: str = ""):
+    normalized = _normalize_history_type(kind) if kind else ""
+    items = _valid_history_items(normalized)
+    return {"items": items, "total": len(items), "limits": _HISTORY_LIMITS}
+
+
+@router.post("/generation-history")
+async def record_generation_history(body: dict):
+    kind = _normalize_history_type(str(body.get("type") or ""))
+    value = str(body.get("path") or body.get("url") or "").strip()
+    if not value:
+        raise HTTPException(400, "path or url is required")
+    try:
+        path = resolve_managed_media_path(value)
+    except Exception as e:
+        raise HTTPException(400, f"生成文件不可用: {e}")
+    if not path.exists() or not path.is_file():
+        raise HTTPException(404, "生成文件不存在")
+
+    resolved = str(path.resolve())
+    materials_by_path = {str(item.get("path") or ""): item for item in _load_materials() if item.get("path")}
+    material = materials_by_path.get(resolved)
+    history = [item for item in _load_generation_history() if _history_key(item) != resolved and _history_key(item) != value]
+    created_at = str(body.get("created_at") or datetime.now().isoformat())
+    item = {
+        "id": str(body.get("id") or f"gen:{kind}:{str(uuid.uuid4())[:8]}"),
+        "type": kind,
+        "title": str(body.get("title") or path.name),
+        "prompt": str(body.get("prompt") or ""),
+        "summary": str(body.get("summary") or ""),
+        "url": media_url_for_path(path),
+        "path": resolved,
+        "filename": path.name,
+        "size": path.stat().st_size,
+        "created_at": created_at,
+        "updated_at": str(body.get("updated_at") or created_at),
+        "adopted": bool(material),
+        "material_id": material.get("id", "") if material else "",
+        "meta": body.get("meta") if isinstance(body.get("meta"), dict) else {},
+    }
+    history.insert(0, item)
+    history = _trim_generation_history(history)
+    _save_generation_history(history)
+    return {"ok": True, "item": item, "limits": _HISTORY_LIMITS}
 
 
 @router.post("/materials/upload")
@@ -307,15 +568,23 @@ async def upload_material(file: UploadFile = File(...)):
         "created_at": __import__("datetime").datetime.now().isoformat(),
         "source": "upload",
     }
+    items = _load_materials()
+    resolved = str(path.resolve())
+    items = [entry for entry in items if str(entry.get("path") or "") != resolved]
+    items.append(item)
+    _save_materials(items)
     return {"ok": True, "material": item}
 
 
 @router.delete("/materials/{material_id}")
 async def delete_material(material_id: str):
     items = _load_materials()
-    items = [m for m in items if m.get("id") != material_id]
+    removed = next((m for m in items if str(m.get("id") or "") == material_id), None)
+    items = [m for m in items if str(m.get("id") or "") != material_id]
     _save_materials(items)
-    return {"ok": True}
+    if removed and removed.get("path"):
+        _sync_history_adoption(str(removed.get("path") or ""), False, "")
+    return {"ok": True, "removed": 1 if removed else 0}
 
 
 # ── Content Assets & Copy Library ────────────────────────────

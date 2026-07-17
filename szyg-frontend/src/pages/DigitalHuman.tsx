@@ -406,8 +406,7 @@ export default function DigitalHuman() {
         className="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
       >
         <div>
-          <h1 className="text-display-md text-[#F1F5F9]">数字人管理</h1>
-          <p className="text-body-md text-[#94A3B8] mt-1">
+          <p className="text-body-md text-[#94A3B8]">
             管理你的数字员工，查看运行状态与性能指标
           </p>
         </div>

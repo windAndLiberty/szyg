@@ -394,6 +394,9 @@ class InterceptEngine:
                 "comments_sent": len([r for r in send_results if r["status"] == "sent"]),
                 "comments_failed": len([r for r in send_results if r["status"] == "failed"]),
                 "comments_skipped": len([r for r in send_results if r["status"] == "skipped"]),
+                "comments_delayed": len([r for r in send_results if r["status"] == "delayed"]),
+                "comments_retrying": len([r for r in send_results if r["status"] == "retrying"]),
+                "comments_needs_human": len([r for r in send_results if r["status"] == "needs_human"]),
             })
 
             # Delay between targets

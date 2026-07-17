@@ -74,6 +74,59 @@ def _build_launch_kwargs(headless: bool) -> dict:
     return launch_kwargs
 
 
+def _is_tencent_access_blocked_error(message: str) -> bool:
+    return "ERR_HTTP_RESPONSE_CODE_FAILURE" in message or "403" in message
+
+
+def _tencent_access_blocked_message() -> str:
+    return (
+        "视频号助手拒绝了自动化浏览器访问，无法完成自动扫码登录。"
+        "请先在普通 Chrome 中确认 https://channels.weixin.qq.com/login.html 可打开；"
+        "当前版本建议将视频号作为人工接管渠道处理。"
+    )
+
+
+async def _goto_tencent_page(page: Page, url: str, timeout: int = 120000) -> None:
+    try:
+        response = await page.goto(url, timeout=timeout, wait_until="domcontentloaded")
+        if response and response.status == 403:
+            raise RuntimeError(_tencent_access_blocked_message())
+    except Exception as exc:
+        message = str(exc)
+        recoverable = (
+            "ERR_HTTP_RESPONSE_CODE_FAILURE" in message
+            or "ERR_ABORTED" in message
+            or "ERR_CONNECTION_CLOSED" in message
+        )
+        if recoverable and "channels.weixin.qq.com" in page.url:
+            try:
+                await page.wait_for_load_state("domcontentloaded", timeout=10000)
+            except Exception:
+                pass
+            tencent_logger.warning(_msg("😵", f"视频号页面导航返回异常，但页面已打开，继续检测登录状态: {message}"))
+            return
+        if _is_tencent_access_blocked_error(message):
+            raise RuntimeError(_tencent_access_blocked_message()) from exc
+        raise
+
+
+async def _open_tencent_login_page(page: Page) -> None:
+    errors: list[str] = []
+    access_blocked = False
+    for url in (TENCENT_UPLOAD_URL, TENCENT_LOGIN_URL):
+        try:
+            await _goto_tencent_page(page, url, timeout=120000)
+            await page.wait_for_timeout(1000)
+            return
+        except Exception as exc:
+            if _tencent_access_blocked_message() in str(exc):
+                access_blocked = True
+            errors.append(f"{url}: {exc}")
+    if access_blocked:
+        raise RuntimeError(_tencent_access_blocked_message())
+    raise RuntimeError("视频号登录页打开失败：" + " | ".join(errors))
+
+
 def _get_qrcode_utils():
     from utils.login_qrcode import build_login_qrcode_path
     from utils.login_qrcode import decode_qrcode_from_path
@@ -111,8 +164,7 @@ async def cookie_auth(account_file):
             context = await browser.new_context(storage_state=account_file)
             context = await set_init_script(context)
             page = await context.new_page()
-            await page.goto(TENCENT_UPLOAD_URL)
-            await page.wait_for_url(TENCENT_UPLOAD_URL, timeout=5000)
+            await _goto_tencent_page(page, TENCENT_UPLOAD_URL, timeout=60000)
 
             login_markers = [
                 page.get_by_text("扫码登录", exact=True).first,
@@ -356,7 +408,7 @@ async def tencent_cookie_gen(
         result = _build_login_result(False, "failed", "视频号登录失败", account_file)
         try:
             page = await context.new_page()
-            await page.goto(TENCENT_LOGIN_URL)
+            await _open_tencent_login_page(page)
             qrcode_info = await _save_tencent_qrcode(page, account_file, qrcode_callback=qrcode_callback)
             qrcode_path = Path(qrcode_info["image_path"])
             tencent_logger.info(_msg("🧍", "请扫码，小人正在耐心等待登录完成"))
@@ -501,8 +553,8 @@ class TencentBaseUploader(BaseVideoUploader):
             await page.keyboard.press("Escape")
 
     async def open_upload_page(self, page: Page) -> None:
-        await page.goto(TENCENT_UPLOAD_URL, timeout=120000, wait_until="domcontentloaded")
-        await page.wait_for_url(TENCENT_UPLOAD_URL, timeout=120000)
+        await _goto_tencent_page(page, TENCENT_UPLOAD_URL, timeout=120000)
+        await page.wait_for_url("**/platform/post/create**", timeout=120000)
 
     async def upload_video_file(self, page: Page, file_path: str) -> None:
         async def find_file_input():

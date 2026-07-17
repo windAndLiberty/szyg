@@ -206,3 +206,114 @@ async def test_audit_writes_are_not_lost_under_concurrency(tmp_path, monkeypatch
     ])
 
     assert len(kernel.list_audit(run["id"])) == 50
+
+
+class FakeComputerUseAdapter:
+    async def health(self):
+        return {
+            "ok": True,
+            "backend": "fake",
+            "available": False,
+            "platform": "nt",
+            "terminator": {"available": False},
+            "providers": {
+                "terminator": {"available": False},
+                "playwright": {"available": True},
+                "omniparser": {"available": False},
+            },
+            "message": "fake desktop ready",
+        }
+
+    async def active_window(self):
+        return {"title": "Fake Window", "process": "fake", "pid": 1}
+
+    async def list_windows(self):
+        return [{"title": "Fake Window", "process": "fake", "pid": 1}]
+
+    async def screenshot(self):
+        return {"ok": True, "path": "fake-screen.png"}
+
+    async def observe(self):
+        return {
+            "ok": True,
+            "summary": "当前窗口：Fake Window；可见窗口 1 个；已截图",
+            "active_window": await self.active_window(),
+            "windows": await self.list_windows(),
+            "screenshot": await self.screenshot(),
+            "elements": [],
+        }
+
+    async def plan_actions(self, payload, observation=None):
+        return {"success": True, "actions": [], "message": "planned"}
+
+    async def execute_computer_actions(self, payload, plan=None):
+        return {"success": True, "message": "executed", "actions": []}
+
+    async def launch_app(self, target_app):
+        return {"success": True, "message": f"opened {target_app}"}
+
+    async def type_text(self, text):
+        return {"success": True, "message": f"typed {text}"}
+
+    async def cleanup(self):
+        return {"success": True, "message": "cleaned"}
+
+
+def _isolate_kernel(tmp_path, monkeypatch):
+    import szyg.execution_kernel as kernel_mod
+
+    monkeypatch.setattr(kernel_mod, "RUNS_FILE", tmp_path / "execution_runs.json")
+    monkeypatch.setattr(kernel_mod, "STEPS_FILE", tmp_path / "execution_steps.json")
+    monkeypatch.setattr(kernel_mod, "AUDIT_FILE", tmp_path / "execution_audit_events.json")
+    monkeypatch.setattr(kernel_mod, "OBSERVATIONS_FILE", tmp_path / "execution_observations.json")
+    monkeypatch.setattr(kernel_mod, "ASSERTIONS_FILE", tmp_path / "execution_assertions.json")
+    monkeypatch.setattr(kernel_mod, "_kernel", None)
+    return get_execution_kernel()
+
+
+@pytest.mark.asyncio
+async def test_computer_use_observe_only_completes_with_fake_adapter(tmp_path, monkeypatch):
+    import szyg.integrations.computer_use_adapter as adapter_mod
+
+    kernel = _isolate_kernel(tmp_path, monkeypatch)
+    monkeypatch.setattr(adapter_mod, "get_computer_use_adapter", lambda: FakeComputerUseAdapter())
+
+    run = kernel.create_run(
+        "computer_use",
+        "windows",
+        "desktop",
+        {"instruction": "观察当前桌面", "target_app": "windows", "mode": "observe_only"},
+    )
+
+    await kernel.run_computer_use(run["id"])
+    finished = kernel.get_run(run["id"])
+
+    assert finished["status"] == "success"
+    assert any(item["artifact_path"] == "fake-screen.png" for item in kernel.list_observations(run["id"]))
+    assert [step["step_id"] for step in kernel.list_steps(run["id"])][:3] == [
+        "validate_request",
+        "preflight_providers",
+        "observe_initial",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_computer_use_sensitive_action_needs_human(tmp_path, monkeypatch):
+    import szyg.integrations.computer_use_adapter as adapter_mod
+
+    kernel = _isolate_kernel(tmp_path, monkeypatch)
+    monkeypatch.setattr(adapter_mod, "get_computer_use_adapter", lambda: FakeComputerUseAdapter())
+
+    run = kernel.create_run(
+        "computer_use",
+        "wechat",
+        "desktop",
+        {"instruction": "打开微信并发送消息", "target_app": "wechat", "mode": "execute"},
+    )
+
+    await kernel.run_computer_use(run["id"])
+    finished = kernel.get_run(run["id"])
+
+    assert finished["status"] == "needs_human"
+    assert finished["error_code"] == "sensitive_action"
+    assert any(step["status"] == "needs_human" for step in kernel.list_steps(run["id"]))

@@ -5,13 +5,25 @@ import {
   MoreHorizontal, RefreshCw, Trash2, X, QrCode, Smartphone,
   Cookie, ChevronDown, ChevronUp, AlertCircle, CheckCircle2,
   Clock, Users, Calendar, BarChart3, Loader2, Wifi, WifiOff,
+  Youtube, MousePointerClick,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyContent } from '@/components/ui/empty'
 import {
-  fetchPlatforms, triggerPlatformLogin, deletePlatformSession,
+  createPlatformAccount,
+  createPublishingProfile,
+  deletePlatformAccountSession,
+  deletePublishingProfile,
+  fetchPlatformAccounts,
+  fetchPublishingProfiles,
+  loginPlatformAccount,
+  openWechatDesktop,
+  captureWechatInputClick,
+  syncPlatformAccountProfile,
+  type ChannelAccount,
   type PlatformInfo,
+  type PublishingProfile,
 } from '@/lib/api'
 
 // ── Platform visual config ────────────────────────────────────
@@ -28,6 +40,46 @@ const PLATFORM_CONFIG: Record<string, {
   kuaishou:  { label: '快手',   icon: Play,            color: '#FF6B00', bg: 'rgba(255,107,0,0.12)',   border: 'rgba(255,107,0,0.3)' },
   bilibili:  { label: 'B站',    icon: Tv,              color: '#FB7299', bg: 'rgba(251,114,153,0.12)',  border: 'rgba(251,114,153,0.3)' },
   wechat_mp: { label: '微信',   icon: MessageCircle,   color: '#07C160', bg: 'rgba(7,193,96,0.12)',    border: 'rgba(7,193,96,0.3)' },
+  tencent:   { label: '视频号', icon: MessageCircle,   color: '#07C160', bg: 'rgba(7,193,96,0.12)',    border: 'rgba(7,193,96,0.3)' },
+  youtube:   { label: 'YouTube', icon: Youtube,        color: '#FF0033', bg: 'rgba(255,0,51,0.12)',     border: 'rgba(255,0,51,0.3)' },
+  weibo:     { label: '微博',   icon: MessageCircle,   color: '#F97316', bg: 'rgba(249,115,22,0.12)',  border: 'rgba(249,115,22,0.3)' },
+}
+
+const CHANNEL_CAPABILITIES: Record<string, { types: string[]; state: string; note: string }> = {
+  douyin: { types: ['视频', '图文', '链接回写'], state: '可发布', note: '风控严格，建议低频稳定发布' },
+  xhs: { types: ['视频', '图文'], state: '可发布', note: '适合种草内容，建议先预检文案' },
+  kuaishou: { types: ['视频', '图文'], state: '可登录', note: '适合短视频和图文分发，资料同步会读取创作者中心' },
+  bilibili: { types: ['视频'], state: '可管理', note: '使用 B站投稿工具登录态，适合知识内容和长视频' },
+  tencent: { types: ['视频', '图文', '桌面辅助'], state: '桌面辅助', note: '打开真实浏览器视频号助手，支持图文和视频发布' },
+  youtube: { types: ['视频'], state: '需配置', note: '适合海外渠道分发' },
+  weibo: { types: ['视频', '图文', '桌面辅助'], state: '桌面辅助', note: '使用真实桌面浏览器发布微博内容' },
+}
+
+function fallbackPlatform(id: string): PlatformInfo {
+  const cfg = PLATFORM_CONFIG[id] || { label: id, icon: KeyRound, color: '#6366F1', bg: '', border: '' }
+  return {
+    id,
+    name: cfg.label,
+    adapter: '',
+    state: 'unavailable',
+    initialized: false,
+    nickname: '',
+    followers: 0,
+    session: {
+      has_session: false,
+      cookie_count: 0,
+      valid: false,
+      saved_at: '',
+      cookie_expiry: null,
+    },
+    meta: {
+      risk_level: '',
+      risk_label: '',
+      login_mode: '',
+      publish_mode: '',
+      description: CHANNEL_CAPABILITIES[id]?.note || '',
+    },
+  }
 }
 
 const LOGIN_METHODS = [
@@ -62,6 +114,14 @@ function fmtNumber(n: number | undefined | null): string {
   return String(n)
 }
 
+function accountAvatarUrl(account: ChannelAccount): string {
+  if (!account.avatar_url) return ''
+  if (account.platform === 'bilibili' || account.platform === 'weibo') {
+    return `/api/platform-accounts/avatar?url=${encodeURIComponent(account.avatar_url)}`
+  }
+  return account.avatar_url
+}
+
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return '—'
   try {
@@ -80,6 +140,26 @@ function fmtDateTime(iso: string | null | undefined): string {
       year: 'numeric', month: '2-digit', day: '2-digit',
       hour: '2-digit', minute: '2-digit',
     })
+  } catch {
+    return '—'
+  }
+}
+
+function fmtRelativeTimeShort(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  try {
+    const time = new Date(iso).getTime()
+    if (Number.isNaN(time)) return '—'
+    const diffMs = Math.max(0, Date.now() - time)
+    const minute = 60 * 1000
+    const hour = 60 * minute
+    const day = 24 * hour
+    const month = 30 * day
+    if (diffMs < minute) return '刚刚'
+    if (diffMs < hour) return `${Math.floor(diffMs / minute)}分`
+    if (diffMs < day) return `${Math.floor(diffMs / hour)}时`
+    if (diffMs < month) return `${Math.floor(diffMs / day)}天`
+    return `${Math.floor(diffMs / month)}月`
   } catch {
     return '—'
   }
@@ -141,6 +221,7 @@ function AccountCard({
   const status = getStatusKind(platform)
   const stCfg = STATUS_CONFIG[status]
   const StatusIcon = status === 'logging' ? Loader2 : stCfg.icon
+  const capability = CHANNEL_CAPABILITIES[platform.id] || { types: ['发布'], state: '待确认', note: '该渠道能力待确认' }
 
   // Close menu on click outside
   useEffect(() => {
@@ -200,6 +281,13 @@ function AccountCard({
                 {fmtDate(platform.session.saved_at)}
               </span>
             )}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {capability.types.map((item) => (
+              <span key={item} className="rounded-md bg-[#0D1321] px-2 py-0.5 text-[11px] text-[#94A3B8]">
+                {item}
+              </span>
+            ))}
           </div>
         </div>
 
@@ -268,7 +356,10 @@ function AccountCard({
                 <DetailItem icon={Calendar} label="最后登录" value={fmtDateTime(platform.session?.saved_at)} />
                 <DetailItem icon={Clock} label="Cookie 有效期" value={fmtDate(platform.session?.cookie_expiry)} />
                 <DetailItem icon={Cookie} label="Cookie 数量" value={String(platform.session?.cookie_count ?? 0)} />
-                <DetailItem icon={BarChart3} label="本周发布" value="—" />
+                <DetailItem icon={BarChart3} label="渠道能力" value={capability.state} />
+              </div>
+              <div className="rounded-lg border border-[#1E293B] bg-[#0D1321] px-3 py-2 text-xs leading-5 text-[#94A3B8]">
+                {capability.note}
               </div>
 
               {/* Re-login button */}
@@ -526,266 +617,686 @@ const containerVariants = {
   },
 }
 
+type WechatSetupStep = 'opening' | 'ready' | 'capturing' | 'success' | 'error'
+
+type WechatSetupState = {
+  open: boolean
+  accountId: string | null
+  step: WechatSetupStep
+  message: string
+}
+
 export default function Accounts() {
-  const [platforms, setPlatforms] = useState<PlatformInfo[]>([])
+  const [accounts, setAccounts] = useState<ChannelAccount[]>([])
+  const [profiles, setProfiles] = useState<PublishingProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [loggingInPlatform, setLoggingInPlatform] = useState<string | null>(null)
-  const loginPollRef = useRef<number | null>(null)
+  const [addingPlatform, setAddingPlatform] = useState('douyin')
+  const [loggingInAccount, setLoggingInAccount] = useState<string | null>(null)
+  const [syncingAccount, setSyncingAccount] = useState<string | null>(null)
+  const [deleteExpandedAccount, setDeleteExpandedAccount] = useState<string | null>(null)
+  const [profileName, setProfileName] = useState('')
+  const [profileAccountIds, setProfileAccountIds] = useState<string[]>([])
+  const [expandedProfileId, setExpandedProfileId] = useState<string | null>(null)
+  const [wechatSetup, setWechatSetup] = useState<WechatSetupState>({
+    open: false,
+    accountId: null,
+    step: 'opening',
+    message: '',
+  })
 
-  const loadPlatforms = useCallback(async () => {
+  const loadAccounts = useCallback(async () => {
     try {
       setError(null)
-      const data = await fetchPlatforms()
-      setPlatforms(data.platforms || [])
+      const [accountData, profileData] = await Promise.all([
+        fetchPlatformAccounts(),
+        fetchPublishingProfiles(),
+      ])
+      setAccounts(accountData.accounts || [])
+      setProfiles(profileData.profiles || [])
     } catch (e: any) {
-      setError(e?.message || '加载平台列表失败')
+      setError(e?.message || '加载渠道账号失败')
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    loadPlatforms()
-  }, [loadPlatforms])
+    loadAccounts()
+  }, [loadAccounts])
 
   useEffect(() => {
-    const refreshOnFocus = () => loadPlatforms()
-    const refreshOnVisible = () => {
-      if (document.visibilityState === 'visible') loadPlatforms()
-    }
+    const refreshOnFocus = () => loadAccounts()
     window.addEventListener('focus', refreshOnFocus)
-    document.addEventListener('visibilitychange', refreshOnVisible)
-    return () => {
-      window.removeEventListener('focus', refreshOnFocus)
-      document.removeEventListener('visibilitychange', refreshOnVisible)
-      if (loginPollRef.current !== null) {
-        window.clearInterval(loginPollRef.current)
+    return () => window.removeEventListener('focus', refreshOnFocus)
+  }, [loadAccounts])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        loadAccounts()
       }
-    }
-  }, [loadPlatforms])
+    }, 10000)
+    return () => window.clearInterval(timer)
+  }, [loadAccounts])
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type })
-    setTimeout(() => setToast(null), 4000)
+    window.setTimeout(() => setToast(null), 3500)
   }
 
-  const pollLoginUntilReady = useCallback((platformId: string) => {
-    if (loginPollRef.current !== null) {
-      window.clearInterval(loginPollRef.current)
-      loginPollRef.current = null
-    }
-
-    let attempts = 0
-    loginPollRef.current = window.setInterval(async () => {
-      attempts += 1
-      try {
-        const data = await fetchPlatforms()
-        const nextPlatforms = data.platforms || []
-        setPlatforms(nextPlatforms)
-        const target = nextPlatforms.find(p => p.id === platformId)
-        if (target?.session?.valid) {
-          if (loginPollRef.current !== null) {
-            window.clearInterval(loginPollRef.current)
-            loginPollRef.current = null
-          }
-          setLoggingInPlatform(null)
-          showToast(`${PLATFORM_CONFIG[platformId]?.label || platformId} login synced`, 'success')
-        }
-      } catch {
-        // Login opens an external browser window; transient failures are expected.
-      }
-
-      if (attempts >= 120) {
-        if (loginPollRef.current !== null) {
-          window.clearInterval(loginPollRef.current)
-          loginPollRef.current = null
-        }
-        setLoggingInPlatform(null)
-        loadPlatforms()
-      }
-    }, 5000)
-  }, [loadPlatforms])
-
-  const handleAddAccount = async (platformId: string, _method: string) => {
-    setLoggingInPlatform(platformId)
+  const startWechatSetup = async (accountId: string) => {
+    setLoggingInAccount(accountId)
+    setWechatSetup({
+      open: true,
+      accountId,
+      step: 'opening',
+      message: '正在打开微信，请稍等…',
+    })
     try {
-      const result = await triggerPlatformLogin(platformId)
-      if (result.ok) {
-        showToast(`已启动 ${PLATFORM_CONFIG[platformId]?.label || platformId} 登录流程，请在浏览器中完成登录`, 'success')
-        // Refresh after a delay to give login time
-        pollLoginUntilReady(platformId)
-      } else {
-        showToast(result.message || '启动登录失败', 'error')
-      }
+      const result = await openWechatDesktop()
+      setWechatSetup({
+        open: true,
+        accountId,
+        step: result.ok ? 'ready' : 'error',
+        message: result.user_prompt || result.message || (result.ok ? '微信已打开' : '微信打开失败'),
+      })
     } catch (e: any) {
-      showToast(e?.message || '启动登录失败，请重试', 'error')
+      setWechatSetup({
+        open: true,
+        accountId,
+        step: 'error',
+        message: e?.message || '打开微信失败，请确认电脑已安装并登录微信',
+      })
     } finally {
-      setLoggingInPlatform(null)
+      setLoggingInAccount(null)
     }
   }
 
-  const handleRelogin = async (platformId: string) => {
-    setLoggingInPlatform(platformId)
+  const handleWechatCapture = async () => {
+    if (!wechatSetup.accountId) return
+    setWechatSetup((prev) => ({
+      ...prev,
+      step: 'capturing',
+      message: '请在微信聊天输入框点击一次，15 秒内完成。',
+    }))
     try {
-      const result = await triggerPlatformLogin(platformId)
-      if (result.ok) {
-        showToast(`已启动重新登录流程，请在浏览器中完成`, 'success')
-        pollLoginUntilReady(platformId)
-      } else {
-        showToast(result.message || '重新登录失败', 'error')
-      }
+      const result = await captureWechatInputClick(15, wechatSetup.accountId)
+      setWechatSetup((prev) => ({
+        ...prev,
+        step: 'success',
+        message: result.message || '输入区已识别',
+      }))
+      showToast('微信输入区已识别', 'success')
+      await loadAccounts()
     } catch (e: any) {
-      showToast(e?.message || '重新登录失败', 'error')
+      setWechatSetup((prev) => ({
+        ...prev,
+        step: 'error',
+        message: e?.message || '未能识别微信输入区，请重试',
+      }))
+      showToast(e?.message || '未能识别微信输入区', 'error')
+    }
+  }
+
+  const createAccountAndStartLogin = async (platformId: string) => {
+    const platformAccounts = accounts.filter((item) => item.platform === platformId)
+    const cfg = PLATFORM_CONFIG[platformId]
+    const result = await createPlatformAccount({
+      platform: platformId,
+      label: `${cfg?.label || platformId}账号${platformAccounts.length + 1}`,
+    })
+    setAccounts((prev) => [...prev, result.account])
+    if (platformId === 'wechat_mp') {
+      showToast('微信账号已创建，请完成输入区识别', 'success')
+      await startWechatSetup(result.account.id)
+      return
+    }
+    showToast('账号已创建，请完成登录', 'success')
+    await handleLogin(result.account.id)
+  }
+
+  const handleCreateAccount = async () => {
+    try {
+      await createAccountAndStartLogin(addingPlatform)
+    } catch (e: any) {
+      showToast(e?.message || '创建账号失败', 'error')
+    }
+  }
+
+  const handleLogin = async (accountId: string) => {
+    const account = accounts.find((item) => item.id === accountId)
+    if (account?.platform === 'wechat_mp') {
+      await startWechatSetup(accountId)
+      return
+    }
+    setLoggingInAccount(accountId)
+    try {
+      const result = await loginPlatformAccount(accountId)
+      showToast(result.message || (result.ok ? '登录完成' : '登录未完成'), result.ok ? 'success' : 'error')
+      await loadAccounts()
+    } catch (e: any) {
+      showToast(e?.message || '启动登录失败', 'error')
     } finally {
-      setLoggingInPlatform(null)
+      setLoggingInAccount(null)
     }
   }
 
-  const handleDelete = async (platformId: string) => {
+  const handleSyncProfile = async (accountId: string) => {
+    setSyncingAccount(accountId)
     try {
-      await deletePlatformSession(platformId)
-      showToast(`已删除 ${PLATFORM_CONFIG[platformId]?.label || platformId} 登录态`, 'success')
-      loadPlatforms()
+      const result = await syncPlatformAccountProfile(accountId)
+      showToast(result.message || (result.ok ? '账号资料已刷新' : '账号资料刷新失败'), result.ok ? 'success' : 'error')
+      await loadAccounts()
     } catch (e: any) {
-      showToast(e?.message || '删除失败，请重试', 'error')
+      showToast(e?.message || '刷新账号资料失败', 'error')
+    } finally {
+      setSyncingAccount(null)
     }
   }
 
-  const hasConnected = platforms.some(p => p.session?.has_session)
+  const handleDeleteSession = async (accountId: string) => {
+    try {
+      await deletePlatformAccountSession(accountId)
+      setDeleteExpandedAccount(null)
+      showToast('账号已删除', 'success')
+      await loadAccounts()
+    } catch (e: any) {
+      showToast(e?.message || '删除账号失败', 'error')
+    }
+  }
 
-  // ── Loading state ──
+  const handleCreateProfile = async () => {
+    if (!profileName.trim() || profileAccountIds.length === 0) return
+    try {
+      await createPublishingProfile({ name: profileName.trim(), account_ids: profileAccountIds })
+      setProfileName('')
+      setProfileAccountIds([])
+      showToast('发布配置档案已保存', 'success')
+      await loadAccounts()
+    } catch (e: any) {
+      showToast(e?.message || '保存配置档案失败', 'error')
+    }
+  }
+
+  const handleDeleteProfile = async (profileId: string) => {
+    try {
+      await deletePublishingProfile(profileId)
+      showToast('发布配置档案已删除', 'success')
+      await loadAccounts()
+    } catch (e: any) {
+      showToast(e?.message || '删除配置档案失败', 'error')
+    }
+  }
+
+  const visibleAccounts = accounts.filter((item) => item.platform !== 'wechat_mp')
+  const visibleProfiles = profiles
+    .map((profile) => ({
+      ...profile,
+      account_ids: profile.account_ids.filter((id) => visibleAccounts.some((account) => account.id === id)),
+      accounts: (profile.accounts || []).filter((account) => account.platform !== 'wechat_mp'),
+    }))
+    .filter((profile) => profile.account_ids.length > 0)
+  const platformIds = Object.keys(CHANNEL_CAPABILITIES)
+  const totalConnected = visibleAccounts.filter((item) => item.status === 'connected' && item.session?.valid).length
+  const accountById = new Map(visibleAccounts.map((account) => [account.id, account]))
+  const grouped = platformIds.map((platformId) => ({
+    platformId,
+    accounts: visibleAccounts.filter((item) => item.platform === platformId),
+  }))
+
   if (loading) {
     return (
       <div className="p-8 max-w-7xl mx-auto">
         <div className="h-10 w-48 rounded-lg mb-8" style={{ background: 'rgba(255,255,255,0.03)' }} />
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {[1, 2, 3].map(i => (
-            <div
-              key={i}
-              className="rounded-card border p-5 h-40 animate-pulse"
-              style={{ background: 'rgba(255,255,255,0.02)', borderColor: '#1E293B' }}
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)' }} />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-24 rounded" style={{ background: 'rgba(255,255,255,0.05)' }} />
-                  <div className="h-3 w-32 rounded" style={{ background: 'rgba(255,255,255,0.03)' }} />
-                </div>
-              </div>
-            </div>
+            <div key={i} className="h-40 animate-pulse rounded-card border border-[#1E293B] bg-white/[0.02]" />
           ))}
         </div>
       </div>
     )
   }
 
-  // ── Error state ──
-  if (error && platforms.length === 0) {
-    return (
-      <div className="p-8 max-w-7xl mx-auto">
-        <Empty>
-          <EmptyHeader>
-            <AlertCircle className="w-12 h-12 text-[#EF4444]" />
-            <EmptyTitle>加载失败</EmptyTitle>
-            <EmptyDescription>{error}</EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <Button onClick={loadPlatforms}>
-              <RefreshCw className="w-4 h-4" /> 重新加载
-            </Button>
-          </EmptyContent>
-        </Empty>
-      </div>
-    )
-  }
-
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-      {/* Toast */}
       <AnimatePresence>
         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       </AnimatePresence>
 
-      {/* ── Header ── */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between mb-8"
-      >
+      <AnimatePresence>
+        {wechatSetup.open && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 10 }}
+              className="w-full max-w-lg rounded-xl border border-[#1E293B] bg-[#0D1422] shadow-2xl shadow-black/40"
+            >
+              <div className="flex items-center justify-between border-b border-[#1E293B] px-5 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#07C160]/15 text-[#07C160]">
+                    <MessageCircle className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="font-medium text-[#F8FAFC]">添加微信</div>
+                    <div className="mt-0.5 text-xs text-[#64748B]">仅识别输入区位置，不写入、不发送消息</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setWechatSetup((prev) => ({ ...prev, open: false }))}
+                  className="rounded-lg p-1.5 text-[#64748B] transition-colors hover:bg-white/5 hover:text-[#F8FAFC]"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-4 px-5 py-5">
+                <div className="rounded-lg border border-[#1E293B] bg-[#020617] p-4">
+                  <div className="flex items-start gap-3">
+                    <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                      wechatSetup.step === 'success'
+                        ? 'bg-[#10B981]/15 text-[#10B981]'
+                        : wechatSetup.step === 'error'
+                          ? 'bg-[#EF4444]/15 text-[#FCA5A5]'
+                          : 'bg-[#6366F1]/15 text-[#A5B4FC]'
+                    }`}>
+                      {wechatSetup.step === 'capturing' || wechatSetup.step === 'opening'
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : wechatSetup.step === 'success'
+                          ? <CheckCircle2 className="h-4 w-4" />
+                          : wechatSetup.step === 'error'
+                            ? <AlertCircle className="h-4 w-4" />
+                            : <MousePointerClick className="h-4 w-4" />
+                      }
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-[#F8FAFC]">
+                        {wechatSetup.step === 'opening' && '正在打开微信'}
+                        {wechatSetup.step === 'ready' && '微信已就绪'}
+                        {wechatSetup.step === 'capturing' && '等待你点击输入框'}
+                        {wechatSetup.step === 'success' && '输入区已识别'}
+                        {wechatSetup.step === 'error' && '需要重试'}
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-[#CBD5E1]">{wechatSetup.message}</div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              <div className="flex items-center justify-end gap-2 border-t border-[#1E293B] px-5 py-4">
+                <Button variant="outline" onClick={() => setWechatSetup((prev) => ({ ...prev, open: false }))}>
+                  {wechatSetup.step === 'success' ? '完成' : '稍后处理'}
+                </Button>
+                {(wechatSetup.step === 'ready' || wechatSetup.step === 'error') && (
+                  <Button variant="outline" onClick={() => wechatSetup.accountId && startWechatSetup(wechatSetup.accountId)}>
+                    <RefreshCw className="h-4 w-4" /> 重新打开微信
+                  </Button>
+                )}
+                {(wechatSetup.step === 'ready' || wechatSetup.step === 'error') && (
+                  <Button onClick={handleWechatCapture}>
+                    <MousePointerClick className="h-4 w-4" /> 开始识别输入区
+                  </Button>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 flex flex-col gap-4 rounded-md border border-[#1E293B] bg-[#0D1422] p-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-[22px] font-semibold text-[#F1F5F9]">平台账号管理</h1>
-          <p className="text-sm text-[#64748B] mt-1">
-            管理已连接的社会化媒体账号
-            {hasConnected && <span className="text-[#10B981]"> · {platforms.filter(p => p.session?.valid).length} 个在线</span>}
+          <p className="text-sm text-[#94A3B8]">
+            管理各平台账号、登录态和发布配置档案
+            <span className="text-[#10B981]"> · {totalConnected} 个在线</span>
+            <span className="text-[#64748B]"> · 全部账号 {visibleAccounts.length}/50</span>
           </p>
         </div>
-        <Button onClick={() => setShowAddModal(true)}>
-          <Plus className="w-4 h-4" /> 添加账号
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={addingPlatform}
+            onChange={(event) => setAddingPlatform(event.target.value)}
+            className="h-10 rounded-lg border border-[#334155] bg-[#020617] px-3 text-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+          >
+            {platformIds.map((id) => (
+              <option key={id} value={id}>{PLATFORM_CONFIG[id]?.label || id}</option>
+            ))}
+          </select>
+          <Button onClick={handleCreateAccount}>
+            <Plus className="w-4 h-4" /> 添加账号
+          </Button>
+        </div>
       </motion.div>
 
-      {/* ── Empty state ── */}
-      {!hasConnected && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
-        >
-          <Empty>
-            <EmptyHeader>
-              <div className="relative mb-2">
-                <div
-                  className="absolute inset-0 rounded-2xl blur-2xl opacity-40"
-                  style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.5) 0%, transparent 70%)' }}
-                />
-                <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-[#6366F1] to-[#8B5CF6] flex items-center justify-center">
-                  <KeyRound className="w-8 h-8 text-white" />
+      {error && (
+        <div className="mb-5 flex items-start gap-3 rounded-md border border-[#7F1D1D] bg-[#450A0A]/35 px-4 py-3 text-sm text-[#FCA5A5]">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="font-medium text-[#FEE2E2]">渠道账号暂不可用</div>
+            <div className="mt-1 text-xs leading-5 text-[#FCA5A5]">{error}</div>
+          </div>
+          <Button variant="outline" size="sm" onClick={loadAccounts}>
+            <RefreshCw className="w-4 h-4" /> 重试
+          </Button>
+        </div>
+      )}
+
+      <section className="mb-6 grid gap-3 md:grid-cols-3">
+        <div className="rounded-md border border-[#1E293B] bg-[#0D1422] px-4 py-3">
+          <div className="text-xs text-[#64748B]">全部账号</div>
+          <div className="mt-1 text-2xl font-semibold text-[#F8FAFC]">{visibleAccounts.length}/50</div>
+        </div>
+        <div className="rounded-md border border-[#1E293B] bg-[#0D1422] px-4 py-3">
+          <div className="text-xs text-[#64748B]">在线账号</div>
+          <div className="mt-1 text-2xl font-semibold text-[#22C55E]">{totalConnected}</div>
+        </div>
+        <div className="rounded-md border border-[#1E293B] bg-[#0D1422] px-4 py-3">
+          <div className="text-xs text-[#64748B]">发布配置档案</div>
+          <div className="mt-1 text-2xl font-semibold text-[#A78BFA]">{visibleProfiles.length}</div>
+        </div>
+      </section>
+
+      <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-5">
+        {grouped.map(({ platformId, accounts: platformAccounts }) => {
+          const cfg = PLATFORM_CONFIG[platformId] || PLATFORM_CONFIG.douyin
+          const Icon = cfg.icon
+          const connected = platformAccounts.filter((item) => item.status === 'connected' && (platformId === 'tencent' || platformId === 'weibo' || item.session?.valid)).length
+          return (
+            <section key={platformId} className="rounded-md border border-[#1E293B] bg-[#0D1422]">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1E293B] px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: cfg.bg, color: cfg.color }}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="font-medium text-[#F8FAFC]">{cfg.label}</div>
+                    <div className="text-xs text-[#64748B]">
+                        {platformId === 'tencent' || platformId === 'weibo'
+                          ? platformAccounts.length > 0
+                            ? `${connected}/${platformAccounts.length} 在线 · 桌面辅助`
+                            : `还未添加${cfg.label}`
+                          : `${connected}/${platformAccounts.length || 10} 可用 · 单平台最多10个账号`}
+                    </div>
+                  </div>
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    setAddingPlatform(platformId)
+                    try {
+                      await createAccountAndStartLogin(platformId)
+                    } catch (e: any) {
+                      showToast(e?.message || '创建账号失败', 'error')
+                    }
+                  }}
+                >
+                  <Plus className="h-4 w-4" /> 添加
+                </Button>
               </div>
-              <EmptyTitle>暂无平台账号</EmptyTitle>
-              <EmptyDescription>点击上方按钮添加第一个社交媒体账号</EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <Button onClick={() => setShowAddModal(true)} size="lg">
-                <Plus className="w-4 h-4" /> 添加账号
+              <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
+                {platformAccounts.length === 0 ? (
+                  <div className="col-span-full rounded-lg border border-dashed border-[#334155] bg-[#020617] px-4 py-6 text-center text-sm text-[#64748B]">
+                    暂无账号，添加后即可在素材管理与发布中选择。
+                  </div>
+                ) : platformAccounts.map((account) => {
+                  const online = account.status === 'connected' && (account.platform === 'tencent' || account.platform === 'weibo' || Boolean(account.session?.valid))
+                  const displayName = account.nickname || account.label || account.id
+                  const metricItems = account.platform === 'weibo'
+                    ? [
+                        { label: '粉丝', value: account.followers },
+                        { label: '关注', value: account.following },
+                        { label: '微博', value: account.works_count },
+                      ]
+                    : [
+                        { label: '粉丝', value: account.followers },
+                        { label: '作品', value: account.works_count },
+                        { label: '获赞', value: account.likes_count },
+                      ]
+                  return (
+                    <div key={account.id} className={`relative rounded-lg border p-4 ${online ? 'border-[#10B981]/40 bg-[#10B981]/5' : 'border-[#334155] bg-[#020617]'}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          {account.avatar_url ? (
+                            <img src={accountAvatarUrl(account)} alt={displayName} className="h-10 w-10 shrink-0 rounded-full border border-[#334155] object-cover" />
+                          ) : (
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#334155] bg-[#111827] text-sm font-semibold text-[#94A3B8]">
+                              {displayName.slice(0, 1)}
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <div className="truncate font-medium text-[#F8FAFC]">{displayName}</div>
+                            <div className="mt-1 text-xs text-[#64748B]">{account.label && account.label !== displayName ? account.label : (account.is_default ? '默认账号' : account.id)}</div>
+                          </div>
+                        </div>
+                        <Badge variant={online ? 'success' : account.session?.has_session ? 'warning' : 'muted'}>
+                          {online ? '在线' : account.session?.has_session ? '需重登' : '未登录'}
+                        </Badge>
+                      </div>
+                      <div className="mt-4 grid grid-cols-4 gap-2 rounded-lg border border-[#1E293B] bg-[#0B1120] px-3 py-2 text-xs text-[#94A3B8]">
+                        {metricItems.map((item) => (
+                          <div key={item.label}>
+                            <div className="text-[#64748B]">{item.label}</div>
+                            <div className="mt-0.5 text-[#E2E8F0]">{fmtNumber(item.value)}</div>
+                          </div>
+                        ))}
+                        <div>
+                          <div className="text-[#64748B]">同步</div>
+                          <div className="mt-0.5 truncate text-[#E2E8F0]" title={fmtDateTime(account.last_profile_sync_at)}>
+                            {fmtRelativeTimeShort(account.last_profile_sync_at)}
+                          </div>
+                        </div>
+                      </div>
+                      {account.sync_status === 'failed' && account.sync_message && (
+                        <div className="mt-3 rounded-md border border-[#F59E0B]/30 bg-[#F59E0B]/10 px-3 py-2 text-xs leading-5 text-[#FCD34D]">
+                          {account.sync_message}
+                        </div>
+                      )}
+                      <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-[#94A3B8]">
+                        <div>
+                          <div className="text-[#64748B]">最近登录</div>
+                          <div>{fmtDateTime(account.last_login_at || account.session?.saved_at)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[#64748B]">最近发布</div>
+                          <div>{fmtDateTime(account.last_publish_at)}</div>
+                        </div>
+                      </div>
+                      <div className="mt-4 flex items-center gap-2">
+                        <div className="flex flex-wrap gap-2">
+                          <Button size="sm" onClick={() => handleLogin(account.id)} disabled={loggingInAccount === account.id}>
+                            {loggingInAccount === account.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
+                            {account.platform === 'tencent' ? '打开助手' : online ? '重新登录' : '登录'}
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => handleSyncProfile(account.id)} disabled={!online || syncingAccount === account.id}>
+                            {syncingAccount === account.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                            刷新资料
+                          </Button>
+                        </div>
+                        <div className="relative ml-auto">
+                          <button
+                            type="button"
+                            onClick={() => setDeleteExpandedAccount((current) => current === account.id ? null : account.id)}
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors ${
+                              deleteExpandedAccount === account.id
+                                ? 'border-[#EF4444]/50 bg-[#EF4444]/15 text-[#FCA5A5]'
+                                : 'border-[#334155] bg-[#0B1120] text-[#64748B] hover:border-[#EF4444]/40 hover:text-[#FCA5A5]'
+                            }`}
+                            title="展开删除账号"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                          {deleteExpandedAccount === account.id && (
+                            <div className="absolute right-0 top-11 z-30 w-64 rounded-lg border border-[#334155] bg-[#020617] p-2 shadow-2xl shadow-black/40">
+                              <div className="px-2 pb-2 text-xs leading-5 text-[#94A3B8]">
+                                删除本地账号槽位、登录态、Cookie 和已同步资料。
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSession(account.id)}
+                                className="flex w-full items-center justify-center gap-1.5 rounded-md bg-[#DC2626] px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-[#B91C1C]"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                删除账号
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          )
+        })}
+      </motion.div>
+
+      <section className="mt-6 rounded-md border border-[#1E293B] bg-[#0D1422]">
+        <div className="border-b border-[#1E293B] px-4 py-3">
+          <div className="font-medium text-[#F8FAFC]">发布配置档案</div>
+          <div className="mt-1 text-xs text-[#64748B]">把常用账号保存为一组，发布时一键选择。</div>
+        </div>
+        <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="rounded-lg border border-[#1E293B] bg-[#020617] p-4">
+            <div className="mb-3 text-sm font-medium text-[#E2E8F0]">新建档案</div>
+            <input
+              value={profileName}
+              onChange={(event) => setProfileName(event.target.value)}
+              placeholder="例如：品牌A全渠道"
+              className="mb-3 h-10 w-full rounded-lg border border-[#334155] bg-[#0B1120] px-3 text-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+            />
+            <div className="grid max-h-[260px] gap-2 overflow-y-auto md:grid-cols-2">
+              {visibleAccounts.length === 0 ? (
+                <div className="text-sm text-[#64748B]">暂无账号可加入档案。</div>
+              ) : visibleAccounts.map((account) => {
+                const checked = profileAccountIds.includes(account.id)
+                const profileAccountName = account.nickname?.trim() || '未同步昵称'
+                return (
+                  <button
+                    key={account.id}
+                    type="button"
+                    onClick={() => setProfileAccountIds((prev) => checked ? prev.filter((id) => id !== account.id) : [...prev, account.id])}
+                    className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${checked ? 'border-[#6366F1] bg-[#6366F1]/15' : 'border-[#334155] hover:bg-[#111827]'}`}
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm text-[#F8FAFC]">{profileAccountName}</div>
+                      <div className="text-xs text-[#64748B]">{PLATFORM_CONFIG[account.platform]?.label || account.platform}</div>
+                    </div>
+                    {checked && <CheckCircle2 className="h-4 w-4 shrink-0 text-[#6366F1]" />}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="mt-4 flex justify-end">
+              <Button onClick={handleCreateProfile} disabled={!profileName.trim() || profileAccountIds.length === 0}>
+                保存档案
               </Button>
-            </EmptyContent>
-          </Empty>
-        </motion.div>
-      )}
+            </div>
+          </div>
+          <div className="space-y-2">
+            {visibleProfiles.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-[#334155] bg-[#020617] p-6 text-center text-sm text-[#64748B]">
+                暂无发布配置档案
+              </div>
+            ) : visibleProfiles.map((profile) => {
+              const expanded = expandedProfileId === profile.id
+              const profileAccounts = profile.account_ids
+                .map((accountId) => accountById.get(accountId))
+                .filter(Boolean) as ChannelAccount[]
+              const onlineCount = profileAccounts.filter((account) => account.status === 'connected' && account.session?.valid).length
+              return (
+                <div
+                  key={profile.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setExpandedProfileId((current) => current === profile.id ? null : profile.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      setExpandedProfileId((current) => current === profile.id ? null : profile.id)
+                    }
+                  }}
+                  className={`w-full rounded-lg border bg-[#020617] p-3 text-left transition-all ${
+                    expanded
+                      ? 'border-[#6366F1]/60 shadow-lg shadow-[#6366F1]/10'
+                      : 'border-[#1E293B] hover:border-[#6366F1]/35 hover:bg-[#0B1120]'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-[#F8FAFC]">{profile.name}</div>
+                      <div className="mt-1 text-xs text-[#64748B]">
+                        {profile.account_ids.length} 个账号 · {onlineCount} 个在线 · {fmtDateTime(profile.updated_at)}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <span className="rounded-md border border-[#334155] bg-[#0B1120] px-2 py-1 text-[11px] text-[#94A3B8]">
+                        {expanded ? '收起' : '详情'}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          handleDeleteProfile(profile.id)
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
 
-      {/* ── Account card grid ── */}
-      {hasConnected && (
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
-        >
-          <AnimatePresence mode="popLayout">
-            {platforms.map(p => (
-              <AccountCard
-                key={p.id}
-                platform={p}
-                onRelogin={handleRelogin}
-                onDelete={handleDelete}
-                isLoggingIn={loggingInPlatform === p.id}
-              />
-            ))}
-          </AnimatePresence>
-        </motion.div>
-      )}
-
-      {/* ── Add account modal ── */}
-      <AddModal
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onAdd={handleAddAccount}
-        loadingPlatform={loggingInPlatform}
-      />
+                  {expanded && (
+                    <div className="mt-3 space-y-2 border-t border-[#1E293B] pt-3">
+                      <div className="rounded-lg border border-[#1E293B] bg-[#0B1120] px-3 py-2 text-xs leading-5 text-[#94A3B8]">
+                        发布时选择这个档案，会自动带上下面这些账号。
+                      </div>
+                      {profileAccounts.length === 0 ? (
+                        <div className="rounded-lg border border-dashed border-[#334155] bg-[#020617] px-3 py-3 text-xs text-[#64748B]">
+                          这组里的账号已经被移除，可以重新创建一个新的档案。
+                        </div>
+                      ) : profileAccounts.map((account) => {
+                        const displayName = account.nickname?.trim() || account.label || account.id
+                        const platformLabel = PLATFORM_CONFIG[account.platform]?.label || account.platform
+                        const online = account.status === 'connected' && Boolean(account.session?.valid)
+                        return (
+                          <div key={account.id} className="flex items-center justify-between gap-3 rounded-lg border border-[#1E293B] bg-[#020617] px-3 py-2">
+                            <div className="flex min-w-0 items-center gap-2">
+                              {account.avatar_url ? (
+                                <img src={accountAvatarUrl(account)} alt={displayName} className="h-7 w-7 shrink-0 rounded-full border border-[#334155] object-cover" />
+                              ) : (
+                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#334155] bg-[#111827] text-xs font-semibold text-[#94A3B8]">
+                                  {displayName.slice(0, 1)}
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <div className="truncate text-sm text-[#F8FAFC]">{displayName}</div>
+                                <div className="text-xs text-[#64748B]">{platformLabel}</div>
+                              </div>
+                            </div>
+                            <Badge variant={online ? 'success' : account.session?.has_session ? 'warning' : 'muted'}>
+                              {online ? '在线' : account.session?.has_session ? '需重登' : '未登录'}
+                            </Badge>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </section>
     </div>
   )
 }

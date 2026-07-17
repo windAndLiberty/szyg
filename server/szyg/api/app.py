@@ -113,6 +113,20 @@ def create_app() -> FastAPI:
         logger.warning(f"Skipped video_endpoint: {e}")
 
     try:
+        from szyg.api.content_copy_routes import router as content_copy_router
+        app.include_router(content_copy_router)
+        logger.info("Content copy routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped content_copy_routes: {e}")
+
+    try:
+        from szyg.api.content_graphic_routes import router as content_graphic_router
+        app.include_router(content_graphic_router)
+        logger.info("Content graphic routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped content_graphic_routes: {e}")
+
+    try:
         from szyg.api.tts_routes import router as tts_router
         app.include_router(tts_router)
         logger.info("TTS routes loaded")
@@ -169,6 +183,14 @@ def create_app() -> FastAPI:
     except Exception as e:
         logger.warning(f"Skipped sau_routes: {e}")
 
+    # Platform Accounts — account-level channel publishing
+    try:
+        from szyg.api.platform_account_routes import router as platform_account_router
+        app.include_router(platform_account_router)
+        logger.info("Platform account routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped platform_account_routes: {e}")
+
     # Execution Kernel — observable automation run state
     try:
         from szyg.api.execution_routes import router as execution_router
@@ -176,6 +198,38 @@ def create_app() -> FastAPI:
         logger.info("Execution routes loaded")
     except Exception as e:
         logger.warning(f"Skipped execution_routes: {e}")
+
+    # Computer Use — controlled Windows desktop automation
+    try:
+        from szyg.api.computer_use_routes import router as computer_use_router
+        app.include_router(computer_use_router)
+        logger.info("Computer-use routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped computer_use_routes: {e}")
+
+    # WeChat desktop — read-only local client detection
+    try:
+        from szyg.api.wechat_desktop_routes import router as wechat_desktop_router
+        app.include_router(wechat_desktop_router)
+        logger.info("WeChat desktop routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped wechat_desktop_routes: {e}")
+
+    # Private domain — AI sales workspace
+    try:
+        from szyg.api.private_domain_routes import router as private_domain_router
+        app.include_router(private_domain_router)
+        logger.info("Private domain routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped private_domain_routes: {e}")
+
+    # Local small model — bundled llama.cpp runtime
+    try:
+        from szyg.api.local_llm_routes import router as local_llm_router
+        app.include_router(local_llm_router)
+        logger.info("Local LLM routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped local_llm_routes: {e}")
 
     # Media storage — Windows user folders for generated assets
     try:

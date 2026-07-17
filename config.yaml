@@ -15,6 +15,17 @@ llm:
   default_backend: volcengine
 
   # ------------------------------------------------------------------
+  # 本地小模型 — szyg 内置 llama.cpp 运行时
+  # 用于摘要、分类、改写、评论初稿等低风险小任务；主力对话仍走 API 模型。
+  local_llama:
+    enabled: true
+    base_url: "http://127.0.0.1:11435/v1"
+    default_model: "qwen3-4b"
+    optional_model: "qwen3-8b"
+    auto_start: true
+    task_timeout_seconds: 30
+
+  # ------------------------------------------------------------------
   # Ollama — 本地 LLM (免费, 需安装 ollama)
   # 安装: curl -fsSL https://ollama.ai/install.sh | sh
   ollama:
@@ -39,6 +50,9 @@ llm:
   volcengine:
     enabled: true
     api_key: "${VOLCENGINE_API_KEY:-}"
+    # OpenSpeech 大模型语音合成 API Key，用于 seed-audio-1.0。
+    # 新版控制台获取后设置 VOLCENGINE_SPEECH_API_KEY。
+    speech_api_key: "${VOLCENGINE_SPEECH_API_KEY:}"
     base_url: "https://ark.cn-beijing.volces.com/api/v3"
     timeout: 120
     max_retries: 3
@@ -62,6 +76,7 @@ llm:
       # ═══════════════════════════════════════════════════════════════
       doubao-pro-128k: "doubao-seed-2-0-pro-260215"
       doubao-lite: "doubao-seed-2-0-lite-260428"
+      doubao-seed-1-6-lite-251015: "doubao-seed-1-6-lite-251015"
       deepseek-r1: "deepseek-v4-flash-260425"
       deepseek-v3: "deepseek-v4-flash-260425"
       # Smart Router 兜底 (自动路由, 但会覆盖模型选择, 暂时禁用)
@@ -72,6 +87,8 @@ llm:
       flux: ""
       # 视频模型 — doubao-seedance 视频生成接入点 (实测可用)
       doubao-video: "ep-20260619184527-7b9h2"
+      doubao-seedance-1-5-pro-251215: "doubao-seedance-1-5-pro-251215"
+      doubao-seedance-2.0: "ep-20260711112636-kvsr7"
       seaweed: ""
       # 语音模型 — 需到方舟控制台创建推理接入点
       # 可用的模型ID: (需创建endpoint后才能用)
@@ -129,6 +146,69 @@ video:
   threads: 4                                  # 编码线程数
   output_dir: "./data/output"                 # 输出目录
   templates_dir: "./data/ffmpeg_templates"    # 模板目录
+  generation:
+    # 开发阶段默认使用 Doubao-Seedance 2.0。
+    # 后续拿到 Seedance 2.5 的真实 endpoint 后，改这里即可切换默认调用模型。
+    default_model: "doubao-seedance-2.0"
+    compose_default_model: "doubao-seedance-1.5-pro"
+    compose_vision_model: "doubao-seed-2-0-pro-260215"
+    compose_planner_model: "doubao-seed-2-0-pro-260215"
+    storyboard_remote_model: "doubao-seed-2-0-lite-260428"
+    prompt_optimize_model: "doubao-seed-2-0-lite-260428"
+    defaults:
+      duration: 15
+      size: "720p"
+      ratio: "9:16"
+      native_audio: false
+      count: 1
+    models:
+      doubao-seedance-1.5-pro:
+        provider_model: "doubao-seedance-1-5-pro-251215"
+        label: "Doubao-Seedance 1.5"
+        sizes: ["720p", "1080p"]
+        min_duration: 4
+        max_duration: 12
+        native_audio: true
+      doubao-seedance-2.0-fast:
+        provider_model: "doubao-seedance-2.0-fast"
+        label: "Doubao-Seedance 2.0 Fast"
+        sizes: ["720p"]
+        min_duration: 4
+        max_duration: 15
+        native_audio: true
+      doubao-seedance-2.0:
+        provider_model: "doubao-seedance-2.0"
+        label: "Doubao-Seedance 2.0"
+        sizes: ["720p", "1080p"]
+        min_duration: 4
+        max_duration: 15
+        native_audio: true
+      doubao-seedance-2.5:
+        # 未开通时保持为空；配置为真实 ep-xxxx 后即可启用原生 4K/30s 档位。
+        provider_model: "doubao-seedance-2.5"
+        label: "Doubao-Seedance 2.5"
+        sizes: ["720p", "1080p", "4K"]
+        min_duration: 3
+        max_duration: 30
+        native_audio: true
+
+# =============================================================================
+# 内容生成
+# =============================================================================
+content:
+  graphic:
+    multimodal_model: "ep-20260714133840-lckqb"
+
+# =============================================================================
+# 内容发布
+# =============================================================================
+publishing:
+  title_model: "doubao-seed-2-0-lite-260428"
+  title_limits:
+    douyin:
+      note: 20
+    xhs:
+      note: 20
 
 # =============================================================================
 # 知识库 & Memory
@@ -197,6 +277,21 @@ platforms:
     viewport_width: 1536
     viewport_height: 864
     stealth_enabled: true                         # 注入 stealth.min.js
+
+  # 真实桌面浏览器接管配置
+  # 用于视频号、公众号后台等容易拒绝托管浏览器的业务页面。
+  desktop_browser:
+    browser: "msedge"
+    executable_path: ""                           # 留空自动查找 Edge
+    profile_root: "./data/browser_profiles"
+    remote_debugging_port: 9223
+    no_proxy: true
+    profiles:
+      tencent_channels_edge:
+        browser: "msedge"
+        profile_dir: "./data/browser_profiles/tencent_channels_edge"
+        remote_debugging_port: 9223
+        no_proxy: true
 
   # 抖音创作服务平台
   douyin:

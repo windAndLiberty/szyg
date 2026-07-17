@@ -1,4 +1,4 @@
-import { generateImage, getErrorMessage } from '@/lib/api'
+import { generateImage, getErrorMessage, recordGenerationHistory } from '@/lib/api'
 import { resolveGeneratedAssetUrl } from '@/lib/generatedAssets'
 
 export const CONTENT_DRAFT_KEY = 'szyg.contentPublish.latestDraft'
@@ -7,6 +7,8 @@ const IMAGE_STATE_KEY = 'szyg.contentProduction.imageState'
 export interface GeneratedImageAsset {
   url: string
   path: string
+  adopted?: boolean
+  material_id?: string
 }
 
 export interface ContentDraft {
@@ -88,7 +90,7 @@ function persistImageDraft(prompt: string, assets: GeneratedImageAsset[]) {
     prompt,
     title: 'AI生成图文草稿',
     note: prompt,
-    tags: ['AI生成', '内容生产'],
+    tags: ['AI生成', '内容生成'],
     assets,
     createdAt: new Date().toISOString(),
   }
@@ -133,14 +135,35 @@ export async function startImageDraftGeneration(opts: {
       url: resolveGeneratedAssetUrl(url, res.paths?.[index] || ''),
       path: res.paths?.[index] || url,
     }))
-    persistImageDraft(prompt, assets)
+    const recordedAssets = await Promise.all(assets.map(async (asset, index) => {
+      try {
+        const recorded = await recordGenerationHistory({
+          type: 'image',
+          path: asset.path,
+          url: asset.url,
+          title: `AI生成图片 ${index + 1}`,
+          prompt,
+          summary: opts.style && opts.style !== 'none' ? `风格：${opts.style}` : '',
+          meta: { style: opts.style, size: opts.size, count },
+        })
+        return {
+          ...asset,
+          adopted: recorded.item.adopted,
+          material_id: recorded.item.material_id,
+        }
+      } catch {
+        return asset
+      }
+    }))
+    persistImageDraft(prompt, recordedAssets)
+    window.dispatchEvent(new CustomEvent('szyg:generation-history-updated', { detail: { type: 'image' } }))
     state = {
       loading: false,
       prompt,
       style: opts.style,
       size: opts.size,
       count,
-      results: assets,
+      results: recordedAssets,
       error: null,
     }
     persistState()
@@ -161,6 +184,28 @@ export function removeGeneratedImageAsset(asset: GeneratedImageAsset): void {
   state = {
     ...state,
     results: state.results.filter((item) => (item.path || item.url) !== target),
+  }
+  persistState()
+  persistImageDraft(state.prompt, state.results)
+  emit()
+}
+
+export function markGeneratedImageAssetAdopted(asset: GeneratedImageAsset, materialId = ''): void {
+  const target = asset.path || asset.url
+  state = {
+    ...state,
+    results: state.results.map((item) => ((item.path || item.url) === target ? { ...item, adopted: true, material_id: materialId || item.material_id } : item)),
+  }
+  persistState()
+  persistImageDraft(state.prompt, state.results)
+  emit()
+}
+
+export function markGeneratedImageAssetUnadopted(asset: GeneratedImageAsset): void {
+  const target = asset.path || asset.url
+  state = {
+    ...state,
+    results: state.results.map((item) => ((item.path || item.url) === target ? { ...item, adopted: false, material_id: '' } : item)),
   }
   persistState()
   persistImageDraft(state.prompt, state.results)

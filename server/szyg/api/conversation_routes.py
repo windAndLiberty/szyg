@@ -5,7 +5,7 @@ Stores conversations as JSON files under data/conversations/.
 import json, logging, os, time, uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -16,6 +16,7 @@ router = APIRouter(prefix="/api/conversations", tags=["conversations"])
 from szyg.data_path import DATA_DIR
 CONV_DIR = DATA_DIR / "conversations"
 CONV_DIR.mkdir(parents=True, exist_ok=True)
+MAX_CONVERSATIONS = 50
 
 
 class ConversationMessage(BaseModel):
@@ -77,17 +78,31 @@ def _list_convs() -> list[dict]:
     return convs
 
 
-@router.get("")
-async def list_conversations(limit: int = 50):
-    """列出所有会话（置顶在前，其余按更新时间倒序）"""
-    convs = _list_convs()
-    convs.sort(
+def _sort_convs(convs: list[dict]) -> list[dict]:
+    return sorted(
+        convs,
         key=lambda c: (
             c.get("pinned", False),
             c.get("updated_at", ""),
         ),
         reverse=True,
     )
+
+
+def _prune_conversations(max_count: int = MAX_CONVERSATIONS):
+    convs = _sort_convs(_list_convs())
+    for conv in convs[max_count:]:
+        try:
+            _conv_path(conv["id"]).unlink(missing_ok=True)
+        except OSError as e:
+            logger.warning("Failed to prune old conversation %s: %s", conv.get("id"), e)
+
+
+@router.get("")
+async def list_conversations(limit: int = Query(default=MAX_CONVERSATIONS, ge=1, le=MAX_CONVERSATIONS)):
+    """列出所有会话（置顶在前，其余按更新时间倒序）"""
+    _prune_conversations()
+    convs = _sort_convs(_list_convs())
     return {"conversations": convs[:limit]}
 
 
@@ -116,6 +131,7 @@ async def create_conversation(body: ConversationCreate):
         "updated_at": now,
     }
     _save_conv(conv_id, data)
+    _prune_conversations()
     return data
 
 
@@ -135,6 +151,7 @@ async def update_conversation(conv_id: str, body: ConversationUpdate):
 
     conv["updated_at"] = datetime.now(timezone.utc).isoformat()
     _save_conv(conv_id, conv)
+    _prune_conversations()
     return conv
 
 

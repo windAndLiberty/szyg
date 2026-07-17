@@ -172,7 +172,9 @@ async def _is_douyin_login_completed(page: Page) -> bool:
 
 async def _wait_for_douyin_login(page: Page, account_file: str, qrcode_info: dict, qrcode_callback=None, poll_interval: int = 3, max_checks: int = 100) -> dict:
     qrcode_path = Path(qrcode_info["image_path"]) if qrcode_info.get("image_path") else None
-    for _ in range(max_checks):
+    original_url = page.url
+    saw_2fa = False
+    for i in range(max_checks):
         if await _is_douyin_login_completed(page):
             douyin_logger.info(_msg("🥳", f"扫码成功，已经跳转到登录后页面: {page.url}"))
             return _build_login_result(True, "success", "抖音扫码登录成功", account_file, qrcode_info, page.url)
@@ -187,7 +189,7 @@ async def _wait_for_douyin_login(page: Page, account_file: str, qrcode_info: dic
             await asyncio.sleep(poll_interval)
             continue
 
-        expired_box = page.get_by_text("二维码失效", exact=True).locator("..").first
+        expired_box = page.get_by_text("二维码失效", exact=True).locator("..").first()
         if await expired_box.count() and await expired_box.is_visible():
             douyin_logger.warning(_msg("😵", "二维码失效了，小人马上去刷新"))
             await expired_box.click()
@@ -305,15 +307,43 @@ class DouYinBaseUploader(BaseVideoUploader):
     async def fill_title_and_description(self, page: Page, title: str, description: str, tags: list[str] | None = None):
         # 2026-06 抖音发布页 DOM：标题=input[placeholder*=填写作品标题]，描述=div.zone-container[contenteditable]
         # version_2(post/video) 发布页要等视频上传完才渲染表单（实测约 40s），故等待超时给到 120s
-        title_input = page.locator('input[placeholder*="填写作品标题"]').first
-        await title_input.wait_for(state="visible", timeout=120000)
-        await title_input.fill(title[:30])
+        title_filled = False
+        title_selectors = [
+            'input[placeholder*="填写作品标题"]',
+            'input[placeholder*="作品标题"]',
+            'input[placeholder*="标题"]',
+            'textarea[placeholder*="标题"]',
+            '[contenteditable="true"][data-placeholder*="标题"]',
+            '[contenteditable="true"][placeholder*="标题"]',
+        ]
+        for selector in title_selectors:
+            locator = page.locator(selector).first
+            try:
+                await locator.wait_for(state="visible", timeout=8000)
+                if selector.startswith("input") or selector.startswith("textarea"):
+                    await locator.fill(title[:30])
+                else:
+                    await locator.click()
+                    await page.keyboard.press("Control+KeyA")
+                    await page.keyboard.press("Delete")
+                    await page.keyboard.type(title[:30])
+                title_filled = True
+                break
+            except Exception:
+                continue
+        if not title_filled:
+            debug_dir = Path("logs/douyin_debug")
+            debug_dir.mkdir(parents=True, exist_ok=True)
+            await page.screenshot(path=str(debug_dir / "title_input_not_found.png"), full_page=True)
+            raise RuntimeError("未找到抖音标题输入框，已保存调试截图 logs/douyin_debug/title_input_not_found.png")
 
         description_editor = page.locator('div.zone-container[contenteditable="true"]').first
         await description_editor.wait_for(state="visible", timeout=120000)
         await description_editor.click()
         await page.keyboard.press("Control+KeyA")
         await page.keyboard.press("Delete")
+        if description:
+            await page.keyboard.type(description[:1000])
 
         for tag in tags or []:
             await page.keyboard.type(" #" + tag)

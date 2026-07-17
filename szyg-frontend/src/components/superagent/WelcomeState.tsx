@@ -56,8 +56,7 @@ const WelcomeState: React.FC<WelcomeStateProps> = ({
           </div>
         </div>
         <div className="text-center">
-          <h1 className="text-display-md text-[#F1F5F9]">超级员工</h1>
-          <p className="text-body-md text-[#94A3B8] mt-1">智能体协同 · 一句话调度真实工具与生成</p>
+          <p className="text-body-md text-[#94A3B8]">智能体协同 · 一句话调度真实工具与生成</p>
         </div>
       </motion.div>
 

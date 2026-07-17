@@ -12,9 +12,26 @@ async def list_executions(
     limit: int = Query(100, ge=1, le=500),
     status: str = Query("", description="Optional execution status filter"),
     platform: str = Query("", description="Optional platform filter"),
+    task_type: str = Query("", description="Optional comma-separated task type filter"),
+    keyword: str = Query("", description="Optional keyword search"),
+    sort_by: str = Query("created_at", description="Sort field"),
+    sort_dir: str = Query("desc", description="Sort direction"),
+    include_archived: bool = Query(False, description="Include archived records"),
 ):
     kernel = get_execution_kernel()
-    return {"runs": kernel.list_runs(limit=limit, status=status, platform=platform)}
+    return {
+        "runs": kernel.list_runs(
+            limit=limit,
+            status=status,
+            platform=platform,
+            task_type=task_type,
+            keyword=keyword,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+            include_archived=include_archived,
+        ),
+        "archive": kernel.archive_stats(),
+    }
 
 
 @router.get("/{run_id}")
@@ -90,4 +107,3 @@ async def retry_execution(run_id: str):
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     return {"ok": True, "run": run}
-

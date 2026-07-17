@@ -212,11 +212,12 @@ HERMES_TOOLS = [
     # ═══════════════════════════════════════════════════════════════
     # AIGC — 火山引擎方舟 (Phase A)
     # ═══════════════════════════════════════════════════════════════
-    # AI图像生成
-    {"type":"function","function":{"name":"ai_image_generate","description":"使用AI生成图像(火山引擎豆包·文生图/SDXL/FLUX)","parameters":{"type":"object","properties":{"prompt":{"type":"string","description":"图像描述，支持中文"},"style":{"type":"string","enum":["realistic","anime","cyberpunk","oil","ink","minimal","3d","pixel"],"description":"风格标签"},"size":{"type":"string","default":"1920x1920","description":"分辨率。预设:1920x1920/2560x1440(16:9)/1440x2560(9:16)/2048x2048/2304x1728(4:3)/3072x1296(21:9)。也可自定义如 2400x1800，需≥368万像素"},"model":{"type":"string","enum":["doubao-image","sdxl","flux"],"default":"doubao-image","description":"模型"}},"required":["prompt"]}}},
+    # 内容生成工具
+    {"type":"function","function":{"name":"content_copy_generate","description":"内容生成工具：生成营销文案、朋友圈文案、小红书文案、抖音标题、评论回复或私信话术。不会向用户暴露底层模型。","parameters":{"type":"object","properties":{"prompt":{"type":"string","description":"文案需求"},"copy_type":{"type":"string","default":"未定义类型","description":"文案类型，如 小红书文案/抖音标题/朋友圈文案/企业宣传/评论区回复/私信话术"},"count":{"type":"integer","default":3,"description":"生成条数，1-10"},"min_words":{"type":"integer","default":80,"description":"每条最低字数"},"max_words":{"type":"integer","default":160,"description":"每条最高字数"}},"required":["prompt"]}}},
+    {"type":"function","function":{"name":"ai_image_generate","description":"内容生成工具：生成图像(火山引擎豆包·文生图/SDXL/FLUX)","parameters":{"type":"object","properties":{"prompt":{"type":"string","description":"图像描述，支持中文"},"style":{"type":"string","enum":["realistic","anime","cyberpunk","oil","ink","minimal","3d","pixel"],"description":"风格标签"},"size":{"type":"string","default":"1920x1920","description":"分辨率。预设:1920x1920/2560x1440(16:9)/1440x2560(9:16)/2048x2048/2304x1728(4:3)/3072x1296(21:9)。也可自定义如 2400x1800，需≥368万像素"},"model":{"type":"string","enum":["doubao-image","sdxl","flux"],"default":"doubao-image","description":"模型"}},"required":["prompt"]}}},
     {"type":"function","function":{"name":"ai_image_styles","description":"列出可用的AI图像生成风格","parameters":{"type":"object","properties":{}}}},
     # AI视频生成
-    {"type":"function","function":{"name":"ai_video_create","description":"使用AI生成视频(火山引擎豆包·视频生成/Seaweed)。注意：视频生成是异步任务，提交后返回task_id，需要轮询查询完成状态","parameters":{"type":"object","properties":{"prompt":{"type":"string","description":"视频内容描述"},"image_url":{"type":"string","description":"参考图片路径或URL(图生视频时)"},"duration":{"type":"integer","default":5,"description":"时长秒数"},"style":{"type":"string","enum":["realistic","anime","cinematic"],"description":"视频风格"},"model":{"type":"string","enum":["doubao-video","seaweed"],"default":"doubao-video","description":"模型"}},"required":["prompt"]}}},
+    {"type":"function","function":{"name":"ai_video_create","description":"内容生成工具：生成视频。注意：视频生成是异步任务，提交后返回task_id，需要轮询查询完成状态","parameters":{"type":"object","properties":{"prompt":{"type":"string","description":"视频内容描述"},"image_url":{"type":"string","description":"参考图片路径或URL(图生视频时)"},"duration":{"type":"integer","default":6,"description":"时长秒数"},"size":{"type":"string","default":"720p","description":"分辨率，如720p/1080p/4K"},"ratio":{"type":"string","default":"9:16","enum":["9:16","16:9","1:1"],"description":"视频比例"},"native_audio":{"type":"boolean","default":False,"description":"是否生成原生声音"},"model":{"type":"string","enum":["doubao-video","doubao-seedance-2.0-fast","doubao-seedance-2.0","doubao-seedance-2.5"],"default":"doubao-video","description":"模式"}},"required":["prompt"]}}},
     {"type":"function","function":{"name":"ai_video_task_status","description":"查询AI视频生成任务状态","parameters":{"type":"object","properties":{"task_id":{"type":"string","description":"任务ID"}},"required":["task_id"]}}},
     # AI语音合成
     {"type":"function","function":{"name":"ai_tts_advanced","description":"使用AI情感语音合成(火山引擎豆包·语音合成)，支持情感表达和语速音调调节","parameters":{"type":"object","properties":{"text":{"type":"string","description":"要合成的文本"},"voice_id":{"type":"string","default":"zh_female_xiaoyi","description":"声音ID"},"emotion":{"type":"string","enum":["neutral","happy","sad","excited","calm","angry"],"default":"neutral","description":"情感"},"speed":{"type":"number","default":1.0,"description":"语速倍率0.5-2.0"},"pitch":{"type":"integer","default":0,"description":"音调-100~+100"}},"required":["text"]}}},
@@ -250,6 +251,13 @@ HERMES_TOOLS = [
     {"type":"function","function":{"name":"sau_upload_note","description":"通过social-auto-upload上传图文笔记到指定平台。支持抖音/小红书/快手/视频号。","parameters":{"type":"object","properties":{"platform":{"type":"string","enum":["douyin","xhs","kuaishou","tencent"],"description":"目标平台"},"image_paths":{"type":"string","description":"逗号分隔的图片文件本地路径"},"title":{"type":"string","description":"图文标题"},"note":{"type":"string","description":"图文正文(可选)"},"tags":{"type":"string","description":"逗号分隔的标签(可选)"},"schedule":{"type":"string","description":"定时发布时间 YYYY-MM-DD HH:MM (可选)"},"headless":{"type":"boolean","description":"是否无头模式,默认true"}},"required":["platform","image_paths","title"]}}},
     {"type":"function","function":{"name":"sau_check_login","description":"检查social-auto-upload平台登录状态(Cookie是否有效)","parameters":{"type":"object","properties":{"platform":{"type":"string","enum":["douyin","xhs","kuaishou","tencent","youtube"],"description":"平台名"}},"required":["platform"]}}},
     {"type":"function","function":{"name":"sau_login","description":"触发social-auto-upload平台扫码登录。会在本地打开浏览器窗口等待用户扫码。","parameters":{"type":"object","properties":{"platform":{"type":"string","enum":["douyin","xhs","kuaishou","tencent","youtube"],"description":"平台名"},"headless":{"type":"boolean","description":"是否无头模式,默认false(登录需要有头)"}},"required":["platform"]}}},
+
+    # Computer Use — Windows desktop automation
+    {"type":"function","function":{"name":"computer_use_status","description":"查看本机 Windows 电脑使用能力状态、当前窗口和可见应用。只观察，不执行动作。","parameters":{"type":"object","properties":{}}}},
+    {"type":"function","function":{"name":"computer_use_observe","description":"观察当前桌面并记录截图、前台窗口和可见窗口。只观察，不执行动作。","parameters":{"type":"object","properties":{}}}},
+    {"type":"function","function":{"name":"computer_use_create_task","description":"创建受控电脑使用任务。电脑使用涉及真实本机操作，外发、删除、付款、登录、加好友、批量操作等敏感动作必须转人工确认。浏览器 URL/selector 任务走托管 Playwright DOM。","parameters":{"type":"object","properties":{"instruction":{"type":"string","description":"要完成的明确目标"},"target_app":{"type":"string","description":"目标应用，如 notepad/wechat/jianying/explorer/browser/chrome"},"url":{"type":"string","description":"托管浏览器要打开的 URL，可选"},"target_selector":{"type":"string","description":"网页或桌面结构目标 selector，可选"},"expected_result":{"type":"string","description":"执行后要验证的页面文字或目标状态，可选"},"mode":{"type":"string","enum":["observe_only","assisted","execute"],"default":"assisted"},"max_steps":{"type":"integer","default":8},"require_confirmation":{"type":"boolean","default":True},"text":{"type":"string","description":"安全输入文本，可选"}},"required":["instruction"]}}},
+    {"type":"function","function":{"name":"computer_use_task_status","description":"查询电脑使用任务执行状态、步骤、审计日志和截图证据。","parameters":{"type":"object","properties":{"task_id":{"type":"string","description":"任务ID或execution_id"}},"required":["task_id"]}}},
+    {"type":"function","function":{"name":"computer_use_cancel","description":"取消正在运行的电脑使用任务。","parameters":{"type":"object","properties":{"task_id":{"type":"string","description":"任务ID或execution_id"}},"required":["task_id"]}}},
 
     # ═══════════════════════════════════════════════════════════════
     # Phase B: 补齐缺失工具 — 调度引擎
@@ -341,7 +349,8 @@ SYSTEM_PROMPT = """你是 szyg 智能矩阵运营系统的超级AI员工。
 ## 核心能力
 你能通过函数调用调度以下子系统：
 
-**内容生产**: content_create(标题+正文+类型) → content_submit → content_approve → platform_publish_direct
+**内容生成**: content_copy_generate 生成文案, ai_image_generate 生成图片, ai_video_create 生成视频, ai_tts_advanced 生成语音
+**内容发布**: content_create(标题+正文+类型) → content_submit → content_approve → platform_publish_direct
 **平台运营**: platform_list 查看所有平台状态, platform_status 查单个平台, platform_health 健康检查
 **发布**: platform_publish_direct(platform, title, body, tags, content_type, media_urls) 直接发布到抖音/小红书/B站/快手/微信
   - content_type: post=图文短帖, video=视频, image=图文
@@ -354,8 +363,8 @@ SYSTEM_PROMPT = """你是 szyg 智能矩阵运营系统的超级AI员工。
 **视频剪辑**: video_info 查看元信息, video_cut/concat 裁剪拼接, video_speed 变速, video_add_title 叠加标题, video_replace_audio/mix_audio 音频替换混音, video_extract_frame 提取封面, video_render 模板渲染
 **知识库**: knowledge_search 检索, knowledge_ingest 摄入文档, knowledge_stats 统计
 **智能体**: agents_list/get/tiers/categories 智能体市场管理
-**AIGC生成(火山引擎)**: ai_image_generate 生成图像(豆包/SDXL/FLUX), ai_image_styles 列出风格
-**AI视频**: ai_video_create 生成视频(豆包·视频生成/Seaweed), ai_video_task_status 查询任务状态
+**AIGC生成(火山引擎)**: ai_image_generate 生成图像, ai_image_styles 列出风格
+**AI视频**: ai_video_create 生成视频, ai_video_task_status 查询任务状态
 **AI语音**: ai_tts_advanced 情感语音合成(支持6种情感), ai_voice_clone 声音克隆
 **向量嵌入**: ai_embedding_create 文本向量化(知识库RAG)
 **内容管理**: content_get 查看详情, content_update 修改, content_delete 删除(管理员), content_reject 驳回(管理员), content_schedule 定时发布, content_publish 立即发布
@@ -376,6 +385,7 @@ SYSTEM_PROMPT = """你是 szyg 智能矩阵运营系统的超级AI员工。
 **行为策略**: acquisition_strategy 查看策略参数, acquisition_strategy_apply 应用策略到平台
 **平台采集(直接调用)**: acq_platforms 查看采集平台, acq_search 搜索视频(支持bilibili/douyin/xhs/kuaishou), acq_get_comments 获取评论, acq_send_comment 发送评论, acq_batch_send_comments 批量发送, acq_send_dm 发私信(B站)
 **多平台发布(social-auto-upload)**: sau_list_platforms 查看支持的平台(抖音/小红书/快手/视频号/YouTube), sau_upload_video 上传视频, sau_upload_note 上传图文, sau_check_login 检查登录, sau_login 扫码登录
+**电脑使用**: computer_use_status 查看本机执行能力, computer_use_observe 观察当前桌面, computer_use_create_task 创建受控电脑使用任务, computer_use_task_status 查询执行证据, computer_use_cancel 取消任务。电脑使用会操作真实 Windows 应用；涉及外发、删除、付款、登录、加好友、批量操作等敏感动作时必须先征求用户确认，无法确认则转入需人工处理。
 **其他**: skills_list
 
 ## 智能发布工作流 (重要!)
@@ -572,7 +582,7 @@ async def _execute_tool(name: str, args_str: str, auth_header: dict | None = Non
 
     ALLOWED = {
         "content_list","content_create","content_get","content_submit","content_approve",
-        "content_generate","content_stats",
+        "content_generate","content_stats","content_copy_generate",
         "platform_list","platform_status","platform_publish_direct","platform_sessions","platform_health","platform_post_status",
         "scheduler_list","scheduler_create","scheduler_get","scheduler_execute",
         "scheduler_pause","scheduler_resume","scheduler_delete","scheduler_history","scheduler_stats",
@@ -592,6 +602,7 @@ async def _execute_tool(name: str, args_str: str, auth_header: dict | None = Non
         # OEM Branding
         "oem_config","oem_themes",
         # AIGC — 火山引擎方舟
+        "content_copy_generate",
         "ai_image_generate","ai_image_styles",
         "ai_video_create","ai_video_task_status",
         "ai_tts_advanced","ai_voice_clone",
@@ -631,6 +642,9 @@ async def _execute_tool(name: str, args_str: str, auth_header: dict | None = Non
         # social-auto-upload 集成
         "sau_list_platforms","sau_upload_video","sau_upload_note",
         "sau_check_login","sau_login",
+        # Computer Use
+        "computer_use_status","computer_use_observe","computer_use_create_task",
+        "computer_use_task_status","computer_use_cancel",
     }
     if name not in ALLOWED:
         return f"错误: 工具 '{name}' 不被允许"
@@ -702,6 +716,8 @@ async def _execute_tool(name: str, args_str: str, auth_header: dict | None = Non
         # ═══════════════════════════════════════════════════════════════
         # AIGC — 火山引擎方舟 (Phase A)
         # ═══════════════════════════════════════════════════════════════
+        elif name == "content_copy_generate":
+            return await _execute_volcengine_aigc(name, args)
         elif name == "ai_image_generate":
             return await _execute_volcengine_aigc(name, args)
         elif name == "ai_image_styles":
@@ -1045,6 +1061,30 @@ async def _execute_tool(name: str, args_str: str, auth_header: dict | None = Non
             except Exception as e:
                 return json.dumps({"error": str(e)}, ensure_ascii=False)
 
+        # ═══════════════════════════════════════════════════════════════
+        # Computer Use — controlled Windows desktop automation
+        # ═══════════════════════════════════════════════════════════════
+        elif name == "computer_use_status":
+            r = await _aGET(f"{base}/api/computer-use/status", timeout=30)
+        elif name == "computer_use_observe":
+            r = await _aPOST(f"{base}/api/computer-use/observe", timeout=60)
+        elif name == "computer_use_create_task":
+            r = await _aPOST(f"{base}/api/computer-use/tasks", json={
+                "instruction": args.get("instruction", ""),
+                "target_app": args.get("target_app", "windows"),
+                "url": args.get("url", ""),
+                "target_selector": args.get("target_selector", ""),
+                "expected_result": args.get("expected_result", ""),
+                "mode": args.get("mode", "assisted"),
+                "max_steps": args.get("max_steps", 8),
+                "require_confirmation": args.get("require_confirmation", True),
+                "text": args.get("text", ""),
+            }, timeout=30)
+        elif name == "computer_use_task_status":
+            r = await _aGET(f"{base}/api/computer-use/tasks/{args.get('task_id','')}", timeout=30)
+        elif name == "computer_use_cancel":
+            r = await _aPOST(f"{base}/api/executions/{args.get('task_id','')}/cancel", timeout=30)
+
         else:
             return _call_direct(name, args)
         r.raise_for_status()
@@ -1067,6 +1107,18 @@ async def _execute_volcengine_aigc(name: str, args: dict) -> str:
         endpoints=VOLCENGINE_ENDPOINTS,
     )
     try:
+        if name == "content_copy_generate":
+            from szyg.api.content_copy_routes import CopyGenerateRequest, generate_copy
+
+            result = await generate_copy(CopyGenerateRequest(
+                prompt=args.get("prompt", ""),
+                copy_type=args.get("copy_type", "未定义类型"),
+                count=int(args.get("count", 3) or 3),
+                min_words=int(args.get("min_words", 80) or 80),
+                max_words=int(args.get("max_words", 160) or 160),
+            ))
+            return json.dumps(result.model_dump(), ensure_ascii=False)
+
         if name == "ai_image_generate":
             ep = VOLCENGINE_ENDPOINTS.get("doubao-image", "")
             if not ep:
@@ -1111,18 +1163,14 @@ async def _execute_volcengine_aigc(name: str, args: dict) -> str:
             }, ensure_ascii=False)
 
         elif name == "ai_video_create":
-            ep = VOLCENGINE_ENDPOINTS.get("doubao-video", "")
-            if not ep:
-                return json.dumps({
-                    "ok": False,
-                    "error": "视频生成未配置 — 需要在火山方舟控制台创建 doubao-video 推理接入点",
-                    "help": "前往 https://console.volcengine.com/ark → 在线推理 → 创建接入点",
-                }, ensure_ascii=False)
             result = await client.generate_video(
                 prompt=args.get("prompt", ""),
                 image_url=args.get("image_url") or None,
                 model=args.get("model", "doubao-video"),
-                duration=args.get("duration", 5),
+                duration=args.get("duration", 6),
+                size=args.get("size", "720p"),
+                ratio=args.get("ratio", "9:16"),
+                native_audio=args.get("native_audio", False),
             )
             return json.dumps({
                 "ok": True,
@@ -1150,17 +1198,10 @@ async def _execute_volcengine_aigc(name: str, args: dict) -> str:
             return json.dumps(result, ensure_ascii=False)
 
         elif name == "ai_tts_advanced":
-            ep = VOLCENGINE_ENDPOINTS.get("doubao-tts", "")
-            if not ep:
-                return json.dumps({
-                    "ok": False,
-                    "error": "语音合成未配置 — 需要在火山方舟控制台创建 doubao-tts 推理接入点",
-                    "help": "前往 https://console.volcengine.com/ark → 在线推理 → 创建接入点",
-                }, ensure_ascii=False)
-            path = await client.text_to_speech(
+            path, duration = await client.seed_audio_text_to_speech(
                 text=args.get("text", ""),
                 voice_id=args.get("voice_id", "zh_female_xiaoyi"),
-                emotion=args.get("emotion", "neutral"),
+                voice_prompt=f"情绪：{args.get('emotion', 'neutral')}",
                 speed=args.get("speed", 1.0),
                 pitch=args.get("pitch", 0),
                 output_dir=str(get_media_output_dir("audio")),
@@ -1172,6 +1213,7 @@ async def _execute_volcengine_aigc(name: str, args: dict) -> str:
                 "path": path,
                 "voice_id": args.get("voice_id", "zh_female_xiaoyi"),
                 "emotion": args.get("emotion", "neutral"),
+                "duration": duration,
                 "text": args.get("text", "")[:50] + "...",
             }, ensure_ascii=False)
 

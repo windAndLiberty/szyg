@@ -53,6 +53,7 @@ export default function SuperAgent() {
   const [statusText, setStatusText] = useState('')
   const [caseCards, setCaseCards] = useState<CaseCard[]>([])
   const [caseCardsLoading, setCaseCardsLoading] = useState(false)
+  const [historyCollapsed, setHistoryCollapsed] = useState(false)
   const messagesRef = useRef<HTMLDivElement>(null)
   const streamMsgIdRef = useRef<string | null>(null)
   const streamBufRef = useRef<string>('')
@@ -76,7 +77,7 @@ export default function SuperAgent() {
 
   const loadConversations = useCallback(async () => {
     try {
-      const data = await apiGet<{ conversations: Conversation[] }>('/api/conversations')
+      const data = await apiGet<{ conversations: Conversation[] }>('/api/conversations?limit=50')
       setConversations(data.conversations || [])
     } catch {
       /* ignore */
@@ -109,6 +110,15 @@ export default function SuperAgent() {
   useEffect(() => {
     if (messages.length === 0) loadCaseCards()
   }, [messages.length, loadCaseCards])
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ collapsed?: boolean }>).detail
+      setHistoryCollapsed((current) => detail?.collapsed ?? !current)
+    }
+    window.addEventListener('szyg:toggle-super-agent-history', handler)
+    return () => window.removeEventListener('szyg:toggle-super-agent-history', handler)
+  }, [])
 
   const newConversation = useCallback(() => {
     setActiveConvId(null)
@@ -444,17 +454,19 @@ export default function SuperAgent() {
   // === RENDER ===
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-[#0B0F1A] overflow-hidden">
-      <ConversationPanel
-        conversations={conversations}
-        activeConvId={activeConvId}
-        onSelect={selectConversation}
-        onNew={newConversation}
-        onPin={handlePin}
-        onDelete={handleDelete}
-        onRename={handleRename}
-      />
+      {!historyCollapsed && (
+        <ConversationPanel
+          conversations={conversations}
+          activeConvId={activeConvId}
+          onSelect={selectConversation}
+          onNew={newConversation}
+          onPin={handlePin}
+          onDelete={handleDelete}
+          onRename={handleRename}
+        />
+      )}
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="relative flex-1 flex flex-col min-w-0">
         {messages.length === 0 ? (
           <WelcomeState
             inputText={inputText}

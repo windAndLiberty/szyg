@@ -103,7 +103,7 @@ def _compute_staff_status() -> list[dict]:
             "completed": pub.get("published", 0),
             "progress": _pct(pub.get("published", 0), max(pub.get("total", 0), 1)),
             "recent": f"发布: {pub.get('published', 0)}篇, 待审: {pub.get('pending_review', 0)}篇",
-            "skills": ["文案生成", "AIGC图像", "视频脚本", "多平台适配"],
+        "skills": ["内容生成", "文案生成", "AIGC图像", "视频脚本"],
             "route": "/content/production",
             "updated_at": now,
         },
@@ -208,7 +208,7 @@ _DEFAULT_STAFF = [
         "completed": 12,
         "progress": 75,
         "recent": "刚完成：小红书文案发布",
-        "skills": ["文案生成", "AIGC图像", "视频脚本", "多平台适配"],
+            "skills": ["内容生成", "文案生成", "AIGC图像", "视频脚本"],
         "route": "/content/production",
     },
     {

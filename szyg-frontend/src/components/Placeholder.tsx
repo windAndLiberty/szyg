@@ -15,7 +15,7 @@ type PlaceholderProps = {
  * 遵循 DESIGN_SYSTEM.md 玻璃态卡片 + Framer Motion 入场动画。
  * 后续 Phase B 逐个替换为真实功能页面。
  */
-export default function Placeholder({ title, description, icon: Icon, module }: PlaceholderProps) {
+export default function Placeholder({ description, icon: Icon, module }: PlaceholderProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -38,19 +38,10 @@ export default function Placeholder({ title, description, icon: Icon, module }: 
         </div>
       </motion.div>
 
-      <motion.h1
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className="text-display-md text-[#F1F5F9] mb-2"
-      >
-        {title}
-      </motion.h1>
-
       <motion.p
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
         className="text-body-lg text-[#94A3B8] text-center max-w-md mb-8"
       >
         {description}
@@ -59,7 +50,7 @@ export default function Placeholder({ title, description, icon: Icon, module }: 
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.4 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
         className="glass-card rounded-card-lg border border-[#1E293B] px-6 py-4 flex items-center gap-3"
         style={{ background: 'linear-gradient(135deg, rgba(26,34,53,0.8) 0%, rgba(17,24,39,0.95) 100%)' }}
       >

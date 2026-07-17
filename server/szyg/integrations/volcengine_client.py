@@ -22,6 +22,7 @@
 """
 
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -44,11 +45,23 @@ logger = logging.getLogger(__name__)
 def _read_config_key(key: str, default: str = "") -> str:
     """Read a volcengine config value from config.yaml."""
     try:
+        from szyg.config.loader import load_config
+        cfg = load_config()
+        value = cfg.get("llm", {}).get("volcengine", {}).get(key, default)
+        if isinstance(value, str):
+            return value
+        return default
+    except Exception:
+        pass
+    try:
         import yaml
         cfg_path = Path(__file__).parent.parent.parent.parent / "config.yaml"
         if cfg_path.exists():
             cfg = yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
-            return cfg.get("llm", {}).get("volcengine", {}).get(key, default)
+            value = cfg.get("llm", {}).get("volcengine", {}).get(key, default)
+            if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
+                return default
+            return value
     except Exception as e:
         logger.debug("Failed to read volcengine config key %s: %s", key, e)
     return default
@@ -73,6 +86,10 @@ DEFAULT_ENDPOINTS = {
     # 文本模型
     "doubao-pro-128k": "doubao-pro-128k",
     "doubao-lite": "doubao-lite",
+    "doubao-seed-2-0-pro": "doubao-seed-2-0-pro-260215",
+    "doubao-seed-2-0-pro-260215": "doubao-seed-2-0-pro-260215",
+    "doubao-seed-2-0-lite": "doubao-seed-2-0-lite-260428",
+    "doubao-seed-2-0-lite-260428": "doubao-seed-2-0-lite-260428",
     "deepseek-r1": "deepseek-r1",
     "deepseek-v3": "deepseek-v3",
     # 图像模型
@@ -81,6 +98,11 @@ DEFAULT_ENDPOINTS = {
     "flux": "flux",
     # 视频模型
     "doubao-video": "doubao-video",
+    "doubao-seedance-1.5-pro": "",
+    "doubao-seedance-1-5-pro-251215": "doubao-seedance-1-5-pro-251215",
+    "doubao-seedance-2.0-fast": "",
+    "doubao-seedance-2.0": "",
+    "doubao-seedance-2.5": "",
     "seaweed": "seaweed",
     # 语音模型
     "doubao-tts": "doubao-tts",
@@ -141,7 +163,7 @@ class VolcEngineClient(BaseLLMClient):
         if not self.DEFAULT_TEXT_ENDPOINT:
             for model, ep in self.endpoints.items():
                 if ep and ep.startswith("ep-") and not any(
-                    model.startswith(p) for p in ("doubao-image", "doubao-video",
+                    model.startswith(p) for p in ("doubao-image", "doubao-video", "doubao-seedance",
                     "doubao-tts", "doubao-voice", "doubao-embedding",
                     "sdxl", "flux", "seaweed", "wan", "seedream", "seedance")
                 ):
@@ -202,11 +224,13 @@ class VolcEngineClient(BaseLLMClient):
           2. 模型名本身 (直接调用，支持 deepseek-v4-flash-260425 等)
           3. 默认文本 endpoint (如果配置了)
         """
+        if model.startswith("ep-"):
+            return model
         if model in self.endpoints and self.endpoints[model]:
             return self.endpoints[model]
         # 如果配置了默认 endpoint 且模型是文本模型，使用默认 endpoint
         if self.DEFAULT_TEXT_ENDPOINT and not any(
-            model.startswith(p) for p in ("doubao-image", "doubao-video",
+            model.startswith(p) for p in ("doubao-image", "doubao-video", "doubao-seedance",
             "doubao-tts", "doubao-voice", "doubao-embedding",
             "sdxl", "flux", "seaweed", "wan", "seedream", "seedance",
             "hitem3d", "hyper3d")
@@ -325,6 +349,53 @@ class VolcEngineClient(BaseLLMClient):
             raise
         except Exception as e:
             raise IntegrationError(f"VolcEngine chat failed: {e}")
+
+    async def responses_text(
+        self,
+        input_items: list[dict],
+        model: str = "doubao-seed-2-0-lite-260428",
+        max_output_tokens: int = 4096,
+        reasoning_effort: str | None = None,
+    ) -> dict:
+        """Call Ark Responses API and return concatenated output_text content."""
+        try:
+            payload = {
+                "model": self._ep(model),
+                "input": input_items,
+                "max_output_tokens": max_output_tokens,
+            }
+            if reasoning_effort:
+                payload["reasoning_effort"] = reasoning_effort
+            async with httpx.AsyncClient(timeout=120, trust_env=False) as c:
+                r = await c.post(
+                    f"{self.base_url}/responses",
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                )
+                if r.is_error:
+                    raise IntegrationError(f"HTTP {r.status_code}: {r.text[:500]}")
+                data = r.json()
+
+            parts: list[str] = []
+            for output in data.get("output") or []:
+                if not isinstance(output, dict):
+                    continue
+                for content in output.get("content") or []:
+                    if isinstance(content, dict) and content.get("type") == "output_text":
+                        parts.append(str(content.get("text") or ""))
+            return {
+                "message": {"role": "assistant", "content": "".join(parts)},
+                "model": data.get("model") or model,
+                "usage": data.get("usage"),
+                "raw": data,
+            }
+        except IntegrationError:
+            raise
+        except Exception as e:
+            raise IntegrationError(f"VolcEngine responses failed: {e}")
 
     async def chat_stream(
         self,
@@ -473,9 +544,12 @@ class VolcEngineClient(BaseLLMClient):
         self,
         prompt: str,
         image_url: str | None = None,
-        model: str = "doubao-video",
+        reference_assets: list[dict] | None = None,
+        model: str = "doubao-seedance-2.0-fast",
         duration: int = 5,
         size: str = "720p",
+        ratio: str = "9:16",
+        native_audio: bool = False,
     ) -> dict:
         """提交视频生成任务 (文生视频 / 图生视频)。
 
@@ -485,29 +559,98 @@ class VolcEngineClient(BaseLLMClient):
         Args:
             prompt: 视频内容描述
             image_url: 参考图片URL (图生视频时提供)
-            model: 模型 (doubao-video)
-            duration: 时长秒数 (5 或 10)
+            reference_assets: 多模态参考素材，元素格式为 {"type": "image_url"|"video_url", "url": "..."}
+            model: 模型 (doubao-seedance-2.0-fast / doubao-seedance-2.0 / doubao-seedance-2.5)
+            duration: 时长秒数
             size: 分辨率 (720p | 1080p)
+            ratio: 视频比例 (16:9 | 1:1 | 9:16)
 
         Returns:
             {"task_id": "cgt-...", "status": "queued", "model": "..."}
         """
         try:
             # 火山方舟视频生成 API — 使用 contents/generations/tasks 端点
-            content = [{"type": "text", "text": prompt}]
+            resolved_model = self._ep(model)
+            if model == "doubao-seedance-1.5-pro":
+                resolved_model = self._ep("doubao-seedance-1-5-pro-251215")
+            if (
+                model in {"doubao-seedance-2.0-fast"}
+                and not resolved_model.startswith("ep-")
+                and self.endpoints.get("doubao-video", "").startswith("ep-")
+            ):
+                resolved_model = self.endpoints["doubao-video"]
+            image_item = None
             if image_url:
-                content.append({"type": "image_url", "image_url": image_url})
+                image_item = {
+                    "type": "image_url",
+                    "image_url": {"url": image_url},
+                    "role": "reference_image",
+                }
+            reference_items = []
+            text_reference_lines = []
+            for item in reference_assets or []:
+                item_type = str(item.get("type") or "").strip()
+                url = str(item.get("url") or item.get("provider_ref") or "").strip()
+                role = str(item.get("role") or "reference").strip()
+                if item_type == "image_url" and url:
+                    ref = {
+                        "type": "image_url",
+                        "image_url": {"url": url},
+                        "role": role if role.startswith("reference_") else "reference_image",
+                    }
+                    reference_items.append(ref)
+                elif item_type == "video_url" and url:
+                    ref = {
+                        "type": "video_url",
+                        "video_url": {"url": url},
+                        "role": role if role.startswith("reference_") else "reference_video",
+                    }
+                    reference_items.append(ref)
+                elif item_type == "audio_url" and url:
+                    ref = {
+                        "type": "audio_url",
+                        "audio_url": {"url": url},
+                        "role": role if role.startswith("reference_") else "reference_audio",
+                    }
+                    reference_items.append(ref)
+                elif item_type == "text" and url:
+                    name = str(item.get("name") or item.get("asset_id") or "text_reference").strip()
+                    text_reference_lines.append(f"[{name} / {role}]\n{url[:1800]}")
+            if image_item and not reference_items:
+                reference_items.append(image_item)
+            if text_reference_lines:
+                prompt = (
+                    f"{prompt}\n\n参考文案素材如下，必须吸收其中的产品信息、卖点和表达重点：\n"
+                    + "\n\n".join(text_reference_lines)
+                )
 
-            payload = {
-                "model": self._ep(model),
-                "content": content,
-                "parameters": {
+            if resolved_model.startswith("doubao-seedance-1-5-"):
+                audio_hint = (
+                    "开启原生声音：同步生成与画面高度匹配的人声对白、环境音效、动作声音和背景氛围音乐。"
+                    if native_audio
+                    else "关闭原生声音：生成无对白、无环境声、无背景音乐的静音视频。"
+                )
+                prompt_text = (
+                    f"{prompt} {audio_hint} --duration {duration} --resolution {size} "
+                    f"--ratio {ratio} --camerafixed false --watermark true"
+                )
+                payload = {
+                    "model": resolved_model,
+                    "content": [{"type": "text", "text": prompt_text}, *reference_items],
+                    "generate_audio": native_audio,
+                }
+            else:
+                payload = {
+                    "model": resolved_model,
+                    "content": [{"type": "text", "text": prompt}, *reference_items],
+                    "resolution": size,
+                    "ratio": ratio,
                     "duration": duration,
-                    "size": size,
-                },
-            }
+                    "generate_audio": native_audio,
+                    "watermark": False,
+                }
 
-            async with httpx.AsyncClient(timeout=60) as c:
+            async with httpx.AsyncClient(timeout=60, trust_env=False) as c:
                 headers = {
                     "Authorization": f"Bearer {self.api_key}",
                     "Content-Type": "application/json",
@@ -517,6 +660,10 @@ class VolcEngineClient(BaseLLMClient):
                     headers=headers,
                     json=payload,
                 )
+                if r.is_error:
+                    raise IntegrationError(
+                        f"HTTP {r.status_code}: {r.text[:500]}"
+                    )
                 r.raise_for_status()
                 data = r.json()
                 return {
@@ -528,7 +675,7 @@ class VolcEngineClient(BaseLLMClient):
         except Exception as e:
             raise IntegrationError(f"VolcEngine video generation submit failed: {e}")
 
-    async def get_video_task(self, task_id: str, model: str = "doubao-video") -> dict:
+    async def get_video_task(self, task_id: str, model: str = "doubao-seedance-2.0-fast") -> dict:
         """查询视频生成任务状态。
 
         API: GET /api/v3/contents/generations/tasks/{task_id}
@@ -538,7 +685,7 @@ class VolcEngineClient(BaseLLMClient):
              "video_url": "...", "progress": 0-100, "error": "..."}
         """
         try:
-            async with httpx.AsyncClient(timeout=30) as c:
+            async with httpx.AsyncClient(timeout=30, trust_env=False) as c:
                 headers = {"Authorization": f"Bearer {self.api_key}"}
                 r = await c.get(
                     f"{self.base_url}/contents/generations/tasks/{task_id}",
@@ -559,7 +706,7 @@ class VolcEngineClient(BaseLLMClient):
     async def download_video(self, video_url: str, output_name: str = "", output_dir: str | None = None) -> str:
         """下载已完成的视频到本地。"""
         try:
-            async with httpx.AsyncClient(timeout=120) as c:
+            async with httpx.AsyncClient(timeout=120, trust_env=False) as c:
                 r = await c.get(video_url)
                 r.raise_for_status()
 
@@ -662,6 +809,89 @@ class VolcEngineClient(BaseLLMClient):
         except Exception as e:
             raise IntegrationError(f"VolcEngine TTS failed: {e}")
 
+    async def seed_audio_text_to_speech(
+        self,
+        text: str,
+        voice_id: str = "zh_female_xiaoyi",
+        voice_prompt: str = "",
+        speed: float = 1.0,
+        pitch: int = 0,
+        output_name: str = "",
+        output_dir: str | None = None,
+        response_format: str = "mp3",
+    ) -> tuple[str, float]:
+        """Generate speech through VolcEngine OpenSpeech seed-audio-1.0 HTTP API."""
+        speech_api_key = (
+            os.environ.get("VOLCENGINE_SPEECH_API_KEY", "")
+            or os.environ.get("VOLCENGINE_TTS_API_KEY", "")
+            or _read_config_key("speech_api_key")
+        )
+        if not speech_api_key:
+            raise IntegrationError("VolcEngine Speech API key not configured — set VOLCENGINE_SPEECH_API_KEY")
+
+        text_prompt = text.strip()
+        if voice_prompt.strip():
+            text_prompt = f"{voice_prompt.strip()}\n{text_prompt}"
+
+        speech_rate = int(round((max(0.5, min(2.0, speed)) - 1.0) * 100))
+        pitch_rate = int(round(max(-100, min(100, pitch)) / 100 * 12))
+        references = []
+        provider_voice = self.VOICE_IDS.get(voice_id, voice_id)
+        # seed-audio-1.0 speaker ids are not the same as legacy Ark TTS voices
+        # such as zh_female_xiaoyi. Only pass explicit Seed Audio speakers.
+        if provider_voice and not provider_voice.startswith(("zh_", "en_")):
+            references.append({"speaker": provider_voice})
+
+        payload = {
+            "model": "seed-audio-1.0",
+            "text_prompt": text_prompt,
+            "references": references,
+            "audio_config": {
+                "format": response_format,
+                "sample_rate": 24000,
+                "speech_rate": max(-50, min(100, speech_rate)),
+                "pitch_rate": max(-12, min(12, pitch_rate)),
+            },
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=120, trust_env=False) as c:
+                response = await c.post(
+                    "https://openspeech.bytedance.com/api/v3/tts/create",
+                    headers={
+                        "X-Api-Key": speech_api_key,
+                        "X-Api-Request-Id": str(uuid.uuid4()),
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                )
+            if response.status_code >= 400:
+                raise IntegrationError(f"HTTP {response.status_code}: {response.text[:500]}")
+            data = response.json()
+            if int(data.get("code", 0) or 0) != 0:
+                raise IntegrationError(f"{data.get('code')}: {data.get('message') or 'speech synthesis failed'}")
+
+            audio = data.get("audio") or ""
+            if not audio:
+                raise IntegrationError("speech synthesis returned no audio data")
+
+            if not output_name:
+                ts = int(time.time())
+                output_name = f"seed_audio_{ts}_{uuid.uuid4().hex[:6]}.{response_format}"
+            if output_dir is None:
+                from szyg.media_storage import get_media_output_dir
+                output_path = get_media_output_dir("audio")
+            else:
+                output_path = Path(output_dir)
+                output_path.mkdir(parents=True, exist_ok=True)
+            path = output_path / output_name
+            path.write_bytes(base64.b64decode(audio))
+            return str(path), float(data.get("duration") or 0)
+        except IntegrationError:
+            raise
+        except Exception as e:
+            raise IntegrationError(f"VolcEngine seed-audio TTS failed: {e}")
+
     # ═══════════════════════════════════════════════════════════════════════
     # 5. 声音克隆 (Voice Clone)
     # ═══════════════════════════════════════════════════════════════════════
@@ -693,7 +923,7 @@ class VolcEngineClient(BaseLLMClient):
 
         try:
             # 火山引擎声音克隆使用 multipart/form-data 上传
-            async with httpx.AsyncClient(timeout=120) as c:
+            async with httpx.AsyncClient(timeout=120, trust_env=False) as c:
                 headers = {"Authorization": f"Bearer {self.api_key}"}
 
                 # Step 1: 上传声音样本获取 voice_id

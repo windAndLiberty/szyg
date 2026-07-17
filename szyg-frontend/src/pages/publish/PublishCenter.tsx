@@ -1,294 +1,206 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle,
+  Archive,
   BookOpen,
-  CheckCircle2,
-  Clock3,
-  ImagePlus,
-  Loader2,
+  ExternalLink,
+  FileText,
+  MonitorCog,
   Music2,
   Play,
-  Send,
-  ShieldCheck,
-  Sparkles,
-  Video,
-  Workflow,
+  Search,
+  Tv,
+  Youtube,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
-  createSauNoteTask,
-  createSauVideoTask,
-  generateImage,
+  fetchExecutions,
+  fetchPlatforms,
   getErrorMessage,
-  type SauCreateResponse,
+  type ExecutionArchiveInfo,
+  type ExecutionRun,
+  type PlatformInfo,
 } from '@/lib/api'
-import {
-  CONTENT_DRAFT_KEY,
-  subscribeImageGeneration,
-  type ContentDraft,
-} from '@/lib/contentDraftStore'
-import { resolveGeneratedAssetUrl } from '@/lib/generatedAssets'
+import { getPublishedPostInfo } from '@/components/publish/PublishedPostLink'
 
 type PublishMode = 'video' | 'note'
+type CapabilityStatus = 'available' | 'login_required' | 'desktop' | 'planned'
+const PAGE_SIZE = 10
 
-const PLATFORMS = [
-  { id: 'douyin', label: '抖音', icon: Music2, tone: 'cyan' },
-  { id: 'xhs', label: '小红书', icon: BookOpen, tone: 'rose' },
+const PLATFORM_CAPABILITIES: Array<{
+  id: string
+  label: string
+  icon: typeof Music2
+  contentTypes: PublishMode[]
+  status: CapabilityStatus
+  risk: '严格' | '中等' | '宽松' | '接入中'
+  description: string
+  supportsLinkBack: boolean
+}> = [
+  { id: 'douyin', label: '抖音', icon: Music2, contentTypes: ['video', 'note'], status: 'available', risk: '严格', description: '短视频和图文发布已接入，支持作品链接回写。', supportsLinkBack: true },
+  { id: 'xhs', label: '小红书', icon: BookOpen, contentTypes: ['video', 'note'], status: 'available', risk: '严格', description: '适合种草图文和短视频，支持作品链接回写。', supportsLinkBack: true },
+  { id: 'kuaishou', label: '快手', icon: Play, contentTypes: ['video', 'note'], status: 'login_required', risk: '中等', description: '发布能力已预留，登录后进入稳定性验证。', supportsLinkBack: false },
+  { id: 'tencent', label: '视频号', icon: MonitorCog, contentTypes: ['video', 'note'], status: 'desktop', risk: '中等', description: '图文和视频走真实桌面浏览器辅助发布。', supportsLinkBack: false },
+  { id: 'bilibili', label: 'B站', icon: Tv, contentTypes: ['video'], status: 'planned', risk: '中等', description: '适合长视频和知识内容，待接入发布验收。', supportsLinkBack: false },
+  { id: 'youtube', label: 'YouTube', icon: Youtube, contentTypes: ['video'], status: 'login_required', risk: '宽松', description: '适合海外渠道，需要先完成账号配置。', supportsLinkBack: false },
+  { id: 'weibo', label: '微博', icon: FileText, contentTypes: ['video', 'note'], status: 'desktop', risk: '中等', description: '图文和视频走真实桌面浏览器辅助发布。', supportsLinkBack: false },
 ]
 
-const metrics = [
-  { label: '今日任务', value: '12', hint: '3 个执行中', color: 'text-[#38BDF8]' },
-  { label: '需人工', value: '2', hint: '验证码/登录态', color: 'text-[#F59E0B]' },
-  { label: '素材生成', value: '7', hint: '火山引擎可用', color: 'text-[#10B981]' },
-  { label: '平均耗时', value: '03:42', hint: '近 20 次', color: 'text-[#22D3EE]' },
-]
-
-function splitTags(raw: string): string[] {
-  return raw
-    .split(/[,，#\s]+/)
-    .map((item) => item.trim())
-    .filter(Boolean)
+function statusText(status: string) {
+  if (status === 'success') return '已发布'
+  if (status === 'failed') return '失败'
+  if (status === 'running') return '发布中'
+  if (status === 'queued') return '排队中'
+  if (status === 'needs_human') return '需处理'
+  if (status === 'paused') return '已暂停'
+  if (status === 'cancelled') return '已取消'
+  return status || '未知'
+}
+function statusVariant(status: string): 'success' | 'warning' | 'error' | 'muted' | 'info' {
+  if (status === 'success') return 'success'
+  if (status === 'failed') return 'error'
+  if (status === 'running' || status === 'queued') return 'info'
+  if (status === 'needs_human' || status === 'paused') return 'warning'
+  return 'muted'
 }
 
-function splitLines(raw: string): string[] {
-  return raw
-    .split(/\r?\n/)
-    .map((item) => item.trim())
-    .filter(Boolean)
+function formatTime(value: string) {
+  if (!value) return '-'
+  try {
+    return new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return '-'
+  }
 }
 
-function appendUniquePath(current: string, nextPath: string): string {
-  const next = nextPath.trim()
-  if (!next) return current
-  const paths = splitLines(current)
-  if (paths.includes(next)) return paths.join('\n')
-  return [...paths, next].join('\n')
+function formatDuration(ms: number) {
+  if (!ms) return '-'
+  const seconds = Math.round(ms / 1000)
+  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`
 }
 
-function TextArea({
-  value,
-  onChange,
-  rows,
-  placeholder,
-}: {
-  value: string
-  onChange: (value: string) => void
-  rows: number
-  placeholder?: string
-}) {
-  return (
-    <textarea
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      rows={rows}
-      placeholder={placeholder}
-      className="w-full resize-none rounded-md border border-[#223049] bg-[#080D16] px-3 py-2.5 text-sm text-[#F1F5F9] placeholder:text-[#64748B] focus:border-[#38BDF8]/50 focus:outline-none focus:ring-1 focus:ring-[#38BDF8]/20"
-    />
-  )
+function platformLabel(id: string) {
+  return PLATFORM_CAPABILITIES.find((item) => item.id === id)?.label || id || '-'
 }
 
-function FieldLabel({ children }: { children: string }) {
-  return <span className="text-xs font-medium uppercase tracking-[0.08em] text-[#94A3B8]">{children}</span>
+function runFailureMessage(run: ExecutionRun) {
+  const resultMessage = typeof run.result?.message === 'string' ? run.result.message : ''
+  return run.error_message || resultMessage || ''
 }
 
-function StatusPanel({ result, error }: { result: SauCreateResponse | null; error: string }) {
-  if (!result && !error) return null
+function publishProgress(run: ExecutionRun) {
+  if (run.status === 'success') return { percent: 100, label: '发布完成' }
+  if (run.status === 'failed' || run.status === 'needs_human' || run.status === 'cancelled') return { percent: 100, label: statusText(run.status) }
+  if (run.status === 'queued') return { percent: 10, label: '等待执行' }
+  const step = run.current_step_id || ''
+  if (step === 'validate_material') return { percent: 25, label: '检查素材' }
+  if (step === 'platform_preflight') return { percent: 40, label: '检查账号' }
+  if (step === 'execute_upload') return { percent: 72, label: '正在发布' }
+  if (step === 'detect_result') return { percent: 90, label: '确认结果' }
+  return { percent: run.status === 'running' ? 32 : 0, label: run.status === 'running' ? '执行中' : statusText(run.status) }
+}
 
-  return (
-    <section className="rounded-md border border-[#223049] bg-[#080D16] p-4">
-      {error ? (
-        <div className="flex items-start gap-3">
-          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-[#EF4444]" />
-          <div>
-            <div className="text-sm font-medium text-[#F1F5F9]">创建失败</div>
-            <div className="mt-1 text-sm text-[#94A3B8]">{error}</div>
-          </div>
-        </div>
-      ) : result ? (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#10B981]" />
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-medium text-[#F1F5F9]">ExecutionRun 已创建</span>
-                <Badge variant="info">{result.run.status}</Badge>
-              </div>
-              <div className="mt-1 break-all text-xs text-[#94A3B8]">{result.execution_id}</div>
-            </div>
-          </div>
-          <Button asChild variant="outline" size="sm">
-            <Link to="/ai-staff/tasks">任务看板</Link>
-          </Button>
-        </div>
-      ) : null}
-    </section>
-  )
+function progressTone(status: string) {
+  if (status === 'success') return 'bg-[#22C55E]'
+  if (status === 'failed' || status === 'needs_human') return 'bg-[#F59E0B]'
+  if (status === 'cancelled') return 'bg-[#64748B]'
+  return 'bg-[#38BDF8]'
+}
+
+function capabilityState(capability: (typeof PLATFORM_CAPABILITIES)[number], platform?: PlatformInfo) {
+  if (platform?.session?.valid) return { label: '可发布', variant: 'success' as const }
+  if (capability.status === 'available') return { label: '需登录', variant: 'warning' as const }
+  if (capability.status === 'login_required') return { label: '需配置', variant: 'warning' as const }
+  if (capability.status === 'desktop') return { label: '需接管', variant: 'info' as const }
+  return { label: '待接入', variant: 'muted' as const }
 }
 
 export default function PublishCenter() {
-  const [mode, setMode] = useState<PublishMode>('note')
-  const [platform, setPlatform] = useState('douyin')
-  const [headless, setHeadless] = useState(false)
+  const [runs, setRuns] = useState<ExecutionRun[]>([])
+  const [platforms, setPlatforms] = useState<PlatformInfo[]>([])
+  const [archiveInfo, setArchiveInfo] = useState<ExecutionArchiveInfo | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [keyword, setKeyword] = useState('')
+  const [platformFilter, setPlatformFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('created_at')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [includeArchived, setIncludeArchived] = useState(false)
+  const [page, setPage] = useState(1)
 
-  const [videoPath, setVideoPath] = useState('')
-  const [videoTitle, setVideoTitle] = useState('SZYG 抖音自动发布测试')
-  const [videoDesc, setVideoDesc] = useState('由 SZYG Execution Kernel 创建的发布任务')
-  const [videoTags, setVideoTags] = useState('szygtest 自动化')
-
-  const [noteImages, setNoteImages] = useState('')
-  const [noteTitle, setNoteTitle] = useState('SZYG 图文自动发布测试')
-  const [noteText, setNoteText] = useState('这是一条用于验证图文发布链路的测试内容。')
-  const [noteTags, setNoteTags] = useState('szygtest 图文测试')
-  const [imagePrompt, setImagePrompt] = useState(
-    '真实产品营销图：办公桌上的笔记本电脑展示抽象运营看板，社媒发布图标、流程卡片、增长图表，蓝绿色点缀，无可读文字'
-  )
-  const [generatedPreview, setGeneratedPreview] = useState('')
-  const [contentDraft, setContentDraft] = useState<ContentDraft | null>(null)
-  const [productionGenerating, setProductionGenerating] = useState(false)
-
-  const [submitting, setSubmitting] = useState(false)
-  const [generating, setGenerating] = useState(false)
-  const generatingRef = useRef(false)
-  const [result, setResult] = useState<SauCreateResponse | null>(null)
-  const [error, setError] = useState('')
-
-  const selectedPlatform = useMemo(
-    () => PLATFORMS.find((item) => item.id === platform) || PLATFORMS[0],
-    [platform]
-  )
-
-  const loadContentDraft = useCallback(() => {
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
+    if (!silent) setLoadError('')
     try {
-      const raw = sessionStorage.getItem(CONTENT_DRAFT_KEY) || localStorage.getItem(CONTENT_DRAFT_KEY)
-      if (!raw) return null
-      const draft = JSON.parse(raw) as ContentDraft
-      if (!Array.isArray(draft.assets) || draft.assets.length === 0) return null
-      setContentDraft(draft)
-      setMode('note')
-      setNoteTitle((current) => current || draft.title || 'AI生成图文草稿')
-      setNoteText((current) => current || draft.note || draft.prompt || '')
-      setNoteTags((current) => current || (draft.tags || []).join(' '))
-      setGeneratedPreview(resolveGeneratedAssetUrl(draft.assets[0]?.url || '', draft.assets[0]?.path || ''))
-      return draft
-    } catch {
-      sessionStorage.removeItem(CONTENT_DRAFT_KEY)
-      localStorage.removeItem(CONTENT_DRAFT_KEY)
-      return null
+      const [executionResult, platformResult] = await Promise.all([
+        fetchExecutions({
+          limit: 300,
+          task_type: 'publish_video,publish_note',
+          keyword: keyword.trim(),
+          platform: platformFilter === 'all' ? '' : platformFilter,
+          status: statusFilter === 'all' ? '' : statusFilter,
+          sort_by: sortBy,
+          sort_dir: sortDir,
+          include_archived: includeArchived,
+        }),
+        fetchPlatforms(),
+      ])
+      setRuns(executionResult.runs || [])
+      setArchiveInfo(executionResult.archive || null)
+      setPlatforms(platformResult.platforms || [])
+      setLoadError('')
+    } catch (err) {
+      setLoadError(getErrorMessage(err, '发布数据暂不可用'))
+    } finally {
+      setLoading(false)
     }
-  }, [])
+  }, [includeArchived, keyword, platformFilter, sortBy, sortDir, statusFilter])
 
   useEffect(() => {
-    loadContentDraft()
-    return subscribeImageGeneration((state) => {
-      setProductionGenerating(state.loading)
-      if (!state.loading && state.results.length > 0) {
-        loadContentDraft()
-      }
-    })
-  }, [loadContentDraft])
+    load()
+    const timer = window.setInterval(() => load(true), 8000)
+    return () => window.clearInterval(timer)
+  }, [load])
 
-  function applyContentDraft() {
-    if (!contentDraft) return
-    setMode('note')
-    setNoteTitle(contentDraft.title || 'AI生成图文草稿')
-    setNoteText(contentDraft.note || contentDraft.prompt || '')
-    setNoteTags((contentDraft.tags || []).join(' '))
-    setNoteImages((current) =>
-      contentDraft.assets.reduce((next, asset) => appendUniquePath(next, asset.path || asset.url), current),
-    )
-    setGeneratedPreview(resolveGeneratedAssetUrl(contentDraft.assets[0]?.url || '', contentDraft.assets[0]?.path || ''))
+  useEffect(() => {
+    setPage(1)
+  }, [includeArchived, keyword, platformFilter, sortBy, sortDir, statusFilter])
+
+  const platformMap = useMemo(() => new Map(platforms.map((item) => [item.id, item])), [platforms])
+  const today = new Date().toDateString()
+  const activeRuns = runs.filter((run) => !run.archived)
+  const todaysRuns = activeRuns.filter((run) => new Date(run.created_at).toDateString() === today)
+  const summary = {
+    published: todaysRuns.filter((run) => run.status === 'success').length,
+    running: activeRuns.filter((run) => run.status === 'running' || run.status === 'queued').length,
+    needsHuman: activeRuns.filter((run) => run.status === 'needs_human' || run.status === 'failed').length,
+    available: PLATFORM_CAPABILITIES.filter((item) => platformMap.get(item.id)?.session?.valid).length,
   }
+  const totalPages = Math.max(1, Math.ceil(runs.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const pageStart = (currentPage - 1) * PAGE_SIZE
+  const pageRuns = runs.slice(pageStart, pageStart + PAGE_SIZE)
 
-  async function handleGenerateImage() {
-    if (generatingRef.current || !imagePrompt.trim()) return
-    generatingRef.current = true
-    setGenerating(true)
-    setError('')
-    setMode('note')
-    try {
-      const data = await generateImage(imagePrompt, '1920x1920')
-      const path = (data.paths?.[0] || data.images[0] || '').trim()
-      if (!path) throw new Error('图片生成完成，但没有返回素材路径')
-      setNoteImages((current) => appendUniquePath(current, path))
-      setGeneratedPreview(resolveGeneratedAssetUrl(data.images[0] || '', path))
-    } catch (err) {
-      setError(getErrorMessage(err, '图片生成失败'))
-    } finally {
-      generatingRef.current = false
-      setGenerating(false)
-    }
-  }
-
-  async function handleSubmit() {
-    setSubmitting(true)
-    setError('')
-    setResult(null)
-    try {
-      const payload =
-        mode === 'video'
-          ? await createSauVideoTask({
-              platform,
-              file_path: videoPath.trim(),
-              title: videoTitle.trim(),
-              desc: videoDesc.trim(),
-              tags: splitTags(videoTags),
-              headless,
-            })
-          : await createSauNoteTask({
-              platform,
-              image_paths: splitLines(noteImages),
-              title: noteTitle.trim(),
-              note: noteText.trim(),
-              tags: splitTags(noteTags),
-              headless,
-            })
-      setResult(payload)
-    } catch (err) {
-      setError(getErrorMessage(err, '发布任务创建失败'))
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const Icon = selectedPlatform.icon
-  const canSubmit =
-    mode === 'video'
-      ? Boolean(videoPath.trim() && videoTitle.trim())
-      : Boolean(splitLines(noteImages).length > 0 && noteTitle.trim())
+  useEffect(() => {
+    setPage((value) => Math.min(value, totalPages))
+  }, [totalPages])
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[#080D16] px-4 py-5 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-[1480px] flex-col gap-5">
-        <header className="flex flex-col gap-4 rounded-md border border-[#1C2940] bg-[#0D1422] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-[#1E3A5F] bg-[#0B1A2D]">
-              <Send className="h-5 w-5 text-[#38BDF8]" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-semibold tracking-normal text-[#F8FAFC]">发布中心</h1>
-                <Badge variant="info">Execution Kernel</Badge>
-              </div>
-              <p className="mt-1 text-sm text-[#94A3B8]">
-                内容、素材生成、平台发布和执行观测在一个工作台完成。
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline">
-              <Link to="/publish/workspace">执行观测</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link to="/ai-staff/tasks">任务看板</Link>
-            </Button>
-          </div>
-        </header>
+        <p className="px-1 text-sm text-[#94A3B8]">
+          查看多平台发布结果、队列进度、作品入口和需要处理的问题。
+        </p>
 
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {metrics.map((metric) => (
+          {[
+            { label: '今日已发布', value: summary.published, hint: '已拿到平台结果', color: 'text-[#22C55E]' },
+            { label: '发布中', value: summary.running, hint: '正在自动执行', color: 'text-[#38BDF8]' },
+            { label: '待处理', value: summary.needsHuman, hint: '失败或需人工', color: 'text-[#F59E0B]' },
+            { label: '可用渠道', value: summary.available, hint: `共 ${PLATFORM_CAPABILITIES.length} 个渠道`, color: 'text-[#A78BFA]' },
+          ].map((metric) => (
             <div key={metric.label} className="rounded-md border border-[#1C2940] bg-[#0D1422] px-4 py-3">
               <div className="text-xs text-[#64748B]">{metric.label}</div>
               <div className="mt-1 flex items-end gap-3">
@@ -299,284 +211,210 @@ export default function PublishCenter() {
           ))}
         </section>
 
-        <section className="rounded-md border border-[#1C2940] bg-[#0D1422]">
-          <div className="grid gap-4 p-4 lg:grid-cols-[1fr_auto] lg:items-end">
-            <label className="grid gap-2">
-              <FieldLabel>AI 图片生成</FieldLabel>
-              <Input value={imagePrompt} onChange={(event) => setImagePrompt(event.target.value)} />
-            </label>
-            <Button
-              type="button"
-              onClick={handleGenerateImage}
-              disabled={generating || !imagePrompt.trim()}
-              className="h-10"
-            >
-              {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              生成图片
-            </Button>
-          </div>
-          <div className="border-t border-[#1C2940] px-4 py-2 text-xs text-[#64748B]">
-            生成后自动切换到图文任务，并写入图片文件路径。此入口始终首屏可见。
-          </div>
-        </section>
-
-        {(contentDraft || productionGenerating) && (
-          <section className="rounded-md border border-[#1E3A5F] bg-[#0B1A2D] p-4">
-            <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#1E3A5F] bg-[#080D16]">
-                  {productionGenerating ? (
-                    <Loader2 className="h-5 w-5 animate-spin text-[#38BDF8]" />
-                  ) : (
-                    <ImagePlus className="h-5 w-5 text-[#38BDF8]" />
-                  )}
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-[#F1F5F9]">
-                    {productionGenerating ? '内容生产正在生成' : '检测到内容生产草稿'}
-                  </div>
-                  <div className="mt-1 text-xs leading-5 text-[#94A3B8]">
-                    {productionGenerating
-                      ? '可以停留在发布中心，生成完成后草稿会自动出现在这里。'
-                      : `${contentDraft?.assets.length || 0} 张素材 · ${contentDraft?.prompt || contentDraft?.title || ''}`}
-                  </div>
-                </div>
-              </div>
-              <Button type="button" onClick={applyContentDraft} disabled={!contentDraft || productionGenerating}>
-                <Send className="h-4 w-4" />
-                加入发布内容
-              </Button>
+        {loadError && (
+          <section className="flex items-start gap-3 rounded-md border border-[#7F1D1D] bg-[#450A0A]/35 px-4 py-3 text-sm text-[#FCA5A5]">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <div className="font-medium text-[#FEE2E2]">发布数据暂不可用</div>
+              <div className="mt-1 text-xs leading-5 text-[#FCA5A5]">{loadError}</div>
             </div>
           </section>
         )}
 
-        <section className="grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[300px_minmax(0,1fr)_340px]">
-          <aside className="rounded-md border border-[#1C2940] bg-[#0D1422]">
-            <div className="border-b border-[#1C2940] px-4 py-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-[#F1F5F9]">
-                <Workflow className="h-4 w-4 text-[#38BDF8]" />
-                任务配置
-              </div>
-              <div className="mt-1 text-xs text-[#64748B]">选择内容形态、平台和执行方式。</div>
-            </div>
-
-            <div className="grid gap-5 p-4">
-              <div className="grid gap-2">
-                <FieldLabel>内容类型</FieldLabel>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    type="button"
-                    variant={mode === 'note' ? 'default' : 'outline'}
-                    className="justify-start"
-                    onClick={() => setMode('note')}
-                  >
-                    <ImagePlus className="h-4 w-4" />
-                    图文
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={mode === 'video' ? 'default' : 'outline'}
-                    className="justify-start"
-                    onClick={() => setMode('video')}
-                  >
-                    <Video className="h-4 w-4" />
-                    视频
-                  </Button>
-                </div>
-              </div>
-
-              <div className="grid gap-2">
-                <FieldLabel>平台</FieldLabel>
-                <div className="grid gap-2">
-                  {PLATFORMS.map((item) => {
-                    const PlatformIcon = item.icon
-                    return (
-                      <Button
-                        key={item.id}
-                        type="button"
-                        variant={platform === item.id ? 'secondary' : 'outline'}
-                        className="justify-start"
-                        onClick={() => setPlatform(item.id)}
-                      >
-                        <PlatformIcon className="h-4 w-4" />
-                        {item.label}
-                      </Button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <div className="grid gap-2">
-                <FieldLabel>执行方式</FieldLabel>
-                <label className="flex items-center justify-between gap-3 rounded-md border border-[#223049] bg-[#080D16] px-3 py-3">
-                  <span>
-                    <span className="block text-sm text-[#F1F5F9]">{headless ? '后台执行' : '可视化浏览器'}</span>
-                    <span className="text-xs text-[#64748B]">{headless ? '适合稳定链路' : '适合登录/验收/人工接管'}</span>
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={headless}
-                    onChange={(event) => setHeadless(event.target.checked)}
-                    className="h-4 w-4 accent-[#38BDF8]"
-                  />
-                </label>
-              </div>
-
-              <div className="rounded-md border border-[#24324B] bg-[#080D16] p-3">
-                <div className="flex items-center gap-2 text-sm font-medium text-[#F1F5F9]">
-                  <ShieldCheck className="h-4 w-4 text-[#10B981]" />
-                  风控策略
-                </div>
-                <p className="mt-2 text-xs leading-5 text-[#94A3B8]">
-                  登录失效、验证码、账号异常、未知弹窗会进入需人工状态，不继续盲点发布。
-                </p>
-              </div>
-            </div>
-          </aside>
-
+        <section>
           <main className="rounded-md border border-[#1C2940] bg-[#0D1422]">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1C2940] px-5 py-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-md border border-[#1E3A5F] bg-[#0B1A2D]">
-                  <Icon className="h-5 w-5 text-[#38BDF8]" />
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-[#F1F5F9]">
-                    {selectedPlatform.label} · {mode === 'video' ? '视频发布' : '图文发布'}
-                  </div>
-                  <div className="mt-1 text-xs text-[#64748B]">提交后立即创建可追踪的 ExecutionRun。</div>
-                </div>
+              <div>
+                <h2 className="text-base font-semibold text-[#F8FAFC]">发布记录</h2>
+                <p className="mt-1 text-sm text-[#64748B]">最近发布任务、执行状态和作品链接集中在这里。</p>
               </div>
-              <Badge variant={headless ? 'muted' : 'warning'}>{headless ? 'headless' : 'headed'}</Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                {archiveInfo && (
+                  <Badge variant="muted">
+                    <Archive className="h-3.5 w-3.5" />
+                    活跃 {archiveInfo.active_publish_records}/{archiveInfo.active_limit} · 归档 {archiveInfo.archived_publish_records}
+                  </Badge>
+                )}
+                <Badge variant="muted">{runs.length} 条记录</Badge>
+              </div>
             </div>
 
-            <div className="grid gap-5 p-5">
-              {mode === 'video' ? (
-                <>
-                  <label className="grid gap-2">
-                    <FieldLabel>视频文件路径</FieldLabel>
-                    <Input
-                      value={videoPath}
-                      onChange={(event) => setVideoPath(event.target.value)}
-                      placeholder="D:\szyg\data\materials\demo.mp4"
-                    />
-                  </label>
-                  <label className="grid gap-2">
-                    <FieldLabel>标题</FieldLabel>
-                    <Input value={videoTitle} onChange={(event) => setVideoTitle(event.target.value)} />
-                  </label>
-                  <label className="grid gap-2">
-                    <FieldLabel>描述</FieldLabel>
-                    <TextArea value={videoDesc} onChange={setVideoDesc} rows={5} />
-                  </label>
-                  <label className="grid gap-2">
-                    <FieldLabel>标签</FieldLabel>
-                    <Input value={videoTags} onChange={(event) => setVideoTags(event.target.value)} />
-                  </label>
-                </>
-              ) : (
-                <>
-                  <label className="grid gap-2">
-                    <FieldLabel>标题</FieldLabel>
-                    <Input value={noteTitle} onChange={(event) => setNoteTitle(event.target.value)} />
-                  </label>
-                  <label className="grid gap-2">
-                    <FieldLabel>正文</FieldLabel>
-                    <TextArea value={noteText} onChange={setNoteText} rows={6} />
-                  </label>
-                  <label className="grid gap-2">
-                    <FieldLabel>图片文件路径</FieldLabel>
-                    <TextArea
-                      value={noteImages}
-                      onChange={setNoteImages}
-                      rows={5}
-                      placeholder="D:\szyg\data\volcengine_output\image.jpg"
-                    />
-                  </label>
-                  <label className="grid gap-2">
-                    <FieldLabel>标签</FieldLabel>
-                    <Input value={noteTags} onChange={(event) => setNoteTags(event.target.value)} />
-                  </label>
-                </>
-              )}
+            <div className="grid gap-3 border-b border-[#1C2940] px-5 py-4 lg:grid-cols-[minmax(220px,1fr)_160px_160px_160px_120px]">
+              <label className="relative block">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
+                <input
+                  value={keyword}
+                  onChange={(event) => setKeyword(event.target.value)}
+                  placeholder="搜索标题、账号、平台、错误原因或任务ID"
+                  className="h-10 w-full rounded-md border border-[#1C2940] bg-[#080D16] pl-9 pr-3 text-sm text-[#F8FAFC] outline-none transition-colors placeholder:text-[#475569] focus:border-[#6366F1]"
+                />
+              </label>
+              <select
+                value={platformFilter}
+                onChange={(event) => setPlatformFilter(event.target.value)}
+                className="h-10 rounded-md border border-[#1C2940] bg-[#080D16] px-3 text-sm text-[#CBD5E1] outline-none focus:border-[#6366F1]"
+              >
+                <option value="all">全部平台</option>
+                {PLATFORM_CAPABILITIES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+              </select>
+              <select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value)}
+                className="h-10 rounded-md border border-[#1C2940] bg-[#080D16] px-3 text-sm text-[#CBD5E1] outline-none focus:border-[#6366F1]"
+              >
+                <option value="all">全部状态</option>
+                <option value="success">已发布</option>
+                <option value="running">发布中</option>
+                <option value="queued">排队中</option>
+                <option value="needs_human">需处理</option>
+                <option value="failed">失败</option>
+                <option value="cancelled">已取消</option>
+              </select>
+              <select
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value)}
+                className="h-10 rounded-md border border-[#1C2940] bg-[#080D16] px-3 text-sm text-[#CBD5E1] outline-none focus:border-[#6366F1]"
+              >
+                <option value="created_at">创建时间</option>
+                <option value="finished_at">完成时间</option>
+                <option value="duration_ms">耗时</option>
+                <option value="platform">平台</option>
+                <option value="status">状态</option>
+                <option value="title">标题</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => setSortDir((value) => value === 'desc' ? 'asc' : 'desc')}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-[#1C2940] bg-[#080D16] px-3 text-sm text-[#CBD5E1] transition-colors hover:border-[#6366F1] hover:text-[#F8FAFC]"
+              >
+                {sortDir === 'desc' ? '降序' : '升序'}
+              </button>
+              <label className="flex items-center gap-2 text-xs text-[#94A3B8] lg:col-span-5">
+                <input
+                  type="checkbox"
+                  checked={includeArchived}
+                  onChange={(event) => setIncludeArchived(event.target.checked)}
+                  className="h-4 w-4 accent-[#6366F1]"
+                />
+                显示归档记录
+              </label>
+            </div>
 
-              <div className="rounded-md border border-[#223049] bg-[#080D16] p-4">
-                <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
-                  <div className="flex items-start gap-3">
-                    <Clock3 className="mt-0.5 h-4 w-4 text-[#38BDF8]" />
-                    <div>
-                      <div className="text-sm font-medium text-[#F1F5F9]">执行闭环</div>
-                      <div className="mt-1 text-xs leading-5 text-[#94A3B8]">
-                        预检、上传、填写、发布、校验都会记录 Step 和 AuditEvent。
-                      </div>
-                    </div>
-                  </div>
-                  <Button type="button" onClick={handleSubmit} disabled={submitting || !canSubmit}>
-                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                    创建发布任务
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] text-left text-sm">
+                <thead className="border-b border-[#1C2940] text-xs uppercase tracking-[0.08em] text-[#64748B]">
+                  <tr>
+                    <th className="px-5 py-3 font-medium">内容</th>
+                    <th className="px-4 py-3 font-medium">平台</th>
+                    <th className="px-4 py-3 font-medium">账号</th>
+                    <th className="px-4 py-3 font-medium">类型</th>
+                    <th className="px-4 py-3 font-medium">状态</th>
+                    <th className="px-4 py-3 font-medium">时间</th>
+                    <th className="px-4 py-3 font-medium">耗时</th>
+                    <th className="px-4 py-3 font-medium">作品</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {runs.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-5 py-16 text-center text-[#64748B]">
+                        暂无发布记录。请在“素材管理与发布”中选择素材并确认发布。
+                      </td>
+                    </tr>
+                  ) : pageRuns.map((run) => {
+                    const post = getPublishedPostInfo(run.result, run.platform)
+                    const showPostLink = run.status === 'success' && post?.url
+                    const progress = publishProgress(run)
+                    return (
+                      <tr key={run.id} className="border-b border-[#111827] hover:bg-[#111827]/60">
+                        <td className="max-w-[340px] px-5 py-4">
+                          <div className="truncate font-medium text-[#F8FAFC]">{run.title || run.input?.title as string || run.task_type}</div>
+                          {run.archived && (
+                            <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-[#64748B]">
+                              <span className="shrink-0 rounded bg-[#1E293B] px-1.5 py-0.5 text-[10px] text-[#94A3B8]">已归档</span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-4 text-[#CBD5E1]">{platformLabel(run.platform)}</td>
+                        <td className="px-4 py-4 text-[#CBD5E1]">{run.account_label || (run.input?.account_label as string) || '-'}</td>
+                        <td className="px-4 py-4 text-[#CBD5E1]">{run.task_type === 'publish_note' ? '图文' : '视频'}</td>
+                        <td className="px-4 py-4">
+                          <div className="flex flex-col items-start gap-1">
+                            <Badge variant={statusVariant(run.status)}>{statusText(run.status)}</Badge>
+                            {(run.status === 'queued' || run.status === 'running') && (
+                              <div className="mt-1 w-36">
+                                <div className="mb-1 flex items-center justify-between text-[11px] text-[#64748B]">
+                                  <span>{progress.label}</span>
+                                  <span>{progress.percent}%</span>
+                                </div>
+                                <div className="h-1.5 overflow-hidden rounded-full bg-[#1E293B]">
+                                  <div
+                                    className={`h-full rounded-full transition-all duration-500 ${progressTone(run.status)}`}
+                                    style={{ width: `${progress.percent}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                            {run.status !== 'success' && runFailureMessage(run) && (
+                              <span className="max-w-[180px] text-xs leading-5 text-[#FCA5A5]" title={runFailureMessage(run)}>
+                                {runFailureMessage(run)}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 text-xs text-[#94A3B8]">{formatTime(run.finished_at || run.started_at || run.created_at)}</td>
+                        <td className="px-4 py-4 text-xs text-[#94A3B8]">{formatDuration(run.duration_ms)}</td>
+                        <td className="px-4 py-4">
+                          {showPostLink ? (
+                            <Button type="button" size="sm" variant="outline" onClick={() => window.open(post.url, '_blank', 'noopener,noreferrer')}>
+                              <ExternalLink className="h-4 w-4" />
+                              {post.label}
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-[#64748B]">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {runs.length > 0 && (
+              <div className="flex flex-col gap-3 border-t border-[#1C2940] px-5 py-4 text-sm text-[#94A3B8] sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  第 {pageStart + 1}-{Math.min(pageStart + PAGE_SIZE, runs.length)} 条，共 {runs.length} 条
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={currentPage <= 1}
+                    onClick={() => setPage((value) => Math.max(1, value - 1))}
+                  >
+                    上一页
+                  </Button>
+                  <span className="min-w-16 text-center text-xs text-[#64748B]">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+                  >
+                    下一页
                   </Button>
                 </div>
               </div>
-
-              <StatusPanel result={result} error={error} />
-            </div>
+            )}
           </main>
 
-          <aside className="rounded-md border border-[#1C2940] bg-[#0D1422]">
-            <div className="border-b border-[#1C2940] px-4 py-4">
-              <div className="flex items-center gap-2 text-sm font-medium text-[#F1F5F9]">
-                <Sparkles className="h-4 w-4 text-[#10B981]" />
-                AI 素材生成
-              </div>
-              <div className="mt-1 text-xs text-[#64748B]">常驻入口，生成后自动写入图文图片路径。</div>
-            </div>
-
-            <div className="grid gap-4 p-4">
-              <label className="grid gap-2">
-                <FieldLabel>图片提示词</FieldLabel>
-                <TextArea value={imagePrompt} onChange={setImagePrompt} rows={6} />
-              </label>
-
-              <Button type="button" onClick={handleGenerateImage} disabled={generating || !imagePrompt.trim()}>
-                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                生成图片
-              </Button>
-
-              <div className="overflow-hidden rounded-md border border-[#223049] bg-[#080D16]">
-                {generatedPreview ? (
-                  <img src={generatedPreview} alt="generated publish asset" className="h-44 w-full object-cover" />
-                ) : (
-                  <div className="flex h-44 flex-col items-center justify-center gap-2 text-[#64748B]">
-                    <ImagePlus className="h-7 w-7" />
-                    <span className="text-sm">等待生成预览</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-md border border-[#223049] bg-[#080D16] p-3">
-                <div className="flex items-center gap-2 text-sm font-medium text-[#F1F5F9]">
-                  <Play className="h-4 w-4 text-[#38BDF8]" />
-                  最近动作
-                </div>
-                <div className="mt-3 grid gap-2 text-xs text-[#94A3B8]">
-                  <div className="flex justify-between gap-2">
-                    <span>生成素材</span>
-                    <span className={generatedPreview ? 'text-[#10B981]' : 'text-[#64748B]'}>
-                      {generatedPreview ? 'ready' : 'waiting'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span>图文路径</span>
-                    <span className={noteImages.trim() ? 'text-[#10B981]' : 'text-[#64748B]'}>
-                      {splitLines(noteImages).length} 张
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </aside>
         </section>
       </div>
+
     </div>
   )
 }

@@ -77,13 +77,16 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({
     <div className="w-[280px] shrink-0 bg-[#0B0F1A] border-r border-[#1E293B] flex flex-col">
       <div className="h-12 flex items-center justify-between px-4 border-b border-[#1E293B] shrink-0">
         <span className="text-[13px] font-semibold text-[#F1F5F9]">对话历史</span>
-        <button
-          onClick={onNew}
-          className="p-1 rounded-md text-[#64748B] hover:text-[#F1F5F9] hover:bg-[rgba(255,255,255,0.05)] transition-colors"
-          aria-label="新建对话"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onNew}
+            className="p-1 rounded-md text-[#64748B] hover:text-[#F1F5F9] hover:bg-[rgba(255,255,255,0.05)] transition-colors"
+            aria-label="新建对话"
+            title="新建对话"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-2">

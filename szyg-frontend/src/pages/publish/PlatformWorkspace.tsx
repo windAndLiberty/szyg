@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { fetchExecutions, fetchPlatforms, type ExecutionRun, type PlatformInfo } from '@/lib/api'
+import { PublishedPostLink } from '@/components/publish/PublishedPostLink'
 
 const PLATFORM_NAMES: Record<string, string> = {
   douyin: '抖音',
@@ -117,8 +118,7 @@ export default function PlatformWorkspace() {
     <div className="flex min-h-0 flex-1 flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-[#F8FAFC]">平台工作台</h1>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-[#94A3B8]">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-[#94A3B8]">
             <span>{activeTasks.length} 个进行中</span>
             <span className="text-[#334155]">/</span>
             <span>{failedTasks.length} 个待处理</span>
@@ -327,6 +327,7 @@ export default function PlatformWorkspace() {
                       {selectedRun.error_message}
                     </div>
                   )}
+                  <PublishedPostLink result={selectedRun.result} platform={selectedRun.platform} />
                 </>
               ) : (
                 <div className="rounded-md border border-dashed border-[#334155] px-3 py-6 text-center text-sm text-[#64748B]">

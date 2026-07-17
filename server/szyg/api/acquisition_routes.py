@@ -39,13 +39,13 @@ def _get_convert():
 
 
 def _get_queue():
-    from szyg.comment_engine import CommentQueue
-    return CommentQueue()
+    from szyg.comment_engine import get_comment_queue
+    return get_comment_queue()
 
 
 def _get_limiter():
-    from szyg.comment_engine import CommentRateLimiter
-    return CommentRateLimiter()
+    from szyg.comment_engine import get_comment_rate_limiter
+    return get_comment_rate_limiter()
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -280,10 +280,21 @@ async def batch_send(req: BatchCommentRequest):
     """批量发送评论"""
     from szyg.comment_engine import batch_send
     results = await batch_send(req.platform, req.comments, req.strategy, req.deai)
-    sent = len([r for r in results if r.get("status") == "sent"])
-    failed = len([r for r in results if r.get("status") == "failed"])
-    skipped = len([r for r in results if r.get("status") == "skipped"])
-    return {"total": len(results), "sent": sent, "failed": failed, "skipped": skipped, "results": results}
+    counts = {}
+    for item in results:
+        status = item.get("status", "unknown")
+        counts[status] = counts.get(status, 0) + 1
+    return {
+        "total": len(results),
+        "sent": counts.get("sent", 0),
+        "failed": counts.get("failed", 0),
+        "skipped": counts.get("skipped", 0),
+        "delayed": counts.get("delayed", 0),
+        "retrying": counts.get("retrying", 0),
+        "needs_human": counts.get("needs_human", 0),
+        "auto_repaired": len([r for r in results if r.get("decision") == "auto_repair_then_send"]),
+        "results": results,
+    }
 
 
 @router.get("/comments/queue")
@@ -306,6 +317,13 @@ async def comment_stats():
         "queue": stats.__dict__,
         "rate_limits": rate_status,
     }
+
+
+@router.post("/comments/process-due")
+async def process_due_comments(limit: int = 20):
+    """处理已到期的延后/重试评论任务"""
+    from szyg.comment_engine import process_due_comments as run_due_comments
+    return await run_due_comments(limit=limit)
 
 
 @router.delete("/comments/queue/{item_id}")
@@ -554,8 +572,7 @@ async def get_strategy(platform: str = "douyin"):
 @router.post("/strategy/apply")
 async def apply_strategy(req: StrategyRequest):
     """应用行为策略到平台的频率限制"""
-    from szyg.comment_engine import CommentRateLimiter
-    limiter = CommentRateLimiter()
+    limiter = _get_limiter()
     limiter.apply_strategy(req.strategy)
     remaining = await limiter.remaining(req.platform)
     return {

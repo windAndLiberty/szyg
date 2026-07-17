@@ -561,7 +561,6 @@ export default function AIMarket() {
     <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
       {/* 页头 */}
       <motion.div variants={cardVariants}>
-        <h1 className="text-display-md font-display text-[#F1F5F9] mb-2">AI 人才市场</h1>
         <p className="text-body-lg text-[#94A3B8]">
           发现并启用领域专家，为超级员工切换专业角色 · 共 {totalAgents} 位专家
         </p>

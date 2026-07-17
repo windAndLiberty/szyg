@@ -14,11 +14,13 @@ import Settings from './pages/Settings'
 
 // 占位页面 — AI员工
 import AIMarket from './pages/ai-staff/AIMarket'
-import TaskBoard from './pages/ai-staff/TaskBoard'
+import AITools from './pages/ai-staff/AITools'
+import ComputerUse from './pages/ai-staff/ComputerUse'
 // 占位页面 — 内容创作
 import ContentProduction from './pages/content/ContentProduction'
 import AssetManagement from './pages/content/AssetManagement'
 // 占位页面 — 营销获客
+import PrivateDomain from './pages/marketing/PrivateDomain'
 import Intercept from './pages/marketing/Intercept'
 import Listen from './pages/marketing/Listen'
 import Conversion from './pages/marketing/Conversion'
@@ -26,7 +28,6 @@ import Customers from './pages/marketing/Customers'
 // 占位页面 — 发布管理
 import PublishCenter from './pages/publish/PublishCenter'
 import Accounts from './pages/publish/Accounts'
-import ContentCalendar from './pages/publish/ContentCalendar'
 import PlatformWorkspace from './pages/publish/PlatformWorkspace'
 // 占位页面 — 工作流
 import Pipeline from './pages/workflow/Pipeline'
@@ -95,7 +96,9 @@ export default function App() {
       <Route element={<Layout />}>
         {/* AI员工 */}
         <Route path="/ai-staff/market" element={<AIMarket />} />
-        <Route path="/ai-staff/tasks" element={<TaskBoard />} />
+        <Route path="/ai-staff/tools" element={<AITools />} />
+        <Route path="/ai-staff/computer-use" element={<ComputerUse />} />
+        <Route path="/ai-staff/tasks" element={<Navigate to="/publish/center" replace />} />
 
         {/* 内容创作 */}
         <Route path="/content/production" element={<ContentProduction />} />
@@ -103,6 +106,7 @@ export default function App() {
         <Route path="/content/digital-human" element={<DigitalHuman />} />
 
         {/* 营销获客 */}
+        <Route path="/marketing/private-domain" element={<PrivateDomain />} />
         <Route path="/marketing/intercept" element={<Intercept />} />
         <Route path="/marketing/listen" element={<Listen />} />
         <Route path="/marketing/conversion" element={<Conversion />} />
@@ -111,7 +115,7 @@ export default function App() {
         {/* 发布管理 */}
         <Route path="/publish/center" element={<PublishCenter />} />
         <Route path="/publish/accounts" element={<Accounts />} />
-        <Route path="/publish/calendar" element={<ContentCalendar />} />
+        <Route path="/publish/calendar" element={<Navigate to="/publish/center" replace />} />
         <Route path="/publish/workspace" element={<PlatformWorkspace />} />
 
         {/* 工作流 */}

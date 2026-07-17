@@ -16,6 +16,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from szyg.channel_accounts import get_account, get_default_account_for_platform
+
 logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).parent.parent.parent.parent
@@ -74,11 +76,21 @@ _PLATFORM_MAP = {
         "module": "uploader.ks_uploader.main",
         "video_class": "KSVideo",
         "note_class": "KSNote",
-        "upload_method_video": "ks_upload_video",
-        "upload_method_note": "ks_upload_note",
+        "upload_method_video": "main",
+        "upload_method_note": "main",
         "cookie_subdir": "ks_uploader",
-        "immediate_strategy": "KS_PUBLISH_STRATEGY_IMMEDIATE",
-        "scheduled_strategy": "KS_PUBLISH_STRATEGY_SCHEDULED",
+        "immediate_strategy": "KUAISHOU_PUBLISH_STRATEGY_IMMEDIATE",
+        "scheduled_strategy": "KUAISHOU_PUBLISH_STRATEGY_SCHEDULED",
+    },
+    "bilibili": {
+        "module": "",
+        "video_class": None,
+        "note_class": None,
+        "upload_method_video": None,
+        "upload_method_note": None,
+        "cookie_subdir": "bilibili_uploader",
+        "immediate_strategy": None,
+        "scheduled_strategy": None,
     },
     "tencent": {
         "module": "uploader.tencent_uploader.main",
@@ -125,26 +137,48 @@ class SocialAutoUploadAdapter:
         _SAU_COOKIES_DIR.mkdir(parents=True, exist_ok=True)
         _SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
 
-    def _account_name(self, platform: str) -> str:
+    def _account_name(self, platform: str, account_id: str | None = None, account_name: str | None = None) -> str:
+        if account_name:
+            return account_name
+        if account_id:
+            account = get_account(account_id)
+            if account and account.get("sau_account_name"):
+                return str(account["sau_account_name"])
         accounts = getattr(_SAU_CONFIG, "accounts", {}) or {}
         return accounts.get(platform, platform)
 
     def _publish_timeout_seconds(self) -> int:
         return int(getattr(_SAU_CONFIG, "publish_timeout_seconds", 900) or 900)
 
-    def _sync_douyin_session_to_external_sau(self) -> Path:
-        account_name = self._account_name("douyin")
-        source = _SESSIONS_DIR / "storage_state_douyin.json"
+    def _external_sau_account_file(self, platform: str, account_id: str | None = None, account_name: str | None = None) -> Path:
+        account_name = self._account_name(platform, account_id=account_id, account_name=account_name)
+        path = _SAU_COOKIES_DIR / f"{platform}_{account_name}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def _sync_douyin_session_to_external_sau(
+        self,
+        account_id: str | None = None,
+        account_file: str | None = None,
+        account_name: str | None = None,
+    ) -> Path:
+        account_name = self._account_name("douyin", account_id=account_id, account_name=account_name)
+        source = Path(account_file) if account_file else Path(self._get_account_file("douyin", account_id=account_id))
         target = _SAU_COOKIES_DIR / f"douyin_{account_name}.json"
         target.parent.mkdir(parents=True, exist_ok=True)
         if source.exists():
             shutil.copy2(source, target)
         return target
 
-    def _sync_external_sau_to_douyin_session(self) -> None:
-        account_name = self._account_name("douyin")
+    def _sync_external_sau_to_douyin_session(
+        self,
+        account_id: str | None = None,
+        account_file: str | None = None,
+        account_name: str | None = None,
+    ) -> None:
+        account_name = self._account_name("douyin", account_id=account_id, account_name=account_name)
         source = _SAU_COOKIES_DIR / f"douyin_{account_name}.json"
-        target = _SESSIONS_DIR / "storage_state_douyin.json"
+        target = Path(account_file) if account_file else Path(self._get_account_file("douyin", account_id=account_id))
         if source.exists():
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
@@ -217,6 +251,193 @@ class SocialAutoUploadAdapter:
             "stderr": stderr,
         }
 
+    async def _login_bilibili_browser(
+        self,
+        account_file: str,
+        timeout_seconds: int = 600,
+        headless: bool = False,
+        force: bool = False,
+    ) -> dict:
+        try:
+            from playwright.async_api import async_playwright
+        except Exception as exc:
+            return {
+                "success": False,
+                "login_started": False,
+                "message": f"浏览器组件不可用：{exc}",
+            }
+
+        account_path = Path(account_file)
+        if force and account_path.exists():
+            try:
+                account_path.unlink()
+            except OSError:
+                pass
+        account_path.parent.mkdir(parents=True, exist_ok=True)
+
+        async with async_playwright() as playwright:
+            browser = await playwright.chromium.launch(headless=headless, channel="chromium")
+            try:
+                context_kwargs: dict[str, Any] = {
+                    "viewport": {"width": 1280, "height": 900},
+                }
+                if account_path.exists():
+                    context_kwargs["storage_state"] = str(account_path)
+                context = await browser.new_context(**context_kwargs)
+                page = await context.new_page()
+                await page.goto("https://passport.bilibili.com/login", wait_until="domcontentloaded", timeout=60000)
+                login_started = True
+                deadline = asyncio.get_running_loop().time() + max(timeout_seconds, 60)
+                last_error = ""
+
+                while asyncio.get_running_loop().time() < deadline:
+                    try:
+                        nav = await page.evaluate(
+                            """async () => {
+                              const response = await fetch('https://api.bilibili.com/x/web-interface/nav', { credentials: 'include' });
+                              return await response.json();
+                            }"""
+                        )
+                        data = nav.get("data") if isinstance(nav, dict) else {}
+                        if isinstance(data, dict) and data.get("isLogin"):
+                            await context.storage_state(path=str(account_path))
+                            return {
+                                "success": True,
+                                "login_started": login_started,
+                                "message": "B站登录成功",
+                                "account_file": str(account_path),
+                            }
+                    except Exception as exc:
+                        last_error = str(exc)
+                    await page.wait_for_timeout(2500)
+
+                return {
+                    "success": False,
+                    "login_started": login_started,
+                    "message": f"等待 B站扫码登录超时{f'：{last_error}' if last_error else ''}",
+                    "account_file": str(account_path),
+                }
+            finally:
+                await browser.close()
+
+    async def _lookup_douyin_published_post(self, account_file: Path, title: str) -> dict:
+        try:
+            from playwright.async_api import async_playwright
+        except Exception as exc:
+            return {
+                "link_extraction": {
+                    "status": "unsupported",
+                    "method": "douyin_creator_work_list",
+                    "message": f"Playwright unavailable: {exc}",
+                }
+            }
+
+        if not account_file.exists():
+            return {
+                "link_extraction": {
+                    "status": "not_found",
+                    "method": "douyin_creator_work_list",
+                    "message": f"Account storage state not found: {account_file}",
+                }
+            }
+
+        work_lists: list[dict[str, Any]] = []
+        browser = None
+        try:
+            async with async_playwright() as playwright:
+                browser = await playwright.chromium.launch(headless=True)
+                context = await browser.new_context(
+                    storage_state=str(account_file),
+                    viewport={"width": 1440, "height": 1000},
+                )
+                page = await context.new_page()
+
+                async def capture_work_list(response) -> None:
+                    if "/janus/douyin/creator/pc/work_list" not in response.url:
+                        return
+                    try:
+                        work_lists.append(await response.json())
+                    except Exception:
+                        logger.debug("Failed to parse Douyin work_list response", exc_info=True)
+
+                page.on("response", capture_work_list)
+                await page.goto(
+                    "https://creator.douyin.com/creator-micro/content/manage?enter_from=publish",
+                    wait_until="domcontentloaded",
+                    timeout=90_000,
+                )
+                try:
+                    await page.wait_for_response(
+                        lambda response: "/janus/douyin/creator/pc/work_list" in response.url,
+                        timeout=15_000,
+                    )
+                except Exception:
+                    pass
+                for _ in range(16):
+                    if any(title and title in json.dumps(data, ensure_ascii=False) for data in work_lists):
+                        break
+                    await page.wait_for_timeout(500)
+                await context.close()
+        except Exception as exc:
+            logger.warning("Douyin post link lookup failed: %s", exc)
+            return {
+                "link_extraction": {
+                    "status": "not_found",
+                    "method": "douyin_creator_work_list",
+                    "message": str(exc),
+                }
+            }
+        finally:
+            if browser:
+                try:
+                    await browser.close()
+                except Exception:
+                    pass
+
+        title = (title or "").strip()
+        candidates: list[dict[str, Any]] = []
+        for data in work_lists:
+            for item in data.get("aweme_list") or []:
+                item_title = str(item.get("item_title") or "").strip()
+                desc = str(item.get("desc") or "").strip()
+                if title and (item_title == title or title in desc):
+                    candidates.append(item)
+
+        if not candidates:
+            return {
+                "link_extraction": {
+                    "status": "not_found",
+                    "method": "douyin_creator_work_list",
+                    "message": "Post link lookup timed out; the work was not visible in the creator work list.",
+                    "attempts": 1,
+                    "timeout_seconds": 25,
+                }
+            }
+
+        item = max(candidates, key=lambda entry: int(entry.get("create_time") or 0))
+        post_id = str(item.get("aweme_id") or item.get("item_id") or "").strip()
+        share_url = str(item.get("share_url") or "").strip()
+        post_url = f"https://www.douyin.com/video/{post_id}" if post_id else share_url
+        status = item.get("status") or {}
+        in_reviewing = bool(status.get("in_reviewing")) if isinstance(status, dict) else False
+        publish_status = "pending_review" if in_reviewing else "published"
+        return {
+            "post_id": post_id,
+            "platform_post_id": post_id,
+            "post_url": post_url,
+            "share_url": share_url,
+            "publish_status": publish_status,
+            "published_title": item.get("item_title") or title,
+            "published_at": datetime.fromtimestamp(int(item.get("create_time") or 0)).isoformat() if item.get("create_time") else "",
+            "link_extraction": {
+                "status": "found" if post_url else "not_found",
+                "method": "douyin_creator_work_list",
+                "message": "Post link extracted from Douyin creator work list." if post_url else "Post exists but no public link was returned before lookup timeout.",
+                "attempts": 1,
+                "timeout_seconds": 25,
+            },
+        }
+
     async def _external_douyin_upload_video(
         self,
         file_path: str,
@@ -226,9 +447,12 @@ class SocialAutoUploadAdapter:
         thumbnail_path: str | None,
         schedule: datetime | None,
         headless: bool,
+        account_id: str | None = None,
+        account_file: str | None = None,
+        account_name: str | None = None,
     ) -> dict:
-        account_name = self._account_name("douyin")
-        account_file = self._sync_douyin_session_to_external_sau()
+        account_name = self._account_name("douyin", account_id=account_id, account_name=account_name)
+        account_file_path = self._sync_douyin_session_to_external_sau(account_id=account_id, account_file=account_file, account_name=account_name)
         args = [
             "douyin",
             "upload-video",
@@ -251,14 +475,17 @@ class SocialAutoUploadAdapter:
             args.extend(["--schedule", schedule.strftime("%Y-%m-%d %H:%M")])
 
         result = await self._run_external_sau(args, timeout_seconds=self._publish_timeout_seconds())
-        self._sync_external_sau_to_douyin_session()
+        self._sync_external_sau_to_douyin_session(account_id=account_id, account_file=account_file, account_name=account_name)
         result.update({
             "platform": "douyin",
             "title": title,
             "file_path": file_path,
-            "account_file": str(account_file),
+            "account_id": account_id or "",
+            "account_file": str(account_file_path),
             "engine": "external-social-auto-upload",
         })
+        if result.get("success") and not schedule:
+            result.update(await self._lookup_douyin_published_post(account_file_path, title))
         return result
 
     async def _external_douyin_upload_note(
@@ -269,9 +496,12 @@ class SocialAutoUploadAdapter:
         tags: list[str] | None,
         schedule: datetime | None,
         headless: bool,
+        account_id: str | None = None,
+        account_file: str | None = None,
+        account_name: str | None = None,
     ) -> dict:
-        account_name = self._account_name("douyin")
-        account_file = self._sync_douyin_session_to_external_sau()
+        account_name = self._account_name("douyin", account_id=account_id, account_name=account_name)
+        account_file_path = self._sync_douyin_session_to_external_sau(account_id=account_id, account_file=account_file, account_name=account_name)
         args = [
             "douyin",
             "upload-note",
@@ -292,21 +522,88 @@ class SocialAutoUploadAdapter:
             args.extend(["--schedule", schedule.strftime("%Y-%m-%d %H:%M")])
 
         result = await self._run_external_sau(args, timeout_seconds=self._publish_timeout_seconds())
-        self._sync_external_sau_to_douyin_session()
+        self._sync_external_sau_to_douyin_session(account_id=account_id, account_file=account_file, account_name=account_name)
         result.update({
             "platform": "douyin",
             "title": title,
-            "account_file": str(account_file),
+            "account_id": account_id or "",
+            "account_file": str(account_file_path),
             "engine": "external-social-auto-upload",
+        })
+        if result.get("success") and not schedule:
+            result.update(await self._lookup_douyin_published_post(account_file_path, title))
+        return result
+
+    async def _external_bilibili_upload_video(
+        self,
+        file_path: str,
+        title: str,
+        desc: str,
+        tags: list[str] | None,
+        schedule: datetime | None,
+        account_id: str | None = None,
+        account_name: str | None = None,
+    ) -> dict:
+        account_name = self._account_name("bilibili", account_id=account_id, account_name=account_name)
+        account_file_path = self._external_sau_account_file("bilibili", account_id=account_id, account_name=account_name)
+        if not account_file_path.exists():
+            return {
+                "success": False,
+                "platform": "bilibili",
+                "title": title,
+                "file_path": file_path,
+                "account_id": account_id or "",
+                "account_file": str(account_file_path),
+                "message": "B站投稿授权未完成，请先在渠道账号中完成登录。",
+                "engine": "bilibili-uploader",
+            }
+
+        tid = int(getattr(_SAU_CONFIG, "bilibili_tid", 21) or 21)
+        args = [
+            "bilibili",
+            "upload-video",
+            "--account",
+            account_name,
+            "--file",
+            file_path,
+            "--title",
+            title,
+            "--desc",
+            desc or title,
+            "--tid",
+            str(tid),
+            "--tags",
+            ",".join(tags or []),
+        ]
+        if schedule:
+            args.extend(["--schedule", schedule.strftime("%Y-%m-%d %H:%M")])
+
+        result = await self._run_external_sau(args, timeout_seconds=self._publish_timeout_seconds())
+        result.update({
+            "platform": "bilibili",
+            "title": title,
+            "file_path": file_path,
+            "account_id": account_id or "",
+            "account_file": str(account_file_path),
+            "engine": "bilibili-uploader",
         })
         return result
 
-    def _get_account_file(self, platform: str) -> str:
+    def _get_account_file(self, platform: str, account_id: str | None = None) -> str:
         """获取平台 cookie 文件路径。
 
         优先使用 szyg session 目录的 storage_state 文件，
         如果不存在则回退到 sau cookies 目录。
         """
+        if account_id:
+            account = get_account(account_id)
+            if account and account.get("session_path"):
+                return str(account["session_path"])
+
+        default_account = get_default_account_for_platform(platform)
+        if default_account and default_account.get("session_path"):
+            return str(default_account["session_path"])
+
         # szyg session 路径
         szyg_session = _SESSIONS_DIR / f"storage_state_{platform}.json"
         if szyg_session.exists():
@@ -327,6 +624,8 @@ class SocialAutoUploadAdapter:
         cfg = _PLATFORM_MAP.get(platform)
         if not cfg:
             raise ValueError(f"不支持的平台: {platform}，支持: {list(_PLATFORM_MAP.keys())}")
+        if not cfg.get("module"):
+            raise ValueError(f"平台 {platform} 使用外部发布引擎，不支持直接导入 uploader 模块")
 
         import importlib
         mod = importlib.import_module(cfg["module"])
@@ -342,6 +641,8 @@ class SocialAutoUploadAdapter:
         thumbnail_path: str | None = None,
         schedule: datetime | None = None,
         account_file: str | None = None,
+        account_id: str | None = None,
+        account_name: str | None = None,
         headless: bool = True,
     ) -> dict:
         """上传视频到指定平台。
@@ -369,11 +670,24 @@ class SocialAutoUploadAdapter:
                 thumbnail_path=thumbnail_path,
                 schedule=schedule,
                 headless=headless,
+                account_id=account_id,
+                account_file=account_file,
+                account_name=account_name,
+            )
+        if platform == "bilibili":
+            return await self._external_bilibili_upload_video(
+                file_path=file_path,
+                title=title,
+                desc=desc,
+                tags=tags,
+                schedule=schedule,
+                account_id=account_id,
+                account_name=account_name,
             )
 
         try:
             mod, cfg = self._import_uploader(platform)
-            account = account_file or self._get_account_file(platform)
+            account = account_file or self._get_account_file(platform, account_id=account_id)
 
             # 确定发布策略
             publish_date = schedule or 0
@@ -413,6 +727,9 @@ class SocialAutoUploadAdapter:
                 "message": f"视频已上传到{platform}",
                 "title": title,
                 "file_path": file_path,
+                "account_id": account_id or "",
+                "account_file": account,
+                **(getattr(uploader, "publish_result", {}) or {}),
             }
 
         except Exception as e:
@@ -423,6 +740,7 @@ class SocialAutoUploadAdapter:
                 "message": str(e),
                 "title": title,
                 "file_path": file_path,
+                "account_id": account_id or "",
             }
 
     async def upload_note(
@@ -434,6 +752,8 @@ class SocialAutoUploadAdapter:
         tags: list[str] | None = None,
         schedule: datetime | None = None,
         account_file: str | None = None,
+        account_id: str | None = None,
+        account_name: str | None = None,
         headless: bool = True,
     ) -> dict:
         """上传图文到指定平台。
@@ -459,14 +779,25 @@ class SocialAutoUploadAdapter:
                 tags=tags,
                 schedule=schedule,
                 headless=headless,
+                account_id=account_id,
+                account_file=account_file,
+                account_name=account_name,
             )
+        if platform == "bilibili":
+            return {
+                "success": False,
+                "platform": platform,
+                "message": "B站当前只支持视频发布，不支持图文发布",
+                "title": title,
+                "account_id": account_id or "",
+            }
 
         try:
             mod, cfg = self._import_uploader(platform)
             if not cfg["note_class"]:
                 raise ValueError(f"平台 {platform} 不支持图文上传")
 
-            account = account_file or self._get_account_file(platform)
+            account = account_file or self._get_account_file(platform, account_id=account_id)
             publish_date = schedule or 0
 
             if cfg["immediate_strategy"]:
@@ -497,6 +828,9 @@ class SocialAutoUploadAdapter:
                 "platform": platform,
                 "message": f"图文已上传到{platform}",
                 "title": title,
+                "account_id": account_id or "",
+                "account_file": account,
+                **(getattr(uploader, "publish_result", {}) or {}),
             }
 
         except Exception as e:
@@ -506,9 +840,19 @@ class SocialAutoUploadAdapter:
                 "platform": platform,
                 "message": str(e),
                 "title": title,
+                "account_id": account_id or "",
             }
 
-    async def login(self, platform: str, headless: bool = False) -> dict:
+    async def login(
+        self,
+        platform: str,
+        headless: bool = False,
+        account_id: str | None = None,
+        account_file: str | None = None,
+        account_name: str | None = None,
+        timeout_seconds: int = 600,
+        force: bool = False,
+    ) -> dict:
         """触发平台登录（扫码）。
 
         Args:
@@ -519,30 +863,63 @@ class SocialAutoUploadAdapter:
             {"success": bool, "platform": str, "account_file": str, "message": str}
         """
         if platform == "douyin":
-            account_name = self._account_name("douyin")
-            account_file = self._sync_douyin_session_to_external_sau()
+            account_name = self._account_name("douyin", account_id=account_id, account_name=account_name)
+            account_file_path = self._sync_douyin_session_to_external_sau(account_id=account_id, account_file=account_file, account_name=account_name)
             result = await self._run_external_sau([
                 "douyin",
                 "login",
                 "--account",
                 account_name,
                 "--headless" if headless else "--headed",
-            ], timeout_seconds=600)
-            self._sync_external_sau_to_douyin_session()
+            ], timeout_seconds=timeout_seconds)
+            self._sync_external_sau_to_douyin_session(account_id=account_id, account_file=account_file, account_name=account_name)
             return {
                 "success": result["success"],
                 "platform": platform,
-                "account_file": str(account_file),
+                "account_id": account_id or "",
+                "account_file": str(account_file_path),
                 "message": result.get("message", ""),
                 "engine": "external-social-auto-upload",
+            }
+        if platform == "bilibili":
+            try:
+                result = await self._login_bilibili_browser(
+                    account_file=account_file or self._get_account_file("bilibili", account_id=account_id),
+                    timeout_seconds=timeout_seconds,
+                    headless=headless,
+                    force=force,
+                )
+            except Exception as exc:
+                result = {
+                    "success": False,
+                    "login_started": False,
+                    "message": f"B站登录失败：{exc}",
+                }
+            account_file_path = Path(account_file or self._get_account_file("bilibili", account_id=account_id))
+            return {
+                "success": result["success"],
+                "login_started": bool(result.get("login_started")),
+                "platform": platform,
+                "account_id": account_id or "",
+                "account_file": str(account_file_path),
+                "message": result.get("message", ""),
+                "engine": "bilibili-browser",
             }
 
         try:
             mod, cfg = self._import_uploader(platform)
-            account = self._get_account_file(platform)
+            account = account_file or self._get_account_file(platform, account_id=account_id)
+            if force and account and os.path.exists(account):
+                try:
+                    os.remove(account)
+                except OSError:
+                    pass
 
-            # sau 的 setup 函数名规则: {platform}_setup
-            setup_func_name = f"{platform.replace('xhs', 'xiaohongshu')}_setup"
+            setup_aliases = {
+                "xhs": "xiaohongshu_setup",
+                "kuaishou": "ks_setup",
+            }
+            setup_func_name = setup_aliases.get(platform, f"{platform}_setup")
             setup_func = getattr(mod, setup_func_name, None)
 
             if setup_func is None:
@@ -562,6 +939,7 @@ class SocialAutoUploadAdapter:
                 return {
                     "success": result.get("success", False),
                     "platform": platform,
+                    "account_id": account_id or "",
                     "account_file": account,
                     "message": result.get("message", ""),
                     "qrcode": result.get("qrcode"),
@@ -570,6 +948,7 @@ class SocialAutoUploadAdapter:
                 return {
                     "success": True,
                     "platform": platform,
+                    "account_id": account_id or "",
                     "account_file": account,
                     "message": "登录成功",
                 }
@@ -577,6 +956,7 @@ class SocialAutoUploadAdapter:
                 return {
                     "success": False,
                     "platform": platform,
+                    "account_id": account_id or "",
                     "account_file": account,
                     "message": "登录失败",
                 }
@@ -586,10 +966,17 @@ class SocialAutoUploadAdapter:
             return {
                 "success": False,
                 "platform": platform,
+                "account_id": account_id or "",
                 "message": str(e),
             }
 
-    async def check_login(self, platform: str) -> dict:
+    async def check_login(
+        self,
+        platform: str,
+        account_id: str | None = None,
+        account_file: str | None = None,
+        account_name: str | None = None,
+    ) -> dict:
         """检查平台登录状态。
 
         Args:
@@ -599,8 +986,8 @@ class SocialAutoUploadAdapter:
             {"logged_in": bool, "platform": str, "account_file": str}
         """
         if platform == "douyin":
-            account_name = self._account_name("douyin")
-            account_file = self._sync_douyin_session_to_external_sau()
+            account_name = self._account_name("douyin", account_id=account_id, account_name=account_name)
+            account_file_path = self._sync_douyin_session_to_external_sau(account_id=account_id, account_file=account_file, account_name=account_name)
             result = await self._run_external_sau([
                 "douyin",
                 "check",
@@ -610,19 +997,47 @@ class SocialAutoUploadAdapter:
             return {
                 "logged_in": result["success"],
                 "platform": platform,
-                "account_file": str(account_file),
+                "account_id": account_id or "",
+                "account_file": str(account_file_path),
                 "message": result.get("message", ""),
                 "engine": "external-social-auto-upload",
+            }
+        if platform == "bilibili":
+            account_name = self._account_name("bilibili", account_id=account_id, account_name=account_name)
+            account_file_path = self._external_sau_account_file("bilibili", account_id=account_id, account_name=account_name)
+            if not account_file_path.exists():
+                return {
+                    "logged_in": False,
+                    "platform": platform,
+                    "account_id": account_id or "",
+                    "account_file": str(account_file_path),
+                    "message": "B站登录态不存在",
+                    "engine": "bilibili-uploader",
+                }
+            result = await self._run_external_sau([
+                "bilibili",
+                "check",
+                "--account",
+                account_name,
+            ], timeout_seconds=120)
+            return {
+                "logged_in": result["success"],
+                "platform": platform,
+                "account_id": account_id or "",
+                "account_file": str(account_file_path),
+                "message": result.get("message", ""),
+                "engine": "bilibili-uploader",
             }
 
         try:
             mod, cfg = self._import_uploader(platform)
-            account = self._get_account_file(platform)
+            account = account_file or self._get_account_file(platform, account_id=account_id)
 
             if not os.path.exists(account):
                 return {
                     "logged_in": False,
                     "platform": platform,
+                    "account_id": account_id or "",
                     "account_file": account,
                     "message": "cookie 文件不存在",
                 }
@@ -634,7 +1049,9 @@ class SocialAutoUploadAdapter:
                 return {
                     "logged_in": bool(is_valid),
                     "platform": platform,
+                    "account_id": account_id or "",
                     "account_file": account,
+                    "message": "登录态有效" if is_valid else f"{platform} 登录态已失效，请重新登录",
                 }
 
             # 没有 cookie_auth 函数，检查文件是否非空
@@ -642,6 +1059,7 @@ class SocialAutoUploadAdapter:
             return {
                 "logged_in": size > 100,
                 "platform": platform,
+                "account_id": account_id or "",
                 "account_file": account,
                 "message": f"cookie 文件 {size} bytes" if size > 0 else "cookie 文件为空",
             }
@@ -651,6 +1069,7 @@ class SocialAutoUploadAdapter:
             return {
                 "logged_in": False,
                 "platform": platform,
+                "account_id": account_id or "",
                 "message": str(e),
             }
 
@@ -658,11 +1077,11 @@ class SocialAutoUploadAdapter:
         """列出所有支持的平台及其状态。"""
         platforms = []
         for name, cfg in _PLATFORM_MAP.items():
-            account = self._get_account_file(name)
+            account = str(self._external_sau_account_file(name)) if name == "bilibili" else self._get_account_file(name)
             has_cookie = os.path.exists(account)
             platforms.append({
                 "platform": name,
-                "video_support": bool(cfg["video_class"]),
+                "video_support": name == "bilibili" or bool(cfg["video_class"]),
                 "note_support": bool(cfg["note_class"]),
                 "has_cookie": has_cookie,
                 "account_file": account,

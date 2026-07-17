@@ -8,6 +8,8 @@ Comment Engine — 评论队列管理、频率控制、DeAI 去AI味、批量发
   - batch_send / preflight_check 完整流水线
 """
 
+from __future__ import annotations
+
 import asyncio
 import hashlib
 import json
@@ -38,8 +40,15 @@ class CommentItem:
     comment_text: str = ""
     original_text: str = ""  # deAI 之前的原始文本
     author_name: str = ""
-    status: str = "pending"  # pending | sent | failed | skipped
+    status: str = "pending"  # pending | sent | failed | skipped | auto_repaired | retrying | delayed | needs_human
     risk_level: str = "low"  # low | medium | high
+    risk_codes: list[str] = field(default_factory=list)
+    decision: str = ""
+    repair_attempts: int = 0
+    repaired_text: str = ""
+    next_run_at: str = ""
+    platform_result: dict = field(default_factory=dict)
+    human_confirmed: bool = False
     strategy: str = "balanced"
     created_at: str = ""
     sent_at: str = ""
@@ -54,6 +63,10 @@ class CommentStats:
     total_sent: int = 0
     total_failed: int = 0
     total_skipped: int = 0
+    total_auto_repaired: int = 0
+    total_retrying: int = 0
+    total_delayed: int = 0
+    total_needs_human: int = 0
     by_platform: dict = field(default_factory=dict)
     hourly_used: dict = field(default_factory=dict)
     daily_used: dict = field(default_factory=dict)
@@ -138,11 +151,37 @@ class CommentQueue:
         items.sort(key=lambda i: i.created_at, reverse=True)
         return items[offset:offset + limit]
 
+    async def due(self, limit: int = 20) -> list[CommentItem]:
+        now = datetime.now()
+        due_items: list[CommentItem] = []
+        for item in self._items.values():
+            if item.status not in {"delayed", "retrying"} or not item.next_run_at:
+                continue
+            try:
+                if datetime.fromisoformat(item.next_run_at) <= now:
+                    due_items.append(item)
+            except ValueError:
+                due_items.append(item)
+        due_items.sort(key=lambda i: i.next_run_at or i.created_at)
+        return due_items[:limit]
+
     async def stats(self) -> CommentStats:
         items = list(self._items.values())
         s = CommentStats()
-        by_platform = defaultdict(lambda: {"pending": 0, "sent": 0, "failed": 0, "skipped": 0})
+        by_platform = defaultdict(lambda: {
+            "pending": 0,
+            "sent": 0,
+            "failed": 0,
+            "skipped": 0,
+            "auto_repaired": 0,
+            "retrying": 0,
+            "delayed": 0,
+            "needs_human": 0,
+        })
         for item in items:
+            if item.decision == "auto_repair_then_send":
+                s.total_auto_repaired += 1
+                by_platform[item.platform]["auto_repaired"] = by_platform[item.platform].get("auto_repaired", 0) + 1
             if item.status == "pending":
                 s.total_pending += 1
             elif item.status == "sent":
@@ -151,6 +190,12 @@ class CommentQueue:
                 s.total_failed += 1
             elif item.status == "skipped":
                 s.total_skipped += 1
+            elif item.status == "retrying":
+                s.total_retrying += 1
+            elif item.status == "delayed":
+                s.total_delayed += 1
+            elif item.status == "needs_human":
+                s.total_needs_human += 1
             by_platform[item.platform][item.status] = by_platform[item.platform].get(item.status, 0) + 1
         s.by_platform = dict(by_platform)
         return s
@@ -172,7 +217,8 @@ class CommentQueue:
 class CommentRateLimiter:
     """评论频率限制器: 小时上限 + 日上限"""
 
-    def __init__(self):
+    def __init__(self, storage_path: str = ""):
+        self._path = Path(storage_path) if storage_path else DATA_DIR / "comment_rate_limits.json"
         self._hourly: dict[str, list[float]] = defaultdict(list)  # platform → [timestamps]
         self._daily: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))  # platform → date → count
         self._default_hourly = 8
@@ -180,6 +226,39 @@ class CommentRateLimiter:
         self._hourly_limits: dict[str, int] = {}
         self._daily_limits: dict[str, int] = {}
         self._lock = asyncio.Lock()
+        self._load()
+
+    def _load(self):
+        if not self._path.exists():
+            return
+        try:
+            data = json.loads(self._path.read_text(encoding="utf-8"))
+            self._hourly = defaultdict(list, {
+                platform: [float(ts) for ts in timestamps]
+                for platform, timestamps in data.get("hourly", {}).items()
+            })
+            self._daily = defaultdict(lambda: defaultdict(int), {
+                platform: defaultdict(int, {date: int(count) for date, count in counts.items()})
+                for platform, counts in data.get("daily", {}).items()
+            })
+            self._hourly_limits = {k: int(v) for k, v in data.get("hourly_limits", {}).items()}
+            self._daily_limits = {k: int(v) for k, v in data.get("daily_limits", {}).items()}
+        except Exception as e:
+            logger.warning("CommentRateLimiter load failed: %s", e)
+
+    def _save(self):
+        try:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            data = {
+                "hourly": {platform: list(timestamps) for platform, timestamps in self._hourly.items()},
+                "daily": {platform: dict(counts) for platform, counts in self._daily.items()},
+                "hourly_limits": dict(self._hourly_limits),
+                "daily_limits": dict(self._daily_limits),
+                "updated_at": datetime.now().isoformat(),
+            }
+            self._path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception as e:
+            logger.error("CommentRateLimiter save failed: %s", e)
 
     def apply_strategy(self, strategy: str = "balanced"):
         """根据策略批量设置限制"""
@@ -192,6 +271,7 @@ class CommentRateLimiter:
         for platform in ["douyin", "xhs", "bilibili", "kuaishou"]:
             self._hourly_limits[platform] = cfg["hourly_limit"]
             self._daily_limits[platform] = cfg["daily_limit"]
+        self._save()
 
     async def can_send(self, platform: str) -> bool:
         async with self._lock:
@@ -206,6 +286,7 @@ class CommentRateLimiter:
                 return False
             if self._daily[platform].get(today, 0) >= daily_limit:
                 return False
+            self._save()
             return True
 
     async def record(self, platform: str):
@@ -214,6 +295,7 @@ class CommentRateLimiter:
             today = datetime.now().strftime("%Y-%m-%d")
             self._hourly[platform].append(now)
             self._daily[platform][today] += 1
+            self._save()
 
     async def remaining(self, platform: str) -> dict:
         async with self._lock:
@@ -222,6 +304,7 @@ class CommentRateLimiter:
             hourly_limit = self._hourly_limits.get(platform, self._default_hourly)
             daily_limit = self._daily_limits.get(platform, self._default_daily)
             self._hourly[platform] = [t for t in self._hourly[platform] if now - t < 3600]
+            self._save()
             return {
                 "hourly_remaining": max(0, hourly_limit - len(self._hourly[platform])),
                 "daily_remaining": max(0, daily_limit - self._daily[platform].get(today, 0)),
@@ -235,6 +318,24 @@ class CommentRateLimiter:
             r = await self.remaining(platform)
             result[platform] = r
         return result
+
+
+_COMMENT_QUEUE: CommentQueue | None = None
+_COMMENT_RATE_LIMITER: CommentRateLimiter | None = None
+
+
+def get_comment_queue() -> CommentQueue:
+    global _COMMENT_QUEUE
+    if _COMMENT_QUEUE is None:
+        _COMMENT_QUEUE = CommentQueue()
+    return _COMMENT_QUEUE
+
+
+def get_comment_rate_limiter() -> CommentRateLimiter:
+    global _COMMENT_RATE_LIMITER
+    if _COMMENT_RATE_LIMITER is None:
+        _COMMENT_RATE_LIMITER = CommentRateLimiter()
+    return _COMMENT_RATE_LIMITER
 
 
 # ── DeAI Processor ───────────────────────────────────────────────────────
@@ -387,43 +488,200 @@ class DeAIProcessor:
 BLOCKED_WORDS = ["微信", "QQ", "qq", "wx", "链接", "http", "电话", "手机号",
                   "加v", "加V", "V信", "vx", "WX", "扫码", "二维码"]
 
+CONTACT_PATTERNS = [
+    re.compile(r'1[3-9]\d{9}'),
+    re.compile(r'(微信|微[信x]|vx|wx|v信|加v|加V|QQ|qq|电话|手机号|联系方式)', re.IGNORECASE),
+]
+REGULATED_CLAIMS = ["包过", "稳赚", "保本", "治愈", "根治", "官方认证", "全网最低", "第一名"]
+MARKETING_WORDS = ["免费领取", "免费获取", "优惠券", "限时", "立减", "下单", "购买", "咨询", "私信我", "关注我"]
+SENSITIVE_ACTION_WORDS = ["加好友", "加微信", "私信", "付款", "支付", "删除", "群发", "批量"]
+
+REPAIRABLE_CODES = {
+    "too_long",
+    "too_short",
+    "contains_url",
+    "marketing_tone",
+    "ai_like",
+    "repeated_chars",
+    "low_chinese_ratio",
+}
+HUMAN_REQUIRED_CODES = {
+    "contains_contact",
+    "regulated_claim",
+    "sensitive_platform_action",
+    "login_required",
+    "captcha_required",
+    "account_risk",
+    "unknown_security_popup",
+    "duplicate_uncertain",
+}
+
+
+class MarketingAutomationPolicy:
+    """统一营销自动化决策，避免普通失败被误判为需人工。"""
+
+    @staticmethod
+    def decide(check: dict) -> dict:
+        codes = set(check.get("risk_codes") or [])
+        risk_level = check.get("risk_level", "low")
+        if codes & HUMAN_REQUIRED_CODES:
+            return {
+                "decision": "needs_human",
+                "status": "needs_human",
+                "message": "包含需要人工确认的敏感动作或账号风险",
+            }
+        if check.get("pass"):
+            return {"decision": "auto_send", "status": "pending", "message": "预检通过，可自动发送"}
+        if codes and codes <= REPAIRABLE_CODES:
+            return {
+                "decision": "auto_repair_then_send",
+                "status": "auto_repaired",
+                "message": "存在可自动修复的问题",
+            }
+        if risk_level == "high":
+            return {"decision": "skip", "status": "skipped", "message": "高风险但不需要人工，已跳过"}
+        return {
+            "decision": "auto_repair_then_send",
+            "status": "auto_repaired",
+            "message": "中风险内容会先自动修复",
+        }
+
+    @staticmethod
+    def classify_send_error(error: str) -> dict:
+        text = (error or "").lower()
+        if any(word in text for word in ["登录", "未登录", "login", "cookie", "session"]):
+            return {"decision": "needs_human", "status": "needs_human", "code": "login_required"}
+        if any(word in text for word in ["验证码", "captcha", "风控", "账号异常", "安全验证", "risk"]):
+            return {"decision": "needs_human", "status": "needs_human", "code": "account_risk"}
+        if any(word in text for word in ["timeout", "超时", "未找到", "button", "selector", "network", "net::"]):
+            return {"decision": "delay_retry", "status": "retrying", "code": "transient_platform_error"}
+        return {"decision": "failed", "status": "failed", "code": "send_failed"}
+
 
 def preflight_check(text: str) -> dict:
     """发前检查: 敏感词 / 长度 / 垃圾模式"""
     risks = []
+    risk_codes: list[str] = []
+    suggestions: list[str] = []
+    raw_text = text or ""
 
     # 检查屏蔽词
     for word in BLOCKED_WORDS:
-        if word.lower() in text.lower():
+        if word.lower() in raw_text.lower():
             risks.append(f"包含屏蔽词: {word}")
+            code = "contains_url" if word.lower() in {"链接", "http"} else "contains_contact"
+            if code not in risk_codes:
+                risk_codes.append(code)
+
+    if re.search(r'https?://|www\.', raw_text, re.IGNORECASE):
+        risks.append("包含 URL")
+        if "contains_url" not in risk_codes:
+            risk_codes.append("contains_url")
+
+    if any(pattern.search(raw_text) for pattern in CONTACT_PATTERNS):
+        risks.append("包含联系方式或引流表达")
+        if "contains_contact" not in risk_codes:
+            risk_codes.append("contains_contact")
+
+    for word in REGULATED_CLAIMS:
+        if word in raw_text:
+            risks.append(f"包含强承诺或合规敏感词: {word}")
+            if "regulated_claim" not in risk_codes:
+                risk_codes.append("regulated_claim")
+
+    if any(word in raw_text for word in SENSITIVE_ACTION_WORDS):
+        risks.append("包含敏感平台动作")
+        if "sensitive_platform_action" not in risk_codes:
+            risk_codes.append("sensitive_platform_action")
+
+    if any(word in raw_text for word in MARKETING_WORDS):
+        risks.append("营销感偏强")
+        if "marketing_tone" not in risk_codes:
+            risk_codes.append("marketing_tone")
 
     # 长度检查
-    if len(text) < 2:
+    if len(raw_text) < 2:
         risks.append("评论过短 (<2字符)")
-    elif len(text) > 200:
+        risk_codes.append("too_short")
+    elif len(raw_text) > 200:
         risks.append("评论过长 (>200字符)")
-
-    # 检查 URL
-    if re.search(r'https?://', text):
-        risks.append("包含 URL")
+        risk_codes.append("too_long")
 
     # 检查中文内容比例
-    chinese_chars = len(re.findall(r'[一-鿿]', text))
-    total_chars = len(text.replace(" ", ""))
+    chinese_chars = len(re.findall(r'[一-鿿]', raw_text))
+    total_chars = len(raw_text.replace(" ", ""))
     if total_chars > 0 and chinese_chars / total_chars < 0.3:
         risks.append("中文占比过低")
+        risk_codes.append("low_chinese_ratio")
 
     # 重复字符检查 (灌水模式)
-    if re.search(r'(.)\1{5,}', text):
+    if re.search(r'(.)\1{5,}', raw_text):
         risks.append("重复字符过多")
+        risk_codes.append("repeated_chars")
+
+    ai_markers = ["总的来说", "值得注意的是", "综上所述", "希望对你有帮助", "欢迎点赞关注"]
+    if any(marker in raw_text for marker in ai_markers):
+        risks.append("AI 模板感明显")
+        risk_codes.append("ai_like")
 
     risk_level = "low"
-    if len(risks) >= 3:
+    unique_codes = list(dict.fromkeys(risk_codes))
+    if set(unique_codes) & HUMAN_REQUIRED_CODES:
+        risk_level = "high"
+    elif len(risks) >= 3:
         risk_level = "high"
     elif len(risks) >= 1:
         risk_level = "medium"
 
-    return {"pass": len(risks) == 0, "risk_level": risk_level, "risks": risks}
+    if "too_long" in unique_codes:
+        suggestions.append("压缩到 200 字以内")
+    if "contains_url" in unique_codes:
+        suggestions.append("删除链接，改为自然提示")
+    if "marketing_tone" in unique_codes or "ai_like" in unique_codes:
+        suggestions.append("改成真实用户口吻")
+
+    result = {"pass": len(risks) == 0, "risk_level": risk_level, "risks": risks,
+              "risk_codes": unique_codes, "suggestions": suggestions}
+    result.update(MarketingAutomationPolicy.decide(result))
+    return result
+
+
+def repair_comment(text: str, platform: str = "douyin", max_length: int = 200) -> dict:
+    """自动修复可恢复的评论风险，不处理需要人工确认的敏感内容。"""
+    original = text or ""
+    repaired = original.strip()
+    changes: list[str] = []
+
+    repaired = re.sub(r'https?://\S+|www\.\S+', '', repaired, flags=re.IGNORECASE).strip()
+    if repaired != original.strip():
+        changes.append("已删除链接")
+
+    before = repaired
+    repaired = DeAIProcessor.process(repaired, platform)
+    if repaired != before:
+        changes.append("已去除 AI 味和强营销表达")
+
+    before = repaired
+    repaired = re.sub(r'(.)\1{5,}', r'\1\1', repaired)
+    if repaired != before:
+        changes.append("已清理重复字符")
+
+    if len(repaired) > max_length:
+        repaired = repaired[:max_length].rstrip("，。！!？?；;、 ") + "…"
+        changes.append("已压缩长度")
+
+    if len(repaired) < 2:
+        repaired = "这个挺有参考价值"
+        changes.append("已补全过短评论")
+
+    check = preflight_check(repaired)
+    return {
+        "original": original,
+        "repaired": repaired,
+        "changed": repaired != original,
+        "changes": changes,
+        "preflight": check,
+    }
 
 
 # ── Batch Send Pipeline ──────────────────────────────────────────────────
@@ -522,24 +780,35 @@ async def batch_send(
     comments: list[dict],
     strategy: str = "balanced",
     deai: bool = True,
+    create_execution: bool = True,
 ) -> list[dict]:
     """批量发送评论完整流水线"""
     from szyg.platforms.registry import get_registry
     from szyg.publisher import Platform as PlatEnum
 
-    limiter = CommentRateLimiter()
+    limiter = get_comment_rate_limiter()
     limiter.apply_strategy(strategy)
-    queue = CommentQueue()
+    queue = get_comment_queue()
     results = []
 
     try:
         p = PlatEnum(platform)
     except ValueError:
-        return [{"error": f"Unsupported platform: {platform}"}]
+        return [{
+            "status": "failed",
+            "decision": "failed",
+            "risk_codes": ["unsupported_platform"],
+            "error": f"Unsupported platform: {platform}",
+        }]
 
     registry = get_registry()
     if not registry.is_registered(p):
-        return [{"error": f"Platform not registered: {platform}"}]
+        return [{
+            "status": "failed",
+            "decision": "failed",
+            "risk_codes": ["unsupported_platform"],
+            "error": f"Platform not registered: {platform}",
+        }]
 
     adapter = await registry.get(p)
 
@@ -553,46 +822,180 @@ async def batch_send(
 
     for comment_data in comments:
         text = comment_data.get("text", comment_data.get("comment_text", ""))
+        original = text
+        execution = _start_marketing_execution(platform, comment_data, original) if create_execution else {}
+        validate_step = _execution_step(execution, "validate", "Validate marketing comment", "validate_comment")
+
+        original_check = preflight_check(original)
+        if set(original_check.get("risk_codes") or []) & HUMAN_REQUIRED_CODES:
+            _finish_execution_step(execution, validate_step, "needs_human", "敏感内容需要人工确认", "sensitive_action")
+            item = CommentItem(
+                platform=platform,
+                video_id=comment_data.get("video_id", ""),
+                video_title=comment_data.get("video_title", ""),
+                video_url=comment_data.get("video_url", ""),
+                comment_text=original,
+                original_text=original,
+                status="needs_human",
+                risk_level=original_check["risk_level"],
+                risk_codes=original_check.get("risk_codes", []),
+                decision="needs_human",
+                error_msg="; ".join(original_check["risks"]),
+                metadata={"execution_id": execution.get("run_id", "")} if execution else {},
+            )
+            await queue.add(item)
+            _complete_marketing_execution(execution, "needs_human", {
+                "status": "needs_human",
+                "risk_codes": item.risk_codes,
+                "queue_item_id": item.id,
+            }, "sensitive_action", item.error_msg)
+            results.append({
+                "id": item.id,
+                "execution_id": execution.get("run_id", "") if execution else "",
+                "status": "needs_human",
+                "decision": "needs_human",
+                "risk_codes": item.risk_codes,
+                "reason": original_check["risks"],
+            })
+            continue
+        _finish_execution_step(execution, validate_step, "success", "评论原文安全意图已确认")
 
         # DeAI 处理
-        original = text
+        repair_step = _execution_step(execution, "repair", "DeAI and repair comment", "repair_comment")
         if deai:
             text = DeAIProcessor.process(text, platform)
 
         # 发前检查
         check = preflight_check(text)
-        if check["risk_level"] == "high":
+        repair_attempts = 0
+        repair_info = None
+        if check.get("decision") == "auto_repair_then_send":
+            for _ in range(2):
+                repair_attempts += 1
+                repair_info = repair_comment(text, platform)
+                text = repair_info["repaired"]
+                check = repair_info["preflight"]
+                if check.get("pass") or check.get("decision") != "auto_repair_then_send":
+                    break
+        _add_execution_observation(
+            execution,
+            repair_step,
+            "text",
+            f"修复次数：{repair_attempts}；决策：{check.get('decision', '')}",
+        )
+        _finish_execution_step(execution, repair_step, "success", "评论修复与预检完成")
+
+        if check.get("decision") == "needs_human":
+            _finish_execution_step(execution, None, "needs_human", "修复后仍需人工确认", "sensitive_action")
             item = CommentItem(
                 platform=platform,
                 video_id=comment_data.get("video_id", ""),
                 video_title=comment_data.get("video_title", ""),
+                video_url=comment_data.get("video_url", ""),
                 comment_text=text,
                 original_text=original,
-                status="skipped",
-                risk_level="high",
+                status="needs_human",
+                risk_level=check["risk_level"],
+                risk_codes=check.get("risk_codes", []),
+                decision="needs_human",
+                repair_attempts=repair_attempts,
+                repaired_text=text if text != original else "",
                 error_msg="; ".join(check["risks"]),
+                metadata={"execution_id": execution.get("run_id", "")} if execution else {},
             )
             await queue.add(item)
-            results.append({"id": item.id, "status": "skipped", "reason": check["risks"]})
+            _complete_marketing_execution(execution, "needs_human", {
+                "status": "needs_human",
+                "risk_codes": item.risk_codes,
+                "queue_item_id": item.id,
+            }, "sensitive_action", item.error_msg)
+            results.append({
+                "id": item.id,
+                "execution_id": execution.get("run_id", "") if execution else "",
+                "status": "needs_human",
+                "decision": "needs_human",
+                "risk_codes": item.risk_codes,
+                "reason": check["risks"],
+            })
             continue
 
-        # 频率检查
-        if not await limiter.can_send(platform):
+        if check.get("decision") == "skip" or check["risk_level"] == "high":
+            _finish_execution_step(execution, None, "success", "评论被自动跳过")
             item = CommentItem(
                 platform=platform,
                 video_id=comment_data.get("video_id", ""),
+                video_title=comment_data.get("video_title", ""),
+                video_url=comment_data.get("video_url", ""),
                 comment_text=text,
                 original_text=original,
                 status="skipped",
                 risk_level=check["risk_level"],
-                error_msg="Rate limit exceeded",
+                risk_codes=check.get("risk_codes", []),
+                decision="skip",
+                repair_attempts=repair_attempts,
+                repaired_text=text if text != original else "",
+                error_msg="; ".join(check["risks"]),
+                metadata={"execution_id": execution.get("run_id", "")} if execution else {},
             )
             await queue.add(item)
-            results.append({"id": item.id, "status": "skipped", "reason": "Rate limit"})
+            _complete_marketing_execution(execution, "success", {
+                "status": "skipped",
+                "risk_codes": item.risk_codes,
+                "queue_item_id": item.id,
+            })
+            results.append({
+                "id": item.id,
+                "execution_id": execution.get("run_id", "") if execution else "",
+                "status": "skipped",
+                "decision": "skip",
+                "risk_codes": item.risk_codes,
+                "reason": check["risks"],
+            })
             continue
 
+        # 频率检查
+        rate_step = _execution_step(execution, "rate_limit", "Check marketing rate limit", "rate_limit")
+        if not await limiter.can_send(platform):
+            next_run = (datetime.now() + timedelta(hours=1)).isoformat()
+            _finish_execution_step(execution, rate_step, "success", "触发频率限制，已延后发送")
+            item = CommentItem(
+                platform=platform,
+                video_id=comment_data.get("video_id", ""),
+                video_title=comment_data.get("video_title", ""),
+                video_url=comment_data.get("video_url", ""),
+                comment_text=text,
+                original_text=original,
+                status="delayed",
+                risk_level=check["risk_level"],
+                risk_codes=check.get("risk_codes", []),
+                decision="delay_retry",
+                repair_attempts=repair_attempts,
+                repaired_text=text if text != original else "",
+                next_run_at=next_run,
+                error_msg="Rate limit exceeded",
+                metadata={"execution_id": execution.get("run_id", "")} if execution else {},
+            )
+            await queue.add(item)
+            _complete_marketing_execution(execution, "success", {
+                "status": "delayed",
+                "queue_item_id": item.id,
+                "next_run_at": next_run,
+            })
+            results.append({
+                "id": item.id,
+                "execution_id": execution.get("run_id", "") if execution else "",
+                "status": "delayed",
+                "decision": "delay_retry",
+                "reason": "Rate limit",
+                "next_run_at": next_run,
+            })
+            continue
+        _finish_execution_step(execution, rate_step, "success", "频率检查通过")
+
         # 发送 — 优先使用 AcquisitionAdapter
+        send_step = _execution_step(execution, "send", "Send marketing comment", "send_comment")
         try:
+            send_result = {"success": True}
             if acq_adapter:
                 send_result = await acq_adapter.send_comment(
                     video_url=comment_data.get("video_url", ""),
@@ -610,32 +1013,216 @@ async def batch_send(
                 platform=platform,
                 video_id=comment_data.get("video_id", ""),
                 video_title=comment_data.get("video_title", ""),
+                video_url=comment_data.get("video_url", ""),
                 comment_text=text,
                 original_text=original,
                 status="sent",
                 risk_level=check["risk_level"],
+                risk_codes=check.get("risk_codes", []),
+                decision="auto_send" if repair_attempts == 0 else "auto_repair_then_send",
+                repair_attempts=repair_attempts,
+                repaired_text=text if text != original else "",
+                platform_result=send_result if isinstance(send_result, dict) else {"result": str(send_result)},
                 strategy=strategy,
                 sent_at=datetime.now().isoformat(),
+                metadata={"execution_id": execution.get("run_id", "")} if execution else {},
             )
             await queue.add(item)
-            results.append({"id": item.id, "status": "sent", "text": text[:50]})
+            _finish_execution_step(execution, send_step, "success", "评论已发送")
+            _complete_marketing_execution(execution, "success", {
+                "status": "sent",
+                "queue_item_id": item.id,
+                "decision": item.decision,
+            })
+            results.append({
+                "id": item.id,
+                "execution_id": execution.get("run_id", "") if execution else "",
+                "status": "sent",
+                "decision": item.decision,
+                "repair_attempts": repair_attempts,
+                "text": text[:50],
+                "repaired_text": item.repaired_text,
+                "repair_changes": (repair_info or {}).get("changes", []),
+            })
         except Exception as e:
+            error_text = str(e)[:200]
+            classified = MarketingAutomationPolicy.classify_send_error(error_text)
+            status = classified["status"]
+            next_run = (datetime.now() + timedelta(minutes=20)).isoformat() if status == "retrying" else ""
+            risk_codes = check.get("risk_codes", [])
+            if classified["code"] not in risk_codes:
+                risk_codes = [*risk_codes, classified["code"]]
             item = CommentItem(
                 platform=platform,
                 video_id=comment_data.get("video_id", ""),
+                video_title=comment_data.get("video_title", ""),
+                video_url=comment_data.get("video_url", ""),
                 comment_text=text,
                 original_text=original,
-                status="failed",
+                status=status,
                 risk_level=check["risk_level"],
-                error_msg=str(e)[:200],
+                risk_codes=risk_codes,
+                decision=classified["decision"],
+                repair_attempts=repair_attempts,
+                repaired_text=text if text != original else "",
+                next_run_at=next_run,
+                error_msg=error_text,
+                metadata={"execution_id": execution.get("run_id", "")} if execution else {},
             )
             await queue.add(item)
-            results.append({"id": item.id, "status": "failed", "error": str(e)[:100]})
+            step_status = "needs_human" if status == "needs_human" else "failed"
+            _finish_execution_step(execution, send_step, step_status, error_text, classified["code"])
+            run_status = "needs_human" if status == "needs_human" else "failed"
+            _complete_marketing_execution(execution, run_status, {
+                "status": status,
+                "queue_item_id": item.id,
+                "next_run_at": next_run,
+            }, classified["code"], error_text)
+            results.append({
+                "id": item.id,
+                "execution_id": execution.get("run_id", "") if execution else "",
+                "status": status,
+                "decision": classified["decision"],
+                "risk_codes": risk_codes,
+                "next_run_at": next_run,
+                "error": error_text[:100],
+            })
 
         # 发送间隔
         await asyncio.sleep(random.uniform(3, 8))
 
     return results
+
+
+async def process_due_comments(limit: int = 20, strategy: str = "balanced", deai: bool = True) -> dict:
+    """Send delayed/retrying queue items whose next_run_at has arrived."""
+    queue = get_comment_queue()
+    due_items = await queue.due(limit)
+    processed: list[dict] = []
+    for item in due_items:
+        retry_count = int(item.metadata.get("retry_count", 0) or 0) + 1
+        await queue.update(
+            item.id,
+            status="pending",
+            metadata={**item.metadata, "retry_count": retry_count, "processing_started_at": datetime.now().isoformat()},
+        )
+        try:
+            results = await batch_send(
+                item.platform,
+                [{
+                    "video_id": item.video_id,
+                    "video_title": item.video_title,
+                    "video_url": item.video_url,
+                    "text": item.comment_text,
+                    "comment_text": item.comment_text,
+                }],
+                item.strategy or strategy,
+                deai,
+            )
+            result = results[0] if results else {"status": "failed", "error": "empty retry result"}
+            new_item_id = result.get("id", "")
+            if new_item_id and new_item_id != item.id:
+                await queue.delete(new_item_id)
+            await queue.update(
+                item.id,
+                status=result.get("status", "failed"),
+                decision=result.get("decision", item.decision),
+                next_run_at=result.get("next_run_at", ""),
+                error_msg=result.get("error", result.get("reason", "")),
+                sent_at=datetime.now().isoformat() if result.get("status") == "sent" else item.sent_at,
+                metadata={**item.metadata, "retry_count": retry_count, "last_retry_at": datetime.now().isoformat()},
+            )
+            processed.append({"id": item.id, "status": result.get("status", "failed"), "result": result})
+        except Exception as exc:
+            error_text = str(exc)[:200]
+            next_run = (datetime.now() + timedelta(minutes=20)).isoformat()
+            await queue.update(
+                item.id,
+                status="retrying",
+                next_run_at=next_run,
+                error_msg=error_text,
+                metadata={**item.metadata, "retry_count": retry_count, "last_retry_at": datetime.now().isoformat()},
+            )
+            processed.append({"id": item.id, "status": "retrying", "error": error_text, "next_run_at": next_run})
+    return {"total_due": len(due_items), "processed": len(processed), "items": processed}
+
+
+# ── Execution Kernel Bridge ──────────────────────────────────────────────
+
+def _start_marketing_execution(platform: str, comment_data: dict, text: str) -> dict:
+    """Create a lightweight observable execution run for outbound marketing actions."""
+    try:
+        from szyg.execution_kernel import get_execution_kernel
+
+        kernel = get_execution_kernel()
+        run = kernel.create_run(
+            "marketing_comment",
+            platform,
+            "browser",
+            {
+                "platform": platform,
+                "video_id": comment_data.get("video_id", ""),
+                "video_title": comment_data.get("video_title", ""),
+                "video_url": comment_data.get("video_url", ""),
+                "text": text,
+            },
+            title=comment_data.get("video_title", "") or "营销评论外发",
+            source_task_id="acquisition:",
+            auto_start=False,
+        )
+        return {"kernel": kernel, "run_id": run["id"]}
+    except Exception as exc:
+        logger.debug("Marketing execution bridge unavailable: %s", exc)
+        return {}
+
+
+def _execution_step(execution: dict, step_id: str, name: str, action: str) -> dict | None:
+    if not execution:
+        return None
+    try:
+        return execution["kernel"].start_step(execution["run_id"], step_id, name, "browser", action)
+    except Exception as exc:
+        logger.debug("Marketing execution step failed: %s", exc)
+        return None
+
+
+def _add_execution_observation(execution: dict, step: dict | None, observation_type: str, summary: str) -> None:
+    if not execution or not step:
+        return
+    try:
+        execution["kernel"].add_observation(execution["run_id"], step["id"], observation_type, summary)
+    except Exception as exc:
+        logger.debug("Marketing execution observation failed: %s", exc)
+
+
+def _finish_execution_step(
+    execution: dict,
+    step: dict | None,
+    status: str,
+    message: str,
+    error_code: str = "",
+) -> None:
+    if not execution or not step:
+        return
+    try:
+        execution["kernel"].finish_step(step, status, message, error_code=error_code)
+    except Exception as exc:
+        logger.debug("Marketing execution finish step failed: %s", exc)
+
+
+def _complete_marketing_execution(
+    execution: dict,
+    status: str,
+    result: dict,
+    error_code: str = "",
+    error_message: str = "",
+) -> None:
+    if not execution:
+        return
+    try:
+        execution["kernel"].complete_run(execution["run_id"], status, result, error_code, error_message)
+    except Exception as exc:
+        logger.debug("Marketing execution complete failed: %s", exc)
 
 
 # ── Utilities ────────────────────────────────────────────────────────────

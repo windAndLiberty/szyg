@@ -17,6 +17,7 @@ import {
 import { fetchTasks, getTaskDetail, retryTask, cancelTask } from '@/lib/api'
 import type { TaskItem, TaskDetail, TaskListResponse } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { PublishedPostLink } from '@/components/publish/PublishedPostLink'
 
 // ── Constants ─────────────────────────────────────────────────
 
@@ -416,6 +417,8 @@ function TaskDetailModal({
                 </div>
               )}
 
+              <PublishedPostLink result={detail.execution_run?.result} platform={detail.execution_run?.platform} />
+
               {detail.steps && detail.steps.length > 0 && (
                 <div>
                   <h4 className="text-sm font-semibold text-[#F1F5F9] mb-3">执行步骤</h4>
@@ -509,9 +512,9 @@ function EmptyBoard() {
       <div className="w-16 h-16 rounded-2xl bg-[#1A2235] border border-[#1E293B] flex items-center justify-center mb-5">
         <ClipboardList className="w-8 h-8 text-[#64748B]" />
       </div>
-      <h3 className="text-base font-semibold text-[#94A3B8] mb-2">暂无任务</h3>
+      <h3 className="text-base font-semibold text-[#94A3B8] mb-2">暂无工作记录</h3>
       <p className="text-sm text-[#64748B] text-center max-w-sm leading-relaxed">
-        通过超级员工对话或各功能页面创建任务，AI 员工将自动执行并在此展示进度
+        通过超级员工、内容发布或营销获客创建任务后，AI 员工的执行过程会在这里留下记录
       </p>
     </div>
   )
@@ -650,8 +653,7 @@ export default function TaskBoard() {
       {/* Page header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-[#F1F5F9]">任务看板</h1>
-          <p className="text-sm text-[#64748B] mt-1">AI 员工正在执行的任务一目了然</p>
+          <p className="text-sm text-[#94A3B8]">查看 AI 员工完成了什么、卡在哪里、是否需要人工处理</p>
         </div>
 
         {/* Manual refresh */}

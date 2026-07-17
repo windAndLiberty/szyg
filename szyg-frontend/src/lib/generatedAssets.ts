@@ -24,6 +24,9 @@ export function resolveGeneratedAssetUrl(url: string, path = ''): string {
   if (['mp3', 'wav', 'm4a', 'aac', 'flac'].includes(ext)) {
     return `/api/media/files/audio/${encodeURIComponent(fileName)}`
   }
+  if (['md', 'txt'].includes(ext)) {
+    return `/api/media/files/document/${encodeURIComponent(fileName)}`
+  }
   return candidate
 }
 

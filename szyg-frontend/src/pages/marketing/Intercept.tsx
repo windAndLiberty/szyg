@@ -182,8 +182,10 @@ export default function Intercept() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="发现目标" value={formatNumber(targets.length)} icon={Target} hint="来自当前关键词搜索" />
         <MetricCard label="高分机会" value={highScoreCount} icon={ShieldCheck} tone="green" hint="质量分 80 以上" />
-        <MetricCard label="待发送队列" value={formatNumber(queueMetrics.pending)} icon={MessageSquareText} tone="blue" hint="评论队列观测" />
-        <MetricCard label="需人工处理" value={formatNumber(queueMetrics.needsHuman)} icon={AlertTriangle} tone="amber" hint="失败、跳过或需人工确认" />
+        <MetricCard label="待发送队列" value={formatNumber(queueMetrics.pending)} icon={MessageSquareText} tone="blue" hint="低风险任务自动排队" />
+        <MetricCard label="自动修复" value={formatNumber(queueMetrics.autoRepaired)} icon={ShieldCheck} tone="green" hint="文案问题由系统处理" />
+        <MetricCard label="延后/重试" value={formatNumber(queueMetrics.delayed + queueMetrics.retrying)} icon={BarChart3} tone="indigo" hint="限流和短暂失败不打扰用户" />
+        <MetricCard label="需人工处理" value={formatNumber(queueMetrics.needsHuman)} icon={AlertTriangle} tone="amber" hint="只统计登录、验证码、敏感动作" />
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[360px_1fr]">
@@ -323,7 +325,15 @@ export default function Intercept() {
                     const passed = item.preflight?.pass ?? item.preflight?.passed ?? item.preflight?.ok
                     const risk = String(item.preflight?.risk_level || item.preflight?.risk || (passed === false ? 'high' : 'low')).toLowerCase()
                     const risks = item.preflight?.risks || item.preflight?.reasons || []
-                    const blocked = passed === false || risk === 'high'
+                    const decision = String(item.preflight?.decision || '')
+                    const decisionLabel = decision === 'auto_repair_then_send'
+                      ? '可自动修复'
+                      : decision === 'needs_human'
+                        ? '需人工确认'
+                        : decision === 'skip'
+                          ? '自动跳过'
+                          : '可自动发送'
+                    const blocked = decision === 'needs_human' || decision === 'skip' || risk === 'high'
                     return (
                       <div key={`${item.processed}-${index}`} className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
                         <div className="flex items-start justify-between gap-3">
@@ -335,7 +345,7 @@ export default function Intercept() {
                             )}
                           </div>
                           <span className={`rounded-full border px-2 py-1 text-xs ${blocked ? 'border-[#EF4444]/25 bg-[#EF4444]/10 text-[#FCA5A5]' : risk === 'medium' ? 'border-[#F59E0B]/25 bg-[#F59E0B]/10 text-[#FCD34D]' : 'border-[#10B981]/25 bg-[#10B981]/10 text-[#86EFAC]'}`}>
-                            {blocked ? '预检未通过' : risk === 'medium' ? '中风险需确认' : '预检通过'}
+                            {decisionLabel}
                           </span>
                         </div>
                         {item.preflight?.message && <p className="mt-3 text-xs text-[#94A3B8]">{item.preflight.message}</p>}
@@ -354,7 +364,7 @@ export default function Intercept() {
                           </button>
                           <button onClick={() => confirmExternalAction('发送评论')} disabled={blocked} className={buttonSecondary}>
                             <Send className="h-4 w-4" />
-                            {blocked ? '高风险需人工' : '预览发送确认'}
+                            {decision === 'needs_human' ? '敏感动作需人工' : '预览发送确认'}
                           </button>
                         </div>
                       </div>
@@ -377,8 +387,17 @@ export default function Intercept() {
                     <span className="text-xs text-[#94A3B8]">{platformLabel(item.platform)}</span>
                     <StatusPill status={item.status} />
                   </div>
-                  <p className="mt-2 line-clamp-2 text-sm text-[#F1F5F9]">{item.text || item.comment || item.video_title || '评论任务'}</p>
-                  {item.error && <p className="mt-2 text-xs text-[#FCA5A5]">{item.error}</p>}
+                  <p className="mt-2 line-clamp-2 text-sm text-[#F1F5F9]">
+                    {String(item.comment_text || item.repaired_text || item.text || item.comment || item.video_title || '评论任务')}
+                  </p>
+                  {item.original_text && item.original_text !== item.comment_text && (
+                    <p className="mt-2 line-clamp-2 text-xs text-[#64748B]">原文：{String(item.original_text)}</p>
+                  )}
+                  {Array.isArray(item.risk_codes) && item.risk_codes.length > 0 && (
+                    <p className="mt-2 text-xs text-[#94A3B8]">风险码：{item.risk_codes.join('、')}</p>
+                  )}
+                  {item.next_run_at && <p className="mt-2 text-xs text-[#C4B5FD]">下次尝试：{String(item.next_run_at).slice(5, 16).replace('T', ' ')}</p>}
+                  {(item.error || item.error_msg) && <p className="mt-2 text-xs text-[#FCA5A5]">{String(item.error || item.error_msg)}</p>}
                 </div>
               ))}
             </div>
@@ -388,7 +407,7 @@ export default function Intercept() {
               <CheckCircle2 className="h-4 w-4 text-[#10B981]" />
               安全执行规则
             </div>
-            评论发送、私信、自动回复必须经过预览、预检和人工确认。高风险、验证码、账号异常会进入需人工处理。
+            普通评论会自动预检、修复、排队和重试；只有登录、验证码、账号异常、联系方式、加好友等敏感动作会进入需人工处理。
           </div>
         </Panel>
       </div>
