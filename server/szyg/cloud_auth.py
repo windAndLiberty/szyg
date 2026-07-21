@@ -71,7 +71,7 @@ class CloudAuthManager:
         url = os.environ.get("SZYG_CONTROL_URL", str(section.get("control_url", ""))).strip().rstrip("/")
         enabled_value = os.environ.get("SZYG_CLOUD_ENABLED", section.get("enabled", bool(url)))
         enabled = str(enabled_value).lower() in {"1", "true", "yes", "on"}
-        return {"enabled": enabled and bool(url), "control_url": url, "app_version": str(section.get("app_version", "1.0.0"))}
+        return {"enabled": enabled and bool(url), "control_url": url, "app_version": str(section.get("app_version", "1.0.2"))}
 
     def device(self) -> dict[str, str]:
         if self._device_file.exists():

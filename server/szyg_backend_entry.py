@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import multiprocessing
+import faulthandler
 import logging
 import os
 import sys
@@ -25,6 +26,9 @@ def main() -> None:
         stream=log_stream,
         force=True,
     )
+    if os.environ.get("SZYG_STARTUP_DIAGNOSTICS", "").lower() in {"1", "true", "yes"}:
+        faulthandler.enable(file=log_stream, all_threads=True)
+        faulthandler.dump_traceback_later(20, repeat=True, file=log_stream)
     uvicorn.run(
         "szyg.api.app:create_app",
         factory=True,

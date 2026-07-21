@@ -95,7 +95,7 @@ class MCPServerManager:
                 "params": {
                     "protocolVersion": "2024-11-05",
                     "capabilities": {},
-                    "clientInfo": {"name": "szyg-hermes", "version": "1.0.0"},
+                    "clientInfo": {"name": "szyg-hermes", "version": "1.0.2"},
                 },
             }, ensure_ascii=False)
             process.stdin.write(init_req + "\n")
