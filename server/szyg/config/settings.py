@@ -24,17 +24,6 @@ class AgentConfig(BaseModel):
     enable_self_correction: bool = Field(default=True)
 
 
-class MemoryConfig(BaseModel):
-    """长期记忆配置。"""
-
-    db_path: str = Field(default="./data/memory.db")
-    enable_fts: bool = Field(default=True)
-    embedding_dim: int = Field(default=768, ge=128, le=4096)
-    similarity_threshold: float = Field(default=0.75, ge=0.0, le=1.0)
-    max_history_per_session: int = Field(default=20, ge=5)
-    auto_summarize_after: int = Field(default=10, ge=5)
-
-
 class MCPServerDefinition(BaseModel):
     """单个 MCP 服务器定义。"""
 
@@ -173,7 +162,6 @@ class YuLingSettings(BaseSettings):
     )
 
     agent: AgentConfig = Field(default_factory=AgentConfig)
-    memory: MemoryConfig = Field(default_factory=MemoryConfig)
     mcp_servers: MCPConfig = Field(default_factory=MCPConfig)
     models: ModelsConfig = Field(default_factory=ModelsConfig)
     integrations: IntegrationsConfig = Field(default_factory=IntegrationsConfig)

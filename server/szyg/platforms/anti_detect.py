@@ -17,10 +17,61 @@ import asyncio
 import random
 import math
 import os
+from enum import Enum
 from pathlib import Path
 from typing import Optional
 
 _STEALTH_JS: str | None = None
+
+
+class BehaviorStrategy(str, Enum):
+    """Named pacing policies shared by marketing automation and the UI."""
+
+    CAUTIOUS = "cautious"
+    BALANCED = "balanced"
+    FAST = "fast"
+    FRIENDLY = "friendly"
+    PROFESSIONAL = "professional"
+
+
+def _strategy(
+    *,
+    hourly_limit: int,
+    daily_limit: int,
+    type_delay: tuple[float, float],
+    click_delay: tuple[float, float],
+    between_actions: tuple[float, float],
+) -> dict:
+    return {
+        "type_delay": type_delay,
+        "click_delay": click_delay,
+        "scroll_delay": (0.8, 2.0),
+        "think_pause": (1.5, 4.0),
+        "between_actions": between_actions,
+        "typo_rate": 0.01,
+        "hourly_limit": hourly_limit,
+        "daily_limit": daily_limit,
+        "mouse_params": {"duration": (0.3, 0.9), "steps": (12, 28)},
+    }
+
+
+STRATEGY_CONFIG = {
+    BehaviorStrategy.CAUTIOUS: _strategy(
+        hourly_limit=4, daily_limit=12, type_delay=(0.12, 0.32), click_delay=(1.0, 2.5), between_actions=(8.0, 18.0),
+    ),
+    BehaviorStrategy.BALANCED: _strategy(
+        hourly_limit=8, daily_limit=30, type_delay=(0.08, 0.24), click_delay=(0.7, 1.8), between_actions=(5.0, 12.0),
+    ),
+    BehaviorStrategy.FAST: _strategy(
+        hourly_limit=12, daily_limit=50, type_delay=(0.05, 0.16), click_delay=(0.4, 1.2), between_actions=(3.0, 8.0),
+    ),
+    BehaviorStrategy.FRIENDLY: _strategy(
+        hourly_limit=8, daily_limit=30, type_delay=(0.09, 0.25), click_delay=(0.7, 1.8), between_actions=(5.0, 12.0),
+    ),
+    BehaviorStrategy.PROFESSIONAL: _strategy(
+        hourly_limit=6, daily_limit=20, type_delay=(0.10, 0.28), click_delay=(0.8, 2.0), between_actions=(6.0, 14.0),
+    ),
+}
 
 
 def _load_stealth_js() -> str:

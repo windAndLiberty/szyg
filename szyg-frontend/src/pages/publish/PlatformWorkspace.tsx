@@ -285,7 +285,7 @@ export default function PlatformWorkspace() {
                 )}
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span className="text-sm text-[#94A3B8]">Cookie</span>
+                <span className="text-sm text-[#94A3B8]">登录信息</span>
                 <span className="text-sm text-[#CBD5E1]">{selectedPlatformInfo?.session?.cookie_count ?? 0}</span>
               </div>
             </div>

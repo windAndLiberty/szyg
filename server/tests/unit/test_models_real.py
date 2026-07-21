@@ -24,7 +24,6 @@ from szyg.models.integration import (
     TranscriptionResult,
 )
 from szyg.models.mcp import MCPServerConfig, Tool, ToolResult
-from szyg.models.memory import MemoryEntry
 from szyg.models.skill import Skill, SkillParameter, SkillResult
 from szyg.models.task import TaskPlan, TaskStep
 from szyg.models.wechaty import WechatyMessage
@@ -106,48 +105,6 @@ class TestModelListResponse:
         assert resp.object == "list"
         assert len(resp.data) == 2
         assert resp.data[0].id == "qwen2.5"
-
-
-# ============================================================================
-# Memory Model
-# ============================================================================
-
-
-class TestMemoryEntry:
-    def test_construction(self):
-        entry = MemoryEntry(
-            id=1,
-            content="test memory",
-            metadata={"key": "value"},
-            created_at="2024-01-01T00:00:00",
-            updated_at="2024-01-01T00:00:00",
-        )
-        assert entry.id == 1
-        assert entry.content == "test memory"
-        assert entry.metadata["key"] == "value"
-
-    def test_defaults(self):
-        entry = MemoryEntry(
-            id=1,
-            content="test",
-            created_at="2024-01-01T00:00:00",
-            updated_at="2024-01-01T00:00:00",
-        )
-        assert entry.metadata == {}
-
-    def test_json_roundtrip(self):
-        entry = MemoryEntry(
-            id=42,
-            content="round trip",
-            metadata={"source": "unit_test"},
-            created_at="2024-01-01T00:00:00",
-            updated_at="2024-01-01T00:00:00",
-            relevance_score=0.95,
-        )
-        json_str = entry.model_dump_json()
-        restored = MemoryEntry.model_validate_json(json_str)
-        assert restored.id == 42
-        assert restored.relevance_score == 0.95
 
 
 # ============================================================================

@@ -1,6 +1,15 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { Send, Film, Loader2, ExternalLink } from 'lucide-react'
+import {
+  Send,
+  Film,
+  Loader2,
+  ExternalLink,
+  BrainCircuit,
+  Target,
+  UsersRound,
+  BarChart3,
+} from 'lucide-react'
 import type { CaseCard } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -12,7 +21,32 @@ type WelcomeStateProps = {
   streaming: boolean
   caseCards: CaseCard[]
   caseCardsLoading: boolean
+  skillCount: number
+  memoryEnabled: boolean
 }
+
+const skillShortcuts = [
+  {
+    label: '策划营销内容',
+    prompt: '请结合我的企业资料，策划一套适合当前产品的营销内容，并说明推荐平台和执行步骤。',
+    icon: Film,
+  },
+  {
+    label: '发现潜在客户',
+    prompt: '请结合我的产品与知识库，寻找高相关的潜在客户机会，并给出安全的触达建议。',
+    icon: Target,
+  },
+  {
+    label: '推进客户转化',
+    prompt: '请分析当前高意向线索，生成个性化跟进建议和下一步行动。',
+    icon: UsersRound,
+  },
+  {
+    label: '复盘运营表现',
+    prompt: '请汇总最近的内容、发布、获客和转化数据，找出最值得优先处理的问题。',
+    icon: BarChart3,
+  },
+]
 
 const formatLikes = (n: number) => (n >= 10000 ? `${(n / 10000).toFixed(1)}w` : `${n}`)
 
@@ -24,6 +58,8 @@ const WelcomeState: React.FC<WelcomeStateProps> = ({
   streaming,
   caseCards,
   caseCardsLoading,
+  skillCount,
+  memoryEnabled,
 }) => {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -41,7 +77,7 @@ const WelcomeState: React.FC<WelcomeStateProps> = ({
     >
       {/* Brand block */}
       <motion.div
-        className="flex flex-col items-center gap-4 mb-10"
+        className="flex flex-col items-center gap-4 mb-8"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
@@ -56,13 +92,28 @@ const WelcomeState: React.FC<WelcomeStateProps> = ({
           </div>
         </div>
         <div className="text-center">
-          <p className="text-body-md text-[#94A3B8]">智能体协同 · 一句话调度真实工具与生成</p>
+          <p className="text-body-md text-[#94A3B8]">一个超级员工，按需组合内容、获客、转化与运营技能</p>
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-[11px] text-[#64748B]">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#334155] bg-[#111827]/70 px-2.5 py-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#10B981] shadow-[0_0_6px_rgba(16,185,129,0.7)]" />
+              超级员工已就绪
+            </span>
+            {skillCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#334155] bg-[#111827]/70 px-2.5 py-1">
+                <BrainCircuit className="h-3 w-3 text-[#818CF8]" />
+                {skillCount} 项可复用技能
+              </span>
+            )}
+            {memoryEnabled && (
+              <span className="rounded-full border border-[#334155] bg-[#111827]/70 px-2.5 py-1">长期记忆已开启</span>
+            )}
+          </div>
         </div>
       </motion.div>
 
       {/* Input box */}
       <motion.div
-        className="w-full max-w-2xl mb-10"
+        className="w-full max-w-2xl mb-5"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 0.15, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
@@ -94,6 +145,29 @@ const WelcomeState: React.FC<WelcomeStateProps> = ({
             </button>
           </div>
         </div>
+      </motion.div>
+
+      <motion.div
+        className="mb-9 grid w-full max-w-2xl grid-cols-2 gap-2 md:grid-cols-4"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.24, ease: [0.16, 1, 0.3, 1] }}
+      >
+        {skillShortcuts.map((item) => {
+          const Icon = item.icon
+          return (
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => setInputText(item.prompt)}
+              disabled={streaming}
+              className="flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-[#1E293B] bg-[#111827]/60 px-3 text-xs text-[#94A3B8] transition-all hover:border-[#6366F1]/40 hover:bg-[#6366F1]/8 hover:text-[#E0E7FF] disabled:opacity-50"
+            >
+              <Icon className="h-3.5 w-3.5 shrink-0 text-[#818CF8]" />
+              <span className="truncate">{item.label}</span>
+            </button>
+          )
+        })}
       </motion.div>
 
       {/* === CASE CARDS SECTION === */}

@@ -1,11 +1,10 @@
-"""统一仪表盘 / 数字员工数据 API — 为 szyg-frontend 提供真实聚合数据.
+"""统一仪表盘数据 API — 为 szyg-frontend 提供真实聚合数据.
 
 所有数据均来自真实业务子系统（AI 员工状态、调度器、发布器、采集引擎、对话历史），
 绝不使用模拟数据。当某项指标无法计算时返回真实的 0 / 空列表，而非编造数字。
 
 覆盖前端页面:
-  - Dashboard  : overview / activities / tasks / interaction-trend / distribution
-  - DigitalHuman: digital-humans（由真实 AI 员工映射）
+  - Dashboard: overview / activities / tasks / interaction-trend / distribution
 """
 
 import json
@@ -23,21 +22,17 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 from szyg.api.staff_routes import (
     _compute_staff_status,
     _compute_tasks,
-    _load_json,
-    _CONFIGS_FILE,
-    _DEFAULT_CONFIGS,
 )
 
 CONV_DIR = DATA_DIR / "conversations"
 
-# ── 真实员工 → 前端 DigitalHuman 类型映射 ────────────────────────────
+# ── 业务能力类型映射 ───────────────────────────────────────────────
 _STAFF_TYPE_MAP = {
     "content": "marketing",
     "acquisition": "sales",
     "conversion": "customer_service",
     "ops": "data_analyst",
 }
-_STAFF_STATUS_MAP = {"running": "active", "idle": "idle", "error": "error"}
 _TYPE_COLOR = {
     "sales": "#6366F1", "customer_service": "#10B981", "marketing": "#F59E0B",
     "data_analyst": "#3B82F6", "custom": "#8B5CF6",
@@ -53,34 +48,6 @@ _TASK_STATUS_MAP = {
 _TASK_TYPE_MAP = {
     "内容专员": "内容", "获客专员": "获客", "转化专员": "转化", "运营专员": "调度",
 }
-
-
-def _agent_configs() -> dict:
-    """读取真实持久化的员工配置（不存在时使用默认配置）。"""
-    configs = _load_json(_CONFIGS_FILE, None)
-    if configs is None:
-        configs = _DEFAULT_CONFIGS
-    return configs
-
-
-def _resolve_model_label() -> str:
-    """从 config.yaml 读取真实默认模型名称。"""
-    try:
-        from szyg.config.loader import load_config
-        cfg = load_config()
-        llm = cfg.get("llm", {})
-        backend = llm.get("default_backend", "ollama")
-        if backend == "volcengine":
-            vc = llm.get("volcengine", {})
-            eps = vc.get("endpoints", {}) or {}
-            for _model_id, ep in eps.items():
-                if ep:
-                    return ep
-            return vc.get("default_model", "doubao-seed-2-0-pro")
-        return llm.get("ollama", {}).get("default_model", "ollama")
-    except Exception as e:
-        logger.debug("resolve model label failed: %s", e)
-        return "未配置"
 
 
 def _to_aware(d: datetime) -> datetime:
@@ -107,46 +74,6 @@ def _list_conversation_mtimes() -> list[datetime]:
             except Exception:
                 continue
     return times
-
-
-# ═══════════════════════════════════════════════════════════════════
-# 数字员工（由真实 AI 员工聚合）
-# ═══════════════════════════════════════════════════════════════════
-
-@router.get("/digital-humans")
-async def digital_humans():
-    """由真实 AI 员工聚合为前端 DigitalHuman 列表。"""
-    staff = _compute_staff_status()
-    configs = _agent_configs()
-    model_label = _resolve_model_label()
-    now_iso = datetime.now(timezone.utc).isoformat()
-
-    humans = []
-    for s in staff:
-        sid = s.get("id", "")
-        cfg = configs.get(sid, {})
-        basic = cfg.get("basic", {}) if isinstance(cfg, dict) else {}
-        staff_status = s.get("status", "idle")
-        progress = s.get("progress", 0)
-        if staff_status == "running" and progress < 100:
-            fe_status = "training"
-        else:
-            fe_status = _STAFF_STATUS_MAP.get(staff_status, "idle")
-        name = s.get("name", sid)
-        humans.append({
-            "id": sid,
-            "name": name,
-            "avatar": s.get("emoji") or (name[:1] if name else "AI"),
-            "status": fe_status,
-            "type": _STAFF_TYPE_MAP.get(sid, "custom"),
-            "model": model_label,
-            "createdAt": s.get("updated_at", now_iso),
-            "lastActive": s.get("updated_at", now_iso),
-            "interactions": int(s.get("tasksToday", 0)),
-            "successRate": round(float(progress or 0), 1),
-            "description": basic.get("description", s.get("recent", "")) if isinstance(basic, dict) else "",
-        })
-    return {"digitalHumans": humans}
 
 
 @router.get("/distribution")

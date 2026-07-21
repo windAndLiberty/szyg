@@ -52,7 +52,8 @@ def load_config(path: str | Path = "config.yaml") -> dict:
     Returns:
         dict: 解析后的配置字典(环境变量已替换)
     """
-    config_path = Path(path)
+    configured_path = os.environ.get("SZYG_CONFIG_PATH", "").strip()
+    config_path = Path(configured_path or path)
     if not config_path.exists():
         # 尝试项目根目录
         alt = Path(__file__).parent.parent.parent.parent / "config.yaml"

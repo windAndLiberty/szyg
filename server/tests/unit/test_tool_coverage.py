@@ -42,6 +42,20 @@ def _find_tool_names_in_source(source: str) -> set[str]:
                 and isinstance(node.comparators[0].value, str)
             ):
                 tool_names.add(node.comparators[0].value)
+        if isinstance(node, ast.Compare):
+            if (
+                isinstance(node.left, ast.Name)
+                and node.left.id == "name"
+                and len(node.ops) == 1
+                and isinstance(node.ops[0], ast.In)
+                and len(node.comparators) == 1
+                and isinstance(node.comparators[0], (ast.Set, ast.Tuple, ast.List))
+            ):
+                tool_names.update(
+                    item.value
+                    for item in node.comparators[0].elts
+                    if isinstance(item, ast.Constant) and isinstance(item.value, str)
+                )
     return tool_names
 
 
@@ -110,6 +124,8 @@ class TestToolCoverage:
         # 允许一些内部工具不在 HERMES_TOOLS 中（如 acq_*, sau_*, pipeline_* 等）
         # 这些是 Phase B/C/D 扩展工具，可能尚未暴露给 LLM
         known_unexposed = {
+            # Runtime-only Hermes memory tool (enabled per session config)
+            "memory",
             # Phase B: SOP/公告/Brain/配置
             "sop_list", "sop_define",
             "announce_list", "announce_create", "announce_delete",

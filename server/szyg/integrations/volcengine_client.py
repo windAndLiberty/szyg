@@ -129,6 +129,20 @@ class VolcEngineClient(BaseLLMClient):
       - 统一错误处理
     """
 
+    def __new__(cls, *args, **kwargs):
+        if cls is VolcEngineClient:
+            try:
+                from szyg.cloud_auth import cloud_auth
+                if cloud_auth.config["enabled"]:
+                    from szyg.integrations.cloud_inference_client import CloudInferenceClient
+                    return CloudInferenceClient(
+                        timeout=float(kwargs.get("timeout", 120)),
+                        output_dir=kwargs.get("output_dir"),
+                    )
+            except Exception as exc:
+                logger.warning("Cloud inference selection failed: %s", exc)
+        return super().__new__(cls)
+
     def __init__(
         self,
         api_key: str | None = None,
@@ -365,7 +379,7 @@ class VolcEngineClient(BaseLLMClient):
                 "max_output_tokens": max_output_tokens,
             }
             if reasoning_effort:
-                payload["reasoning_effort"] = reasoning_effort
+                payload["reasoning"] = {"effort": reasoning_effort}
             async with httpx.AsyncClient(timeout=120, trust_env=False) as c:
                 r = await c.post(
                     f"{self.base_url}/responses",

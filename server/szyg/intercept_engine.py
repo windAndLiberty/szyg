@@ -43,6 +43,12 @@ class VideoTarget:
     likes: int = 0
     comments_count: int = 0
     shares: int = 0
+    favorites: int = 0
+    coins: int = 0
+    danmaku: int = 0
+    author_id: str = ""
+    author_profile_url: str = ""
+    author_following: int = 0
     published_at: str = ""
     duration: int = 0
     tags: list = field(default_factory=list)
@@ -244,6 +250,9 @@ class InterceptEngine:
                 scored = []
                 for v_data in videos:
                     vid = v_data.get("video_id", v_data.get("id", ""))
+                    if not str(vid or "").strip():
+                        logger.debug("Skip non-commentable %s result without video id: %s", plat_name, v_data.get("url", ""))
+                        continue
                     if strict_dedup and self.is_duplicate(plat_name, vid):
                         continue
                     target = VideoTarget(
@@ -257,8 +266,14 @@ class InterceptEngine:
                         cover=v_data.get("cover", ""),
                         plays=int(v_data.get("plays", v_data.get("view_count", 0))),
                         likes=int(v_data.get("likes", v_data.get("like_count", 0))),
-                        comments_count=int(v_data.get("comments", v_data.get("comment_count", 0))),
+                        comments_count=int(v_data.get("comments_count", v_data.get("comments", v_data.get("comment_count", 0)))),
                         shares=int(v_data.get("shares", v_data.get("share_count", 0))),
+                        favorites=int(v_data.get("favorites", v_data.get("favorite", 0))),
+                        coins=int(v_data.get("coins", v_data.get("coin", 0))),
+                        danmaku=int(v_data.get("danmaku", 0)),
+                        author_id=str(v_data.get("author_id", v_data.get("mid", ""))),
+                        author_profile_url=str(v_data.get("author_profile_url", "")),
+                        author_following=int(v_data.get("author_following", 0)),
                         published_at=v_data.get("published_at", v_data.get("publish_time", "")),
                         duration=int(v_data.get("duration", 0)),
                         tags=v_data.get("tags", []),
@@ -350,7 +365,7 @@ class InterceptEngine:
 
     async def run_pipeline(self, keyword: str, platforms: list[str] = None,
                            comment_count: int = 5, strategy: str = "balanced",
-                           deai: bool = True) -> dict:
+                           deai: bool = True, confirmed: bool = False) -> dict:
         """一键截流流水线: 搜索→筛选→生成→DeAI→发送"""
         from szyg.comment_engine import generate_comments_with_llm, batch_send, DeAIProcessor
 
@@ -374,6 +389,7 @@ class InterceptEngine:
                     "video_id": target.video_id,
                     "video_title": target.title,
                     "video_url": target.url,
+                    "human_confirmed": confirmed,
                 }
                 for c in raw_comments
             ]

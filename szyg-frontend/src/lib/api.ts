@@ -1,7 +1,7 @@
 /**
  * szyg-frontend API 客户端 — 真实联通 szyg 后端 (FastAPI, port 8000).
  *
- * - JWT Bearer 鉴权，token 存 localStorage；401 自动以 admin/admin123 重新登录后重试。
+ * - 云账户会话由本地后端代理；长期凭证不会进入浏览器存储。
  * - 开发态经 Vite 代理 (/api → 127.0.0.1:8000)；生产态后端直接托管 SPA，同源。
  * - 绝不使用模拟数据：所有数据均来自后端真实接口。
  */
@@ -23,31 +23,49 @@ export function getCurrentUser(): { username: string } | null {
 }
 
 export async function autoLogin(): Promise<string | null> {
-  try {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: 'admin', password: 'admin123' }),
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    if (data.access_token) {
-      localStorage.setItem(TOKEN_KEY, data.access_token)
-      localStorage.setItem(USER_KEY, JSON.stringify(data.user || { username: 'admin' }))
-      return data.access_token as string
-    }
-  } catch (e) {
-    console.error('Auto login failed:', e)
-  }
+  // Kept as a compatibility shim for older call sites. Cloud session recovery
+  // happens inside the local backend and never returns a token to the renderer.
   return null
+}
+
+export function toUserFacingMessage(value: unknown, fallback = '操作未完成，请稍后重试'): string {
+  const raw = String(value || '').trim()
+  if (!raw) return fallback
+
+  if (/total tokens of image and text exceed|max message tokens|context length/i.test(raw)) {
+    return '素材或文字内容较多，请减少内容后重试'
+  }
+  if (/duration[^\n]*(not valid|invalid)|specified duration/i.test(raw)) {
+    return '当前时长不受支持，请调整后重试'
+  }
+  if (/invalid role|role must be specified|task_type[^\n]*not support/i.test(raw)) {
+    return '当前参考素材组合暂不受支持，请调整素材后重试'
+  }
+  if (/method not allowed/i.test(raw)) return '当前操作暂不可用'
+
+  const hasTechnicalDetail = /seedance|seedream|doubao|qwen|volcengine|火山方舟|火山引擎|\bprovider\b|\bendpoint\b|ep-(?:m-)?[\w-]+|invalidendpointormodel|model id|推理服务|接入点/i.test(raw)
+  if (hasTechnicalDetail && /failed|error|not found|does not exist|not configured|invalid|不可用|未配置|失败|无权限|拒绝/i.test(raw)) {
+    return '当前智能服务暂时不可用，请稍后重试'
+  }
+
+  return raw
+    .replace(/doubao-seedance-[\w.-]+|seedance(?:\s*[\w.-]+)?/gi, '视频生成服务')
+    .replace(/doubao-seed(?:ream)?-[\w.-]+|qwen[\w.-]*/gi, '智能服务')
+    .replace(/VolcEngine|火山方舟|火山引擎/gi, '智能服务')
+    .replace(/ep-(?:m-)?[\w-]+/gi, '服务配置')
+    .replace(/Execution\s*Kernel/gi, '任务系统')
+    .replace(/Hermes/gi, '超级员工')
+    .replace(/Playwright|OmniParser|RPA/gi, '自动操作服务')
+    .replace(/API\s*Key/gi, '服务凭证')
+    .replace(/\bProvider\b/gi, '服务')
 }
 
 export function getErrorMessage(err: unknown, fallback = '请求失败'): string {
   const any = err as { response?: { data?: { detail?: unknown } }; message?: string }
   const detail = any?.response?.data?.detail
-  if (typeof detail === 'string') return detail
-  if (detail && typeof detail === 'object' && 'message' in detail) return String((detail as { message: unknown }).message)
-  return any?.message || fallback
+  if (typeof detail === 'string') return toUserFacingMessage(detail, fallback)
+  if (detail && typeof detail === 'object' && 'message' in detail) return toUserFacingMessage((detail as { message: unknown }).message, fallback)
+  return toUserFacingMessage(any?.message, fallback)
 }
 
 async function request<T>(method: string, url: string, body?: unknown, _retry = false): Promise<T> {
@@ -60,12 +78,8 @@ async function request<T>(method: string, url: string, body?: unknown, _retry = 
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    cache: 'no-store',
   })
-
-  if (res.status === 401 && !_retry) {
-    const newToken = await autoLogin()
-    if (newToken) return request<T>(method, url, body, true)
-  }
 
   if (!res.ok) {
     let detail: unknown = `${res.status} ${res.statusText}`
@@ -76,20 +90,622 @@ async function request<T>(method: string, url: string, body?: unknown, _retry = 
       /* ignore */
     }
     if (detail && typeof detail === 'object' && 'message' in detail) {
-      throw new Error(String((detail as { message: unknown }).message))
+      const rawMessage = String((detail as { message: unknown }).message)
+      console.error(`[API] ${method} ${url}:`, rawMessage)
+      throw new Error(toUserFacingMessage(rawMessage))
     }
-    throw new Error(String(detail))
+    const rawMessage = String(detail)
+    console.error(`[API] ${method} ${url}:`, rawMessage)
+    throw new Error(toUserFacingMessage(rawMessage))
   }
   if (res.status === 204) return undefined as T
   const text = await res.text()
   if (!text) return undefined as T
-  return JSON.parse(text) as T
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    const contentType = res.headers.get('content-type') || 'unknown'
+    throw new Error(`接口返回格式异常：${url}（${contentType}）`)
+  }
 }
 
 export const apiGet = <T = unknown>(url: string): Promise<T> => request<T>('GET', url)
 export const apiPost = <T = unknown>(url: string, body?: unknown): Promise<T> => request<T>('POST', url, body)
 export const apiPut = <T = unknown>(url: string, body?: unknown): Promise<T> => request<T>('PUT', url, body)
 export const apiDel = <T = unknown>(url: string): Promise<T> => request<T>('DELETE', url)
+
+export interface CloudSession {
+  configured: boolean
+  authenticated: boolean
+  message?: string
+  user?: { id: string; email: string; display_name: string; role: string; organization_id: string }
+  device?: { id: string; name: string; status: string; last_seen_at?: string }
+}
+
+export interface CloudUsage {
+  period: 'day'
+  timezone: string
+  period_start: string
+  period_end: string
+  today_credits: number
+  as_of: string
+  used: Record<string, number>
+  quotas: Record<string, number>
+}
+
+export interface CloudBillingBreakdown {
+  capability: string
+  credits: number
+  requests: number
+}
+
+export interface CloudCreditRecord {
+  id: string
+  kind: 'recharge' | 'adjustment'
+  credits: number
+  payment_amount_cny: number
+  currency: string
+  note: string
+  reference_id: string
+  created_at: string
+}
+
+export interface CloudUsageRecord {
+  id: string
+  capability: string
+  credits: number
+  status: string
+  created_at: string
+}
+
+export interface CloudBilling {
+  balance_credits: number
+  credited_credits: number
+  spent_credits: number
+  today_credits: number
+  thirty_day_credits: number
+  timezone: string
+  as_of: string
+  breakdown: CloudBillingBreakdown[]
+  recharges: CloudCreditRecord[]
+  recent_usage: CloudUsageRecord[]
+}
+
+export const fetchCloudSession = () => apiGet<CloudSession>('/api/cloud/session')
+export const loginCloud = (email: string, password: string, totp_code = '') =>
+  apiPost<CloudSession>('/api/cloud/login', { email, password, totp_code })
+export const activateCloud = (invitation_code: string, display_name: string, password: string) =>
+  apiPost<CloudSession>('/api/cloud/activate', { invitation_code, display_name, password })
+export const logoutCloud = () => apiPost<{ ok: boolean }>('/api/cloud/logout')
+export const fetchCloudDevices = () => apiGet<{ items: Array<Record<string, unknown>> }>('/api/cloud/devices')
+export const fetchCloudEntitlements = () => apiGet<Record<string, unknown>>('/api/cloud/entitlements')
+export const fetchCloudUsage = () => apiGet<CloudUsage>('/api/cloud/usage')
+export const fetchCloudBilling = () => apiGet<CloudBilling>('/api/cloud/billing')
+
+export interface CompetitorAccount {
+  id: string
+  platform: string
+  platform_label: string
+  name: string
+  profile_url: string
+  handle: string
+  avatar_url?: string
+  followers?: number | null
+  following?: number | null
+  works_count?: number | null
+  bio?: string
+  tags: string[]
+  sync_status: string
+  sync_message: string
+  last_sync_at?: string
+  recent_items?: Array<Record<string, unknown>>
+  created_at: string
+  updated_at: string
+}
+
+export interface IntelligenceOverview {
+  total_competitors: number
+  synced_competitors: number
+  needs_sync: number
+  platforms: Record<string, number>
+  available_platforms: Array<{ value: string; label: string }>
+}
+
+export interface IntelligenceBusinessProfile {
+  id: string
+  product_name: string
+  industry: string
+  audience: string
+  region: string
+  goals: string[]
+  selling_points: string[]
+  seed_keywords: string[]
+  platforms: string[]
+  use_knowledge_base?: boolean
+  knowledge_query?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface IntelligenceContentItem {
+  id: string
+  platform: string
+  platform_label: string
+  keyword: string
+  title: string
+  description: string
+  author: string
+  source_url: string
+  cover?: string
+  plays: number
+  likes: number
+  comments_count: number
+  shares: number
+  favorites?: number
+  coins?: number
+  danmaku?: number
+  author_id?: string
+  author_profile_url?: string
+  author_followers?: number
+  author_following?: number
+  comment_samples?: Array<Record<string, unknown>>
+  comment_insights?: {
+    sample_count: number
+    questions: string[]
+    needs: string[]
+    summary: string
+  }
+  published_at?: string
+  quality_score: number
+  score_detail?: Record<string, unknown>
+  engagement?: number
+  hot_score?: number
+  is_breakout?: boolean
+  breakout_reason?: string
+  comparison_sample_size?: number
+  source_name?: string
+  collection_method?: string
+  collected_at?: string
+  data_quality?: string
+  relevance_score?: number
+}
+
+export interface IntelligenceCandidate {
+  id: string
+  platform: string
+  platform_label: string
+  name: string
+  profile_url: string
+  author_id?: string
+  followers?: number
+  following?: number
+  evidence_url: string
+  reason: string
+  matched_items: number
+  top_title: string
+  tags: string[]
+}
+
+export interface IntelligenceDiscovery {
+  id: string
+  profile: IntelligenceBusinessProfile
+  keywords: string[]
+  platforms: string[]
+  search_plans: Array<{ platform: string; platform_label: string; keyword: string; search_url: string }>
+  content_items: IntelligenceContentItem[]
+  top_content?: IntelligenceContentItem[]
+  candidates: IntelligenceCandidate[]
+  summary?: IntelligenceReportSummary
+  analysis?: IntelligenceAnalysis
+  action_suggestions?: IntelligenceActionSuggestion[]
+  knowledge_context?: Array<{ content: string; source: string; score?: number }>
+  knowledge_sources?: string[]
+  errors: Array<{ platform: string; keyword: string; message: string }>
+  created_at: string
+  updated_at: string
+}
+
+export interface IntelligenceReportSummary {
+  headline: string
+  content_count: number
+  candidate_count: number
+  platforms: Record<string, number>
+  keywords: Record<string, number>
+  error_count: number
+  confidence: string
+}
+
+export interface IntelligenceActionSuggestion {
+  id: string
+  type: string
+  priority: number
+  title: string
+  description: string
+  reason: string
+  source_item_ids: string[]
+  source_urls: string[]
+  created_at: string
+}
+
+export interface IntelligenceAnalysis {
+  top_topics: Array<{
+    topic: string
+    count: number
+    engagement: number
+    top_title: string
+    source_url: string
+    avg_quality_score: number
+  }>
+  demand_signals: Array<{
+    text: string
+    source_title: string
+    source_url: string
+    platform: string
+    platform_label: string
+  }>
+  account_opportunities: Array<{
+    name: string
+    platform: string
+    platform_label: string
+    profile_url: string
+    evidence_url: string
+    matched_items: number
+    followers?: number | null
+    reason: string
+  }>
+  content_angles: Array<{
+    title: string
+    description: string
+    source_url: string
+    platform_label: string
+    priority: number
+  }>
+}
+
+export interface IntelligenceMonitoringDigest {
+  account_count: number
+  accounts_with_updates: number
+  recent_item_count: number
+  account_updates: Array<{
+    account_id: string
+    name: string
+    platform: string
+    platform_label: string
+    profile_url: string
+    followers?: number | null
+    recent_count: number
+    last_sync_at: string
+  }>
+  top_recent_items: Array<{
+    id?: string
+    title: string
+    url: string
+    account_name: string
+    platform: string
+    platform_label: string
+    plays?: number
+    likes?: number
+    comments_count?: number
+    favorites?: number
+    coins?: number
+    danmaku?: number
+    engagement?: number
+    published_at?: string
+  }>
+  latest_items: Array<Record<string, unknown>>
+}
+
+export interface IntelligenceDailyReport {
+  discovery_id?: string
+  summary: IntelligenceReportSummary
+  analysis?: IntelligenceAnalysis
+  monitoring?: IntelligenceMonitoringDigest
+  action_suggestions: IntelligenceActionSuggestion[]
+  top_content: IntelligenceContentItem[]
+  visualization?: IntelligenceVisualization
+  market_signals?: IntelligenceMarketSignal[]
+  knowledge_sources?: string[]
+  updated_at: string
+}
+
+export interface IntelligenceMarketSignal {
+  id: string
+  type: 'breakout' | 'demand' | 'competitor_update' | string
+  level: 'high' | 'medium' | 'info' | string
+  title: string
+  summary: string
+  platform: string
+  platform_label: string
+  source_url: string
+  source_name: string
+  observed_at: string
+  score: number
+}
+
+export interface IntelligenceVisualization {
+  platform_distribution: Array<{ platform: string; label: string; count: number }>
+  topic_engagement: Array<{ topic: string; engagement: number; count: number; quality: number }>
+  collection_timeline: Array<{ date: string; content: number; competitors: number }>
+  account_growth: Array<{
+    entity_id: string
+    name: string
+    platform: string
+    followers?: number | null
+    growth?: number | null
+    points: Array<{ time: string; followers?: number | null }>
+  }>
+  data_sources: Array<{
+    name: string
+    method: string
+    count: number
+    quality: string
+    last_collected_at: string
+  }>
+  breakouts: IntelligenceContentItem[]
+  sample_size: number
+  updated_at: string
+}
+
+export interface IntelligenceInformationSource {
+  id: string
+  name: string
+  url: string
+  keywords: string[]
+  enabled: boolean
+  status: 'pending' | 'success' | 'failed' | string
+  last_sync_at: string
+  last_error: string
+  item_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface IntelligenceMarketNewsItem {
+  id: string
+  title: string
+  summary: string
+  source_url: string
+  source_id: string
+  source_name: string
+  collection_method: string
+  data_quality: string
+  published_at: string
+  collected_at: string
+  relevance_score: number
+  matched_keywords: string[]
+}
+
+export interface IntelligenceContentBrief {
+  id: string
+  discovery_id?: string
+  title: string
+  objective: string
+  platform_suggestion: string[]
+  outline: string[]
+  reference_topic?: string
+  reference_content?: string
+  demand_signals: Array<Record<string, unknown>>
+  source_urls: string[]
+  notes?: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface IntelligenceQueryReport {
+  id: string
+  query: string
+  title: string
+  status: string
+  plan: {
+    intent: string
+    focus: string
+    search_keywords: string[]
+    exclude_topics: string[]
+    platforms: string[]
+    time_range: string
+  }
+  executive_summary: Array<{
+    title: string
+    finding: string
+    why_it_matters: string
+    confidence: string
+  }>
+  word_cloud: Array<{ text: string; weight: number }>
+  topic_trends: Array<{ topic: string; count: number; engagement: number; score: number }>
+  platform_distribution: Array<{ name: string; value: number }>
+  customer_voice: Array<{ theme: string; type: string; summary: string; count: number }>
+  content_patterns: Array<{ pattern: string; finding: string; recommendation: string }>
+  industry_moves: Array<{ title: string; summary: string; impact: string }>
+  market_gap: Array<{
+    topic: string
+    market_score: number
+    enterprise_coverage: number
+    gap: number
+    recommendation: string
+  }>
+  actions: Array<{ title: string; description: string; priority: string | number }>
+  evidence: Array<{
+    id: string
+    title: string
+    summary: string
+    source: string
+    source_url: string
+    relation_type: string
+    marketing_value: number
+    reason: string
+    metrics: { plays: number; likes: number; comments: number; favorites: number }
+  }>
+  data_scope: {
+    raw_samples: number
+    relevant_samples: number
+    filtered_samples: number
+    platforms: string[]
+    knowledge_sources: string[]
+    published_records: number
+    use_enterprise_context: boolean
+    confidence: string
+    semantic_model_used: boolean
+    narrative_model_used: boolean
+    source_health: Array<{
+      source: string
+      label: string
+      source_type: string
+      method: string
+      status: 'success' | 'partial' | 'no_data' | 'needs_login' | 'restricted' | 'timeout' | 'unavailable' | 'failed'
+      item_count: number
+      attempted_queries: number
+      successful_queries: number
+      duration_ms: number
+      error_code: string
+      message: string
+    }>
+  }
+  created_at: string
+  updated_at: string
+}
+
+export interface IntelligenceDiscoverPayload {
+  product_name: string
+  industry?: string
+  audience?: string
+  region?: string
+  goals?: string[]
+  selling_points?: string[]
+  seed_keywords?: string[]
+  platforms?: string[]
+  use_knowledge_base?: boolean
+  knowledge_query?: string
+  max_keywords?: number
+  per_keyword_limit?: number
+}
+
+export async function fetchIntelligenceOverview(): Promise<IntelligenceOverview> {
+  const data = await apiGet<{ overview: IntelligenceOverview }>('/api/intelligence/overview')
+  return data.overview
+}
+
+export async function fetchBusinessProfiles(): Promise<{ items: IntelligenceBusinessProfile[]; total: number }> {
+  return apiGet('/api/intelligence/business-profiles')
+}
+
+export async function discoverIntelligence(payload: IntelligenceDiscoverPayload): Promise<{ discovery: IntelligenceDiscovery }> {
+  return apiPost('/api/intelligence/discover', payload)
+}
+
+export async function fetchDiscoveries(limit = 5): Promise<{ items: IntelligenceDiscovery[]; total: number }> {
+  return apiGet(`/api/intelligence/discoveries?limit=${limit}`)
+}
+
+export async function fetchIntelligenceDailyReport(): Promise<IntelligenceDailyReport> {
+  const data = await apiGet<{ report: IntelligenceDailyReport }>('/api/intelligence/reports/daily')
+  return data.report
+}
+
+export async function fetchIntelligenceSources(): Promise<{ items: IntelligenceInformationSource[]; total: number }> {
+  return apiGet('/api/intelligence/sources')
+}
+
+export async function createIntelligenceSource(payload: {
+  name?: string
+  url: string
+  keywords?: string[]
+}): Promise<{ item: IntelligenceInformationSource }> {
+  return apiPost('/api/intelligence/sources', payload)
+}
+
+export async function updateIntelligenceSource(
+  sourceId: string,
+  payload: Partial<Pick<IntelligenceInformationSource, 'name' | 'url' | 'keywords' | 'enabled'>>,
+): Promise<{ item: IntelligenceInformationSource }> {
+  return apiPut(`/api/intelligence/sources/${encodeURIComponent(sourceId)}`, payload)
+}
+
+export async function deleteIntelligenceSource(sourceId: string): Promise<{ ok: boolean }> {
+  return apiDel(`/api/intelligence/sources/${encodeURIComponent(sourceId)}`)
+}
+
+export async function fetchMarketNews(limit = 50): Promise<{ items: IntelligenceMarketNewsItem[]; total: number }> {
+  return apiGet(`/api/intelligence/market-news?limit=${limit}`)
+}
+
+export async function collectMarketNews(payload: {
+  profile_id?: string
+  include_auto_search?: boolean
+} = {}): Promise<{
+  items: IntelligenceMarketNewsItem[]
+  total: number
+  keywords: string[]
+  knowledge_sources: string[]
+  updated_at: string
+}> {
+  return apiPost('/api/intelligence/market-news/collect', payload)
+}
+
+export async function fetchIntelligenceBriefs(limit = 5): Promise<{ items: IntelligenceContentBrief[]; total: number }> {
+  return apiGet(`/api/intelligence/briefs?limit=${limit}`)
+}
+
+export async function runIntelligenceQuery(payload: {
+  query: string
+  use_enterprise_context?: boolean
+  include_publish_records?: boolean
+}): Promise<{ report: IntelligenceQueryReport }> {
+  return apiPost('/api/intelligence/query', payload)
+}
+
+export async function fetchIntelligenceQueryReports(limit = 20): Promise<{ items: IntelligenceQueryReport[]; total: number }> {
+  return apiGet(`/api/intelligence/query-reports?limit=${limit}`)
+}
+
+export async function fetchIntelligenceQueryReport(reportId: string): Promise<{ report: IntelligenceQueryReport }> {
+  return apiGet(`/api/intelligence/query-reports/${encodeURIComponent(reportId)}`)
+}
+
+export async function createIntelligenceBrief(payload: { angle_index?: number; title?: string; notes?: string; source?: string; source_url?: string } = {}): Promise<{ brief: IntelligenceContentBrief }> {
+  return apiPost('/api/intelligence/briefs', payload)
+}
+
+export async function acceptDiscoveryCandidate(discoveryId: string, candidateId: string): Promise<{ item: CompetitorAccount }> {
+  return apiPost(`/api/intelligence/discoveries/${encodeURIComponent(discoveryId)}/accept`, { candidate_id: candidateId })
+}
+
+export async function fetchCompetitors(params: { platform?: string; keyword?: string } = {}): Promise<{
+  items: CompetitorAccount[]
+  total: number
+}> {
+  const query = new URLSearchParams()
+  if (params.platform) query.set('platform', params.platform)
+  if (params.keyword) query.set('keyword', params.keyword)
+  return apiGet(`/api/intelligence/competitors${query.toString() ? `?${query.toString()}` : ''}`)
+}
+
+export async function createCompetitor(payload: {
+  profile_url: string
+  platform?: string
+  name?: string
+  tags?: string[]
+}): Promise<{ item: CompetitorAccount }> {
+  return apiPost('/api/intelligence/competitors', payload)
+}
+
+export async function syncCompetitor(competitorId: string): Promise<{ item: CompetitorAccount }> {
+  return apiPost(`/api/intelligence/competitors/${encodeURIComponent(competitorId)}/sync`)
+}
+
+export async function syncCompetitors(params: { platform?: string; limit?: number } = {}): Promise<{
+  items: CompetitorAccount[]
+  total: number
+}> {
+  const query = new URLSearchParams()
+  if (params.platform) query.set('platform', params.platform)
+  if (params.limit) query.set('limit', String(params.limit))
+  return apiPost(`/api/intelligence/competitors/sync-all${query.toString() ? `?${query.toString()}` : ''}`)
+}
+
+export async function deleteCompetitor(competitorId: string): Promise<{ ok: boolean }> {
+  return apiDel(`/api/intelligence/competitors/${encodeURIComponent(competitorId)}`)
+}
 
 // ── 真实图片/视频生成 REST 调用 ──────────────────────────────────────
 // hermes/chat SSE 不产出 image/video 事件；生成走独立 REST 端点。
@@ -295,6 +911,95 @@ export async function pollVideoTask(taskId: string, model = 'doubao-seedance-2.0
   return apiGet<VideoTaskResult>(`/api/video/task/${taskId}?model=${encodeURIComponent(model)}`)
 }
 
+export type DigitalHumanAssetRole =
+  | 'avatar_reference'
+  | 'product_reference'
+  | 'background_reference'
+  | 'motion_reference'
+  | 'voice_reference'
+  | 'brand_asset'
+
+export interface DigitalHumanAsset {
+  id: string
+  name: string
+  alias?: string
+  role: DigitalHumanAssetRole
+  kind: 'image' | 'video' | 'audio'
+  content_type: string
+  size: number
+  path: string
+  url: string
+}
+
+export interface DigitalHumanConfig {
+  ok: boolean
+  provider: string
+  model_label: string
+  configured: boolean
+  configuration_message: string
+  durations: number[]
+  sizes: Array<'720p' | '1080p' | '4K'>
+  ratios: Array<'9:16' | '16:9' | '1:1'>
+  max_assets: number
+  max_inline_asset_mb: number
+  native_audio: boolean
+}
+
+export interface DigitalHumanCreateResult {
+  ok: boolean
+  task_id: string
+  status: string
+  model: string
+  model_label: string
+  prompt: string
+  asset_ids: string[]
+}
+
+export async function fetchDigitalHumanConfig(): Promise<DigitalHumanConfig> {
+  return apiGet<DigitalHumanConfig>('/api/digital-human/config')
+}
+
+export async function uploadDigitalHumanAsset(file: File, role: DigitalHumanAssetRole): Promise<DigitalHumanAsset> {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('role', role)
+  const send = async (retry = false): Promise<DigitalHumanAsset> => {
+    const token = getToken()
+    const res = await fetch('/api/digital-human/assets', {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: formData,
+    })
+    if (res.status === 401 && !retry && await autoLogin()) return send(true)
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({})) as { detail?: string }
+      throw new Error(data.detail || `素材上传失败：${res.status}`)
+    }
+    const data = await res.json() as { asset: DigitalHumanAsset }
+    return data.asset
+  }
+  return send()
+}
+
+export async function removeDigitalHumanAsset(assetId: string): Promise<void> {
+  await apiDel(`/api/digital-human/assets/${encodeURIComponent(assetId)}`)
+}
+
+export async function createDigitalHumanVideo(payload: {
+  script: string
+  asset_ids: string[]
+  asset_aliases: Record<string, string>
+  duration: number
+  size: '720p' | '1080p' | '4K'
+  ratio: '9:16' | '16:9' | '1:1'
+  native_audio: boolean
+  style: string
+  avatar_position: 'center' | 'left' | 'right' | 'full'
+  background_prompt: string
+}): Promise<DigitalHumanCreateResult> {
+  return apiPost<DigitalHumanCreateResult>('/api/digital-human/create', payload)
+}
+
 export interface ComposeAssetRef {
   id: string
   name: string
@@ -346,8 +1051,9 @@ export interface ComposeVideoParams {
 
 export interface VideoModelConfig {
   id: string
-  provider_model: string
+  provider_model?: string
   label: string
+  available?: boolean
   sizes: string[]
   min_duration: number
   max_duration: number
@@ -628,6 +1334,7 @@ export interface StreamChatOpts {
   model: string
   messages: { role: string; content: string }[]
   agent_id?: string
+  session_id?: string
   expert_prompt?: string  // AI人才市场专家 prompt（独立通道）
   onEvent: (ev: HermesEvent) => void
   signal?: AbortSignal
@@ -1367,6 +2074,14 @@ export interface AcquisitionTargetResponse {
   total: number
   videos?: AcquisitionTarget[]
   targets?: AcquisitionTarget[]
+  platforms?: AcquisitionPlatformStatus[]
+}
+
+export interface AcquisitionPlatformStatus {
+  platform: string
+  status: string
+  error_code?: string
+  message?: string
 }
 
 export interface GenerateCommentResponse {
@@ -1399,7 +2114,9 @@ export interface PreflightResult {
 export interface CommentQueueItem {
   id?: string
   item_id?: string
+  batch_id?: string
   platform?: string
+  video_id?: string
   status?: string
   text?: string
   comment?: string
@@ -1411,17 +2128,29 @@ export interface CommentQueueItem {
   repair_attempts?: number
   next_run_at?: string
   target_url?: string
+  video_url?: string
   video_title?: string
   created_at?: string
+  sent_at?: string
   updated_at?: string
   error?: string
   error_msg?: string
+  metadata?: Record<string, unknown>
+  platform_result?: Record<string, unknown>
+  archived?: boolean
+  archived_at?: string
   [key: string]: unknown
 }
 
 export interface CommentQueueResponse {
   items: CommentQueueItem[]
   total: number
+  archive?: {
+    total_items?: number
+    total_batches?: number
+    batch_limit?: number
+    retention_days?: number
+  }
 }
 
 export interface AcquisitionStatsResponse {
@@ -1516,6 +2245,7 @@ export async function acquisitionGenerateComments(payload: {
   video_description?: string
   count?: number
   strategy?: string
+  shared_across_targets?: boolean
 }): Promise<GenerateCommentResponse> {
   return apiPost('/api/acquisition/comments/generate', payload)
 }
@@ -1528,10 +2258,43 @@ export async function acquisitionPreflight(text: string): Promise<PreflightResul
   return apiPost('/api/acquisition/comments/preflight', { text })
 }
 
-export async function acquisitionCommentQueue(params?: { status?: string; platform?: string; limit?: number; offset?: number }): Promise<CommentQueueResponse> {
+export async function acquisitionEnqueueComment(payload: {
+  platform: string
+  video_id?: string
+  video_title?: string
+  video_url?: string
+  text: string
+  strategy?: string
+  deai?: boolean
+  confirmed: boolean
+}): Promise<{ ok: boolean; item: { id: string; execution_id: string; status: string } }> {
+  return apiPost('/api/acquisition/comments/enqueue', payload)
+}
+
+export async function acquisitionEnqueueCommentBatch(payload: {
+  targets: Array<{
+    platform: string
+    video_id?: string
+    video_title?: string
+    video_url?: string
+  }>
+  text: string
+  strategy?: string
+  deai?: boolean
+  confirmed: boolean
+}): Promise<{
+  ok: boolean
+  batch_id: string
+  items: Array<{ id: string; execution_id: string; status: string; platform: string; video_title: string }>
+}> {
+  return apiPost('/api/acquisition/comments/enqueue-batch', payload)
+}
+
+export async function acquisitionCommentQueue(params?: { status?: string; platform?: string; archived?: boolean; limit?: number; offset?: number }): Promise<CommentQueueResponse> {
   const query = new URLSearchParams()
   if (params?.status) query.set('status', params.status)
   if (params?.platform) query.set('platform', params.platform)
+  if (params?.archived) query.set('archived', 'true')
   if (params?.limit) query.set('limit', String(params.limit))
   if (params?.offset) query.set('offset', String(params.offset))
   const suffix = query.toString() ? `?${query.toString()}` : ''
@@ -1764,6 +2527,7 @@ export async function streamHermesChat(opts: StreamChatOpts): Promise<void> {
     messages: opts.messages,
     stream: true,
     agent_id: opts.agent_id,
+    session_id: opts.session_id,
     expert_prompt: opts.expert_prompt || '',
   }
   let res = await postChat(payload, opts.signal)

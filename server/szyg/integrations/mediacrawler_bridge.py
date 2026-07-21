@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 MediaCrawler Bridge — 连接 szyg 与 MediaCrawler
 
@@ -33,6 +35,10 @@ try:
     MEDIACRAWLER_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"MediaCrawler import failed: {e}")
+    DouYinClient = None
+    SearchChannelType = None
+    SearchSortType = None
+    PublishTimeType = None
     MEDIACRAWLER_AVAILABLE = False
 
 from szyg.platforms.session_manager import SessionManager
@@ -68,6 +74,10 @@ class MediaCrawlerBridge:
         self.session_manager = SessionManager()
         self.browser_pool = get_browser_pool(headless=True)
         self._clients: Dict[str, Any] = {}
+
+    @property
+    def available(self) -> bool:
+        return bool(MEDIACRAWLER_AVAILABLE and mediacrawler_path.exists())
 
     async def _prepare_browser_context(self, platform: Platform) -> tuple:
         """

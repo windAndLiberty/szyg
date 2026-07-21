@@ -12,7 +12,7 @@ import threading
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Awaitable, Callable, Protocol
 
 from szyg.atomic_file import atomic_read, atomic_write
 from szyg.data_path import DATA_DIR
@@ -193,10 +193,37 @@ class ExecutionKernel:
 
     def __init__(self) -> None:
         self._running: dict[str, asyncio.Task] = {}
+        self._task_runners: dict[str, Callable[[str], Awaitable[dict]]] = {}
         self._lock = threading.RLock()
         self._sau_global_semaphore = asyncio.Semaphore(2)
         self._sau_platform_locks: dict[str, asyncio.Lock] = {}
         self._recover_stale_active_runs()
+
+    def register_task_runner(self, task_type: str, runner: Callable[[str], Awaitable[dict]]) -> None:
+        """Register a resumable task runner without hard-coding it in the kernel."""
+        self._task_runners[task_type] = runner
+
+    def start_run(self, run_id: str) -> dict:
+        run = self.get_run(run_id)
+        if not run:
+            raise KeyError(run_id)
+        runner = self._task_runners.get(str(run.get("task_type") or ""))
+        if runner is None:
+            raise ValueError(f"No runner registered for task type: {run.get('task_type')}")
+        current = self._running.get(run_id)
+        if current and not current.done():
+            return run
+        updated = self._patch_run(run_id, status="queued", error_code="", error_message="", finished_at="")
+        self._running[run_id] = asyncio.create_task(self._run_registered(run_id, runner))
+        return updated
+
+    async def _run_registered(self, run_id: str, runner: Callable[[str], Awaitable[dict]]) -> dict:
+        try:
+            return await runner(run_id)
+        finally:
+            current = self._running.get(run_id)
+            if current is asyncio.current_task():
+                self._running.pop(run_id, None)
 
     def _recover_stale_active_runs(self) -> None:
         runs = _read(RUNS_FILE)
@@ -605,6 +632,9 @@ class ExecutionKernel:
             self.add_audit(run_id, "", "resume", "queued", "Marketing comment execution resumed")
             self._running[run_id] = asyncio.create_task(self.run_marketing_comment(run_id))
             return updated
+        if run.get("task_type") in self._task_runners:
+            self.add_audit(run_id, "", "resume", "queued", "Execution resumed")
+            return self.start_run(run_id)
         self.add_audit(run_id, "", "resume", "running", "Execution marked as running")
         return self._patch_run(run_id, status="running", error_code="", error_message="")
 
@@ -615,13 +645,28 @@ class ExecutionKernel:
         if run.get("status") not in {"failed", "paused", "needs_human"}:
             raise ValueError("Only failed, paused, or needs_human executions can be retried")
         self.add_audit(run_id, "", "retry", "queued", "Execution retry queued")
-        updated = self._patch_run(run_id, status="queued", error_code="", error_message="", finished_at="", result={})
+        # Registered resumable runners persist their completed-step checkpoint in
+        # ``result``. Keep it on retry so successful external actions are not
+        # executed twice; legacy runners retain their previous reset behavior.
+        retry_result = (run.get("result") or {}) if run.get("task_type") in self._task_runners else {}
+        updated = self._patch_run(
+            run_id,
+            status="queued",
+            error_code="",
+            error_message="",
+            finished_at="",
+            result=retry_result,
+        )
         if run.get("task_type") in {"publish_video", "publish_note"} and run.get("source_task_id", "").startswith("sau:"):
             self._running[run_id] = asyncio.create_task(self.run_sau_publish(run_id))
         elif run.get("task_type") == "computer_use":
             self._running[run_id] = asyncio.create_task(self.run_computer_use(run_id))
         elif run.get("task_type") == "marketing_comment":
             self._running[run_id] = asyncio.create_task(self.run_marketing_comment(run_id))
+        elif run.get("task_type") in self._task_runners:
+            self._running[run_id] = asyncio.create_task(
+                self._run_registered(run_id, self._task_runners[run.get("task_type")])
+            )
         return updated
 
     async def run_marketing_comment(self, run_id: str) -> dict:
@@ -643,6 +688,8 @@ class ExecutionKernel:
                     "video_url": payload.get("video_url", ""),
                     "text": payload.get("text", ""),
                     "comment_text": payload.get("text", ""),
+                    "queue_item_id": payload.get("queue_item_id", ""),
+                    "human_confirmed": bool(payload.get("human_confirmed")),
                 }],
                 payload.get("strategy", "balanced"),
                 payload.get("deai", True),
@@ -667,6 +714,20 @@ class ExecutionKernel:
             message = str(exc)
             self.finish_step(step, "failed", message, error_code="marketing_comment_failed")
             return self.complete_run(run_id, "failed", error_code="marketing_comment_failed", error_message=message)
+
+    def create_marketing_comment_run(self, payload: dict, source_task_id: str = "") -> dict:
+        """Create and start an observable, confirmed marketing-comment run."""
+        run = self.create_run(
+            "marketing_comment",
+            payload.get("platform", ""),
+            "browser",
+            payload,
+            title=payload.get("video_title", "") or "营销评论",
+            source_task_id=source_task_id or "acquisition:confirmed",
+            auto_start=False,
+        )
+        self._running[run["id"]] = asyncio.create_task(self.run_marketing_comment(run["id"]))
+        return run
 
     def create_sau_upload_video_run(self, payload: dict, source_task_id: str = "") -> dict:
         return self.create_run(

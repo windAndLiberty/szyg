@@ -34,7 +34,12 @@ _sandbox_lock = asyncio.Lock()
 def _resolve_chromium_dir() -> Path | None:
     """Resolve Chromium directory — checks bundled path first, then system cache."""
     # 1. Bundled: server/szyg/storage/chromium/ (packaged distribution)
-    bundled = Path(__file__).resolve().parent.parent / "storage" / "chromium"
+    bundled = Path(
+        os.environ.get(
+            "SZYG_CHROMIUM_DIR",
+            str(Path(__file__).resolve().parent.parent / "storage" / "chromium"),
+        )
+    )
     if bundled.exists():
         for d in bundled.iterdir():
             if d.is_dir() and d.name.startswith("chromium-"):

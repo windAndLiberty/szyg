@@ -33,12 +33,6 @@ class MCPError(YuLingError):
     pass
 
 
-class MemoryError(YuLingError):
-    """记忆错误。"""
-
-    pass
-
-
 class SkillNotFoundError(YuLingError):
     """技能未找到。"""
 

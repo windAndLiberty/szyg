@@ -41,13 +41,6 @@ export function useAsync<T>(
   return { data, loading, error, reload }
 }
 
-/** 加载仪表盘数字员工（真实 AI 员工聚合）。 */
-export function useDigitalHumans() {
-  return useAsync<{ digitalHumans: import('@/types').DigitalHuman[] }>(
-    () => apiGet('/api/dashboard/digital-humans'),
-  )
-}
-
 /** 加载仪表盘真实任务队列。 */
 export function useDashboardTasks() {
   return useAsync<{ tasks: import('@/types').TaskQueueItem[] }>(

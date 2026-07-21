@@ -5,11 +5,12 @@ import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
 import { legacyRedirects } from './lib/navConfig'
 import { useLayout } from './lib/layout'
+import { useI18n } from './lib/i18n'
+import CloudAuthGate from './components/CloudAuthGate'
 
 // 已实现的真实页面
 import SuperAgent from './pages/SuperAgent'
 import Dashboard from './pages/Dashboard'
-import DigitalHuman from './pages/DigitalHuman'
 import Settings from './pages/Settings'
 
 // 占位页面 — AI员工
@@ -21,6 +22,7 @@ import ContentProduction from './pages/content/ContentProduction'
 import AssetManagement from './pages/content/AssetManagement'
 // 占位页面 — 营销获客
 import PrivateDomain from './pages/marketing/PrivateDomain'
+import Intelligence from './pages/marketing/Intelligence'
 import Intercept from './pages/marketing/Intercept'
 import Listen from './pages/marketing/Listen'
 import Conversion from './pages/marketing/Conversion'
@@ -29,21 +31,17 @@ import Customers from './pages/marketing/Customers'
 import PublishCenter from './pages/publish/PublishCenter'
 import Accounts from './pages/publish/Accounts'
 import PlatformWorkspace from './pages/publish/PlatformWorkspace'
-// 占位页面 — 工作流
-import Pipeline from './pages/workflow/Pipeline'
-import Scheduler from './pages/workflow/Scheduler'
-import Sop from './pages/workflow/Sop'
+// 工作流
+import AutomationPlans from './pages/workflow/AutomationPlans'
+import AutomationRuns from './pages/workflow/AutomationRuns'
 // 占位页面 — 数据洞察
 import ContentAnalytics from './pages/insights/ContentAnalytics'
 import AcquisitionAnalytics from './pages/insights/AcquisitionAnalytics'
 // 占位页面 — 知识库
 import KnowledgeBase from './pages/knowledge/KnowledgeBase'
-import Memory from './pages/knowledge/Memory'
 import Skills from './pages/knowledge/Skills'
 import Academy from './pages/knowledge/Academy'
 // 占位页面 — 系统设置
-import RiskControl from './pages/settings/RiskControl'
-import Tools from './pages/settings/Tools'
 import Brand from './pages/settings/Brand'
 import Team from './pages/settings/Team'
 import Billing from './pages/settings/Billing'
@@ -64,16 +62,17 @@ function FullBleedLayout({ children }: { children: ReactNode }) {
 
 // 404 页面 — 未匹配路由的兜底
 function NotFound() {
+  const { t } = useI18n()
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-6">
       <div className="text-display-xl text-[#1E293B] font-bold mb-4">404</div>
-      <h1 className="text-heading-lg text-[#F1F5F9] mb-2">页面未找到</h1>
-      <p className="text-body-md text-[#64748B] mb-6">您访问的页面不存在或已被移动</p>
+      <h1 className="text-heading-lg text-[#F1F5F9] mb-2">{t('页面未找到')}</h1>
+      <p className="text-body-md text-[#64748B] mb-6">{t('您访问的页面不存在或已被移动')}</p>
       <a
         href="/"
         className="px-4 py-2 rounded-button bg-[#6366F1] text-white text-sm font-medium hover:bg-[#818CF8] transition-colors"
       >
-        返回超级员工
+        {t('返回超级员工')}
       </a>
     </div>
   )
@@ -81,6 +80,7 @@ function NotFound() {
 
 export default function App() {
   return (
+    <CloudAuthGate>
     <Routes>
       {/* ── 超级员工：full-bleed 布局（系统默认首页）── */}
       <Route
@@ -103,10 +103,10 @@ export default function App() {
         {/* 内容创作 */}
         <Route path="/content/production" element={<ContentProduction />} />
         <Route path="/content/assets" element={<AssetManagement />} />
-        <Route path="/content/digital-human" element={<DigitalHuman />} />
 
         {/* 营销获客 */}
         <Route path="/marketing/private-domain" element={<PrivateDomain />} />
+        <Route path="/marketing/intelligence" element={<Intelligence />} />
         <Route path="/marketing/intercept" element={<Intercept />} />
         <Route path="/marketing/listen" element={<Listen />} />
         <Route path="/marketing/conversion" element={<Conversion />} />
@@ -119,9 +119,11 @@ export default function App() {
         <Route path="/publish/workspace" element={<PlatformWorkspace />} />
 
         {/* 工作流 */}
-        <Route path="/workflow/pipeline" element={<Pipeline />} />
-        <Route path="/workflow/scheduler" element={<Scheduler />} />
-        <Route path="/workflow/sop" element={<Sop />} />
+        <Route path="/automation/plans" element={<AutomationPlans />} />
+        <Route path="/automation/runs" element={<AutomationRuns />} />
+        <Route path="/workflow/pipeline" element={<Navigate to="/automation/plans" replace />} />
+        <Route path="/workflow/scheduler" element={<Navigate to="/automation/runs" replace />} />
+        <Route path="/workflow/sop" element={<Navigate to="/automation/plans?view=standards" replace />} />
 
         {/* 数据洞察 */}
         <Route path="/insights/dashboard" element={<Dashboard />} />
@@ -130,14 +132,13 @@ export default function App() {
 
         {/* 知识库 */}
         <Route path="/knowledge/base" element={<KnowledgeBase />} />
-        <Route path="/knowledge/memory" element={<Memory />} />
         <Route path="/knowledge/skills" element={<Skills />} />
         <Route path="/knowledge/academy" element={<Academy />} />
 
         {/* 系统设置 */}
         <Route path="/settings" element={<Settings />} />
-        <Route path="/settings/risk-control" element={<RiskControl />} />
-        <Route path="/settings/tools" element={<Tools />} />
+        <Route path="/settings/risk-control" element={<Navigate to="/settings" replace />} />
+        <Route path="/settings/tools" element={<Navigate to="/knowledge/skills" replace />} />
         <Route path="/settings/brand" element={<Brand />} />
         <Route path="/settings/team" element={<Team />} />
         <Route path="/settings/billing" element={<Billing />} />
@@ -151,5 +152,6 @@ export default function App() {
         <Route key={r.from} path={r.from} element={<Navigate to={r.to} replace />} />
       ))}
     </Routes>
+    </CloudAuthGate>
   )
 }

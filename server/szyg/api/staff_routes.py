@@ -1,7 +1,7 @@
 """AI Staff API — 员工状态、任务管理、配置持久化.
 
 员工状态和任务数据从真实业务子系统动态聚合：
-  - 调度器 (scheduler_engine) → 任务计数
+  - 工作流服务 (WorkflowService + ExecutionKernel) → 任务计数
   - 发布器 (publisher) → 内容计数
   - 采集引擎 (listen_engine, convert_engine) → 线索/转化计数
 """
@@ -41,14 +41,36 @@ def _save_json(path: Path, data):
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _load_agent_configs(default=None) -> dict:
+    """Load employee settings and remove the retired product-side memory block."""
+    configs = _load_json(_CONFIGS_FILE, default if default is not None else _DEFAULT_CONFIGS)
+    changed = False
+    for config in configs.values():
+        if isinstance(config, dict) and "memory" in config:
+            config.pop("memory", None)
+            changed = True
+    if changed:
+        _save_json(_CONFIGS_FILE, configs)
+    return configs
+
+
 # ── Dynamic data aggregation helpers ──────────────────────────────
 
-def _get_scheduler_stats() -> dict:
-    """Get real scheduler stats (active/completed/failed job counts)."""
+def _get_workflow_stats() -> dict:
+    """Get automation plan and Execution Kernel run counts."""
     try:
-        from szyg.scheduler_engine import get_scheduler
-        scheduler = get_scheduler()
-        return scheduler.get_stats()
+        from szyg.workflow_service import get_workflow_service
+        service = get_workflow_service()
+        overview = service.overview()
+        runs = service.list_runs(limit=500)
+        instances = service.list_instances()
+        return {
+            "active": overview.get("active_instances", 0),
+            "completed": sum(1 for item in runs if item.get("status") == "success"),
+            "paused": sum(1 for item in instances if item.get("status") == "paused"),
+            "failed": sum(1 for item in runs if item.get("status") in {"failed", "cancelled"}),
+            "total_jobs": len(instances),
+        }
     except Exception:
         return {"active": 0, "completed": 0, "paused": 0, "failed": 0, "total_jobs": 0}
 
@@ -84,7 +106,7 @@ def _get_acquisition_stats() -> dict:
 
 def _compute_staff_status() -> list[dict]:
     """Compute staff status from real subsystem data."""
-    sched = _get_scheduler_stats()
+    sched = _get_workflow_stats()
     pub = _get_publisher_stats()
     acq = _get_acquisition_stats()
     now = datetime.now(timezone.utc).isoformat()
@@ -144,49 +166,44 @@ def _compute_staff_status() -> list[dict]:
             "tasksToday": sched.get("total_jobs", 0),
             "completed": sched.get("completed", 0),
             "progress": _pct(sched.get("completed", 0), max(sched.get("total_jobs", 0), 1)),
-            "recent": f"调度: {sched.get('active', 0)}活跃, {sched.get('completed', 0)}完成",
-            "skills": ["调度引擎", "A/B测试", "数据报告", "审计日志"],
-            "route": "/workflow/scheduler",
+            "recent": f"工作流: {sched.get('active', 0)}个启用, {sched.get('completed', 0)}次完成",
+            "skills": ["工作流方案", "运行计划", "数据报告", "审计日志"],
+            "route": "/automation/runs",
             "updated_at": now,
         },
     ]
 
 
 def _compute_tasks() -> list[dict]:
-    """Merge scheduler jobs with manual tasks to produce unified task list."""
+    """Merge workflow runs with manual tasks to produce a unified task list."""
     tasks = []
 
-    # 1) Load scheduler jobs as tasks
+    # 1) Load observable workflow runs as tasks.
     try:
-        from szyg.scheduler_engine import get_scheduler
-        scheduler = get_scheduler()
-        jobs = scheduler.get_jobs() if hasattr(scheduler, 'list_jobs') else []
-        if not jobs and hasattr(scheduler, '_jobs'):
-            jobs = list(scheduler._jobs.values())
-        status_map = {"active": "running", "paused": "blocked", "completed": "done", "failed": "blocked"}
-        next_id = 1
-        for j in jobs:
-            jstatus = getattr(j, 'status', 'active')
-            if hasattr(jstatus, 'value'):
-                jstatus = jstatus.value
+        from szyg.workflow_service import get_workflow_service
+        status_map = {
+            "queued": "ready", "running": "running", "paused": "blocked",
+            "needs_human": "blocked", "success": "done", "failed": "blocked", "cancelled": "blocked",
+        }
+        for run in get_workflow_service().list_runs(limit=200):
+            run_status = str(run.get("status") or "queued")
             tasks.append({
-                "id": next_id,
-                "name": getattr(j, 'name', '未命名任务') if hasattr(j, 'name') else str(j),
+                "id": run.get("id", ""),
+                "name": run.get("instance_name") or "工作流任务",
                 "assignee": "运营专员",
-                "status": status_map.get(str(jstatus), "ready"),
+                "status": status_map.get(run_status, "ready"),
                 "priority": "medium",
-                "progress": 50 if str(jstatus) == "active" else (100 if str(jstatus) == "completed" else 0),
-                "deadline": getattr(j, 'next_run_at', '') or '',
+                "progress": 100 if run_status == "success" else (50 if run_status == "running" else 0),
+                "deadline": run.get("finished_at") or run.get("created_at") or "",
                 "reviewStatus": None,
                 "reviewComment": "",
                 "reviewTime": "",
-                "source": "scheduler",
+                "source": "workflow",
             })
-            next_id += 1
     except Exception as e:
-        logger.warning("Failed to load scheduler jobs for task list: %s", e)
+        logger.warning("Failed to load workflow runs for task list: %s", e)
 
-    # 2) Merge manual tasks from JSON file (skip ones already covered by scheduler)
+    # 2) Merge manual tasks from JSON file (skip ones already covered by workflow runs).
     manual_tasks = _load_json(_TASKS_FILE, [])
     existing_names = {t.get("name", "") for t in tasks}
     for mt in manual_tasks:
@@ -246,9 +263,9 @@ _DEFAULT_STAFF = [
         "tasksToday": 6,
         "completed": 5,
         "progress": 45,
-        "recent": "刚完成：定时任务调度",
-        "skills": ["调度引擎", "A/B测试", "数据报告", "审计日志"],
-        "route": "/workflow/scheduler",
+        "recent": "刚完成：工作流方案运行",
+        "skills": ["工作流方案", "运行计划", "数据报告", "审计日志"],
+        "route": "/automation/runs",
     },
 ]
 
@@ -265,7 +282,6 @@ _DEFAULT_CONFIGS = {
     "content": {
         "basic": {"name": "内容专员", "description": "负责内容创作、文案撰写、脚本生成", "avatar": "📝", "enabled": True},
         "soul": {"systemPrompt": "你是一位专业的内容创作专员，擅长短视频脚本、社交媒体文案和品牌内容输出。请确保内容符合品牌调性，语言生动有趣。", "behaviorMode": "balanced", "temperature": 0.8},
-        "memory": {"shortTermDepth": 10, "longTermEnabled": True, "knowledgeBases": ["product", "brand"]},
         "skills": {"list": [
             {"id": "script", "name": "脚本生成", "description": "自动生成短视频脚本", "enabled": True, "priority": 1},
             {"id": "copy", "name": "文案撰写", "description": "撰写社交媒体文案", "enabled": True, "priority": 2},
@@ -276,7 +292,6 @@ _DEFAULT_CONFIGS = {
     "acquisition": {
         "basic": {"name": "获客专员", "description": "负责公域拓客、搜索截流、评论互动", "avatar": "🎯", "enabled": True},
         "soul": {"systemPrompt": "你是一位精准的获客专员，擅长通过关键词搜索、评论互动和截流策略获取高意向客户。行为要自然，避免过度营销。", "behaviorMode": "fast", "temperature": 0.9},
-        "memory": {"shortTermDepth": 15, "longTermEnabled": True, "knowledgeBases": ["sales", "competitor"]},
         "skills": {"list": [
             {"id": "search", "name": "搜索截流", "description": "关键词搜索与线索截流", "enabled": True, "priority": 1},
             {"id": "comment", "name": "评论生成", "description": "自动生成互动评论", "enabled": True, "priority": 2},
@@ -287,7 +302,6 @@ _DEFAULT_CONFIGS = {
     "conversion": {
         "basic": {"name": "转化专员", "description": "负责私域转化、客户跟进、成交推进", "avatar": "💰", "enabled": True},
         "soul": {"systemPrompt": "你是一位专业的销售转化专员，擅长客户跟进、需求挖掘和成交推进。请以客户为中心，提供个性化解决方案。", "behaviorMode": "cautious", "temperature": 0.6},
-        "memory": {"shortTermDepth": 20, "longTermEnabled": True, "knowledgeBases": ["sales", "product"]},
         "skills": {"list": [
             {"id": "lead", "name": "线索管理", "description": "管理和跟进销售线索", "enabled": True, "priority": 1},
             {"id": "sop", "name": "SOP执行", "description": "执行标准销售流程", "enabled": True, "priority": 2},
@@ -298,7 +312,6 @@ _DEFAULT_CONFIGS = {
     "ops": {
         "basic": {"name": "运营专员", "description": "负责调度引擎、数据报告、审计日志", "avatar": "🚀", "enabled": True},
         "soul": {"systemPrompt": "你是一位运营调度专员，负责协调各 AI 员工的工作流、生成数据报告并监控系统运行状态。请确保调度高效、数据准确。", "behaviorMode": "balanced", "temperature": 0.7},
-        "memory": {"shortTermDepth": 8, "longTermEnabled": False, "knowledgeBases": ["product"]},
         "skills": {"list": [
             {"id": "scheduler", "name": "调度引擎", "description": "任务调度与定时执行", "enabled": True, "priority": 1},
             {"id": "abtest", "name": "A/B测试", "description": "策略对比测试", "enabled": True, "priority": 2},
@@ -331,7 +344,6 @@ class TaskUpdate(BaseModel):
 class AgentConfigUpdate(BaseModel):
     basic: Optional[dict] = None
     soul: Optional[dict] = None
-    memory: Optional[dict] = None
     skills: Optional[dict] = None
 
 
@@ -430,7 +442,7 @@ async def delete_task(task_id: int):
 @router.get("/configs/list")
 async def list_configs():
     """获取所有员工配置."""
-    configs = _load_json(_CONFIGS_FILE, None)
+    configs = _load_agent_configs(None)
     if configs is None:
         configs = _DEFAULT_CONFIGS
         _save_json(_CONFIGS_FILE, configs)
@@ -440,7 +452,7 @@ async def list_configs():
 @router.get("/configs/{agent_id}")
 async def get_config(agent_id: str):
     """获取单个员工配置."""
-    configs = _load_json(_CONFIGS_FILE, _DEFAULT_CONFIGS)
+    configs = _load_agent_configs(_DEFAULT_CONFIGS)
     if agent_id in configs:
         return {"config": configs[agent_id]}
     raise HTTPException(status_code=404, detail=f"Agent config not found: {agent_id}")
@@ -449,15 +461,13 @@ async def get_config(agent_id: str):
 @router.put("/configs/{agent_id}")
 async def update_config(agent_id: str, body: AgentConfigUpdate):
     """保存员工配置."""
-    configs = _load_json(_CONFIGS_FILE, _DEFAULT_CONFIGS)
+    configs = _load_agent_configs(_DEFAULT_CONFIGS)
     if agent_id not in configs:
         raise HTTPException(status_code=404, detail=f"Agent not found: {agent_id}")
     if body.basic is not None:
         configs[agent_id]["basic"] = {**configs[agent_id].get("basic", {}), **body.basic}
     if body.soul is not None:
         configs[agent_id]["soul"] = {**configs[agent_id].get("soul", {}), **body.soul}
-    if body.memory is not None:
-        configs[agent_id]["memory"] = {**configs[agent_id].get("memory", {}), **body.memory}
     if body.skills is not None:
         configs[agent_id]["skills"] = {**configs[agent_id].get("skills", {}), **body.skills}
     _save_json(_CONFIGS_FILE, configs)
@@ -467,7 +477,7 @@ async def update_config(agent_id: str, body: AgentConfigUpdate):
 @router.post("/configs/{agent_id}/reset")
 async def reset_config(agent_id: str):
     """重置员工配置为默认值."""
-    configs = _load_json(_CONFIGS_FILE, _DEFAULT_CONFIGS)
+    configs = _load_agent_configs(_DEFAULT_CONFIGS)
     if agent_id not in _DEFAULT_CONFIGS:
         raise HTTPException(status_code=404, detail=f"Agent not found: {agent_id}")
     configs[agent_id] = json.loads(json.dumps(_DEFAULT_CONFIGS[agent_id]))

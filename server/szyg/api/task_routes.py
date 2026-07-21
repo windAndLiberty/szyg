@@ -1,103 +1,7 @@
-"""Task Board API — 任务看板后端
-面向老板视角，展示 AI 员工任务执行状态（进行中/已完成/失败）。
-对接 scheduler_engine.py，提供任务列表、详情、重试、取消接口。
-"""
+"""Task Board API — aggregate observable Execution Kernel tasks."""
 from fastapi import APIRouter, HTTPException, Query
-from datetime import datetime, timedelta
-from typing import Optional
-
-from szyg.scheduler_engine import (
-    get_scheduler, ScheduleJob, JobExecution,
-    JobStatus, JobAction,
-)
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
-
-# ── Action → Task Type mapping ──────────────────────────────────
-ACTION_TYPE_MAP: dict[str, dict[str, str]] = {
-    "publish_content":       {"type": "publish", "label": "发布内容", "icon": "📹"},
-    "generate_content":      {"type": "generate", "label": "AI生成", "icon": "🤖"},
-    "run_workflow":          {"type": "workflow", "label": "工作流", "icon": "🔄"},
-    "send_notification":     {"type": "notify", "label": "发送通知", "icon": "📢"},
-    "execute_tool":          {"type": "tool", "label": "执行工具", "icon": "🔧"},
-    "platform_login_check":  {"type": "check", "label": "登录检查", "icon": "🔐"},
-    "platform_health_check": {"type": "health", "label": "健康检查", "icon": "💚"},
-    "custom":                {"type": "custom", "label": "自定义", "icon": "⚙️"},
-}
-
-# Action-specific progress labels for running tasks
-ACTION_PROGRESS_LABELS: dict[str, str] = {
-    "publish_content":       "正在发布中...",
-    "generate_content":      "AI 生成中...",
-    "run_workflow":          "工作流执行中...",
-    "send_notification":     "发送中...",
-    "execute_tool":          "工具执行中...",
-    "platform_login_check":  "检查中...",
-    "platform_health_check": "巡检中...",
-    "custom":                "执行中...",
-}
-
-
-def _job_status_to_board(job: ScheduleJob) -> str:
-    """Map internal JobStatus to task board status."""
-    status = job.status.value if hasattr(job.status, 'value') else job.status
-    if status in ("active", "paused", "disabled"):
-        return "pending"
-    if status == "running":
-        return "running"
-    if status == "completed":
-        return "completed"
-    if status == "failed":
-        return "failed"
-    return "pending"
-
-
-def _format_task(job: ScheduleJob, execution: Optional[JobExecution] = None) -> dict:
-    """Transform a ScheduleJob into the task board response format."""
-    action_key = job.action.value if hasattr(job.action, 'value') else str(job.action)
-    type_info = ACTION_TYPE_MAP.get(action_key, ACTION_TYPE_MAP["custom"])
-    board_status = _job_status_to_board(job)
-
-    # Extract platform from action_config
-    platform = job.action_config.get("platform", "") or job.action_config.get("tool", "") or "多平台"
-
-    task: dict = {
-        "id": job.id,
-        "name": job.name,
-        "description": job.description,
-        "type": type_info["type"],
-        "type_label": type_info["label"],
-        "type_icon": type_info["icon"],
-        "platform": platform,
-        "status": board_status,
-        "priority": job.priority,
-        "tags": job.tags,
-        "created_at": job.created_at,
-        "started_at": job.last_run_at or job.created_at,
-        "progress": "",
-        "result": "",
-        "error": "",
-        "finished_at": "",
-    }
-
-    if execution:
-        task["progress"] = execution.result or ACTION_PROGRESS_LABELS.get(action_key, "执行中...")
-        task["finished_at"] = execution.finished_at
-        if execution.status == "success":
-            task["result"] = execution.result
-        elif execution.status == "failed":
-            task["error"] = execution.error
-        elif execution.status == "running":
-            task["progress"] = execution.result or ACTION_PROGRESS_LABELS.get(action_key, "执行中...")
-
-    return task
-
-
-def _get_latest_execution(job_id: str) -> Optional[JobExecution]:
-    """Get the most recent execution for a job from history."""
-    history = get_scheduler().get_history(job_id=job_id, limit=1)
-    return history[0] if history else None
-
 
 # ── Routes ──────────────────────────────────────────────────────
 
@@ -158,12 +62,13 @@ def _format_execution_task(run: dict) -> dict:
     if run.get("error_code"):
         error = f"{run.get('error_code')}: {error}".strip(": ")
     is_computer_use = run.get("task_type") == "computer_use"
+    is_publish = str(run.get("task_type") or "").startswith("publish_")
     return {
         "id": run.get("id", ""),
         "name": run.get("title") or f"{run.get('platform', '')} {run.get('task_type', '')}".strip() or "ExecutionRun",
         "description": f"{run.get('executor_type', '')} · {run.get('task_type', '')}".strip(" ·"),
-        "type": "tool" if is_computer_use else "publish" if run.get("task_type") == "publish_video" else "workflow",
-        "type_label": "电脑使用" if is_computer_use else "自动化执行",
+        "type": "tool" if is_computer_use else "publish" if is_publish else "workflow",
+        "type_label": "电脑使用" if is_computer_use else "内容发布" if is_publish else "自动化执行",
         "type_icon": "🖥️" if is_computer_use else "⚙️",
         "platform": "Windows" if is_computer_use else run.get("platform", ""),
         "status": board_status,
@@ -203,28 +108,6 @@ async def list_tasks(
       - completed   → completed (已完成)
       - failed      → failed (失败)
     """
-    scheduler = get_scheduler()
-    history = scheduler.get_history(limit=500)
-
-    if status == "all":
-        jobs = scheduler.list_jobs(status="", search=search, limit=limit)
-    elif status == "running":
-        # 进行中: running + active + paused
-        all_jobs = scheduler.list_jobs(status="", search=search, limit=limit)
-        jobs = [j for j in all_jobs if j.status.value in ("running", "active", "paused")]
-    elif status == "completed":
-        jobs = scheduler.list_jobs(status="completed", search=search, limit=limit)
-    elif status == "failed":
-        jobs = scheduler.list_jobs(status="failed", search=search, limit=limit)
-    else:
-        jobs = scheduler.list_jobs(status="", search=search, limit=limit)
-
-    # Build history lookup: job_id → latest execution
-    exec_map: dict[str, JobExecution] = {}
-    for h in history:
-        if h.job_id not in exec_map:
-            exec_map[h.job_id] = h
-
     tasks = []
     try:
         from szyg.execution_kernel import get_execution_kernel
@@ -246,7 +129,6 @@ async def list_tasks(
     except Exception:
         pass
 
-    tasks.extend(_format_task(j, exec_map.get(j.id)) for j in jobs)
     try:
         from szyg.integrations.sau_task_manager import get_sau_task_manager
         sau_tasks = [_format_sau_task(item) for item in get_sau_task_manager().list_tasks(limit=limit)]
@@ -267,13 +149,12 @@ async def list_tasks(
     tasks = tasks[:limit]
 
     # Compute counts for each status bucket
-    all_jobs = scheduler.list_jobs(status="", limit=500)
     counts = {
-        "all": len(all_jobs),
-        "running": sum(1 for j in all_jobs if j.status.value in ("running", "active", "paused")),
+        "all": 0,
+        "running": 0,
         "needs_human": 0,
-        "completed": sum(1 for j in all_jobs if j.status.value == "completed"),
-        "failed": sum(1 for j in all_jobs if j.status.value == "failed"),
+        "completed": 0,
+        "failed": 0,
     }
     try:
         from szyg.execution_kernel import get_execution_kernel
@@ -374,39 +255,7 @@ async def get_task_detail(task_id: str):
         task["debug_screenshot"] = sau_task.get("debug_screenshot", "")
         return task
 
-    scheduler = get_scheduler()
-    job = scheduler.get_job(task_id)
-    if not job:
-        raise HTTPException(404, "任务不存在")
-
-    # Build history with logs
-    executions = scheduler.get_history(job_id=task_id, limit=50)
-
-    # Build subtask-like log entries from executions
-    logs: list[dict] = []
-    for ex in executions:
-        log_entry: dict = {
-            "id": ex.id,
-            "type": "log",
-            "message": ex.result or ex.error or f"执行状态: {ex.status}",
-            "timestamp": ex.started_at,
-            "status": "success" if ex.status == "success" else ("error" if ex.status == "failed" else "info"),
-            "duration_ms": ex.duration_ms,
-        }
-        logs.append(log_entry)
-
-    latest = executions[0] if executions else None
-    task = _format_task(job, latest)
-
-    # Add extra detail fields
-    task["executions"] = [e.model_dump() for e in executions[:20]]
-    task["logs"] = logs[:50]
-    task["action"] = job.action.value if hasattr(job.action, 'value') else str(job.action)
-    task["action_config"] = job.action_config
-    task["trigger_type"] = job.trigger_type.value if hasattr(job.trigger_type, 'value') else str(job.trigger_type)
-    task["trigger_config"] = job.trigger_config
-
-    return task
+    raise HTTPException(404, "任务不存在")
 
 
 @router.post("/{task_id}/retry")
@@ -422,18 +271,7 @@ async def retry_task(task_id: str):
         except ValueError as e:
             raise HTTPException(400, str(e))
 
-    scheduler = get_scheduler()
-    job = scheduler.get_job(task_id)
-    if not job:
-        raise HTTPException(404, "任务不存在")
-    if job.status.value not in ("failed", "paused"):
-        raise HTTPException(400, "只能重试失败或暂停的任务")
-
-    try:
-        execution = scheduler.retry_job(task_id)
-        return {"ok": True, "task_id": task_id, "execution_id": execution.id if execution else ""}
-    except Exception as e:
-        raise HTTPException(500, f"重试失败: {str(e)}")
+    raise HTTPException(404, "任务不存在")
 
 
 @router.post("/{task_id}/cancel")
@@ -447,12 +285,4 @@ async def cancel_task(task_id: str):
         except KeyError:
             raise HTTPException(404, "任务不存在")
 
-    scheduler = get_scheduler()
-    job = scheduler.get_job(task_id)
-    if not job:
-        raise HTTPException(404, "任务不存在")
-    if job.status.value not in ("running", "active", "paused"):
-        raise HTTPException(400, "只能取消进行中的任务")
-
-    scheduler.cancel_job(task_id)
-    return {"ok": True, "task_id": task_id}
+    raise HTTPException(404, "任务不存在")

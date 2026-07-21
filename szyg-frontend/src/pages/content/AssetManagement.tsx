@@ -2611,10 +2611,31 @@ function normalizeTaskStatus(status: string): string {
   return status || 'queued'
 }
 
+function taskStatusLabel(status: string): string {
+  return {
+    queued: '等待生成',
+    running: '正在生成',
+    processing: '正在生成',
+    succeeded: '生成完成',
+    failed: '生成失败',
+  }[normalizeTaskStatus(status)] || '处理中'
+}
+
+function videoQualityLabel(modelId: string, label = ''): string {
+  const labels: Record<string, string> = {
+    'doubao-seedance-1.5-pro': '基础模式',
+    'doubao-seedance-2.0-fast': '快速模式',
+    'doubao-seedance-2.0': '高质量模式',
+    'doubao-seedance-2.5': '专业模式',
+  }
+  if (labels[modelId]) return labels[modelId]
+  return /seedance|doubao|model|endpoint|provider/i.test(label) ? '智能模式' : (label || '智能模式')
+}
+
 function formatUnsupportedFeature(feature: string): string {
   const labels: Record<string, string> = {
     audio_reference_input: '音频参考输入',
-    visual_reference_input: '当前模型不支持直接输入参考图片/视频，已使用 AI 理解后的素材信息生成',
+    visual_reference_input: '当前生成服务不支持直接输入参考图片或视频，已使用 AI 理解后的素材信息生成',
     visual_reference_upload: '视觉参考素材上传',
   }
   return labels[feature] || feature
@@ -2688,15 +2709,25 @@ function ComposeVideoDrawer({
       .then((config) => {
         if (cancelled) return
         setVideoModels(config.models || [])
-        setParams((current) => ({
-          ...current,
-          duration: config.defaults?.duration || current.duration,
-          size: config.defaults?.size || current.size,
-          ratio: config.defaults?.ratio || current.ratio,
-          native_audio: config.defaults?.native_audio ?? current.native_audio,
-          count: config.defaults?.count || current.count,
-          model: hasSavedParamsRef.current ? current.model : (config.compose_default_model || current.model),
-        }))
+        setParams((current) => {
+          const requestedModel = hasSavedParamsRef.current ? current.model : (config.compose_default_model || current.model)
+          const requestedProfile = (config.models || []).find((model) => model.id === requestedModel)
+          const fallbackProfile = (config.models || []).find((model) => model.available !== false)
+          const selectedProfile = requestedProfile?.available === false ? fallbackProfile : requestedProfile
+          const requestedSize = config.defaults?.size || current.size
+          const requestedDuration = config.defaults?.duration || current.duration
+          return {
+            ...current,
+            duration: selectedProfile
+              ? Math.min(selectedProfile.max_duration, Math.max(selectedProfile.min_duration, requestedDuration))
+              : requestedDuration,
+            size: selectedProfile?.sizes.includes(requestedSize) ? requestedSize : (selectedProfile?.sizes[0] || current.size),
+            ratio: config.defaults?.ratio || current.ratio,
+            native_audio: config.defaults?.native_audio ?? current.native_audio,
+            count: config.defaults?.count || current.count,
+            model: selectedProfile?.id || requestedModel,
+          }
+        })
       })
       .catch(() => {
         /* keep local fallback defaults */
@@ -2711,7 +2742,8 @@ function ComposeVideoDrawer({
   }, [step, analysis, prepared, answers, params, tasks])
 
   const currentModelLabel = useMemo(() => {
-    return videoModels.find((model) => model.id === params.model)?.label || params.model
+    const configured = videoModels.find((model) => model.id === params.model)
+    return videoQualityLabel(params.model, configured?.label)
   }, [params.model, videoModels])
 
   const runAnalyze = useCallback(async () => {
@@ -2882,7 +2914,7 @@ function ComposeVideoDrawer({
               一键成片
             </div>
             <div className="mt-1 text-body-xs text-[#64748B]">
-              已选 {assets.length}/{MAX_COMPOSE_ASSETS} 个素材 · AI 理解素材 · 生成模型 {currentModelLabel}
+              已选 {assets.length}/{MAX_COMPOSE_ASSETS} 个素材 · AI 理解素材 · {currentModelLabel}
             </div>
           </div>
           <button onClick={onClose} className="rounded-lg p-2 text-[#64748B] transition-colors hover:bg-[#1E293B] hover:text-[#F1F5F9]">
@@ -3046,14 +3078,11 @@ function ComposeVideoDrawer({
 
             {step === 'tasks' && (
               <div className="space-y-3">
-                {tasks.map((task) => (
+                {tasks.map((task, index) => (
                   <div key={task.taskId} className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
                     <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="text-body-sm font-medium text-[#F1F5F9]">{task.taskId}</div>
-                        <div className="mt-1 text-body-xs text-[#64748B]">{task.model}</div>
-                      </div>
-                      <span className="rounded-md bg-[#1E293B] px-3 py-1 text-body-xs text-[#CBD5E1]">{normalizeTaskStatus(task.status)}</span>
+                      <div className="text-body-sm font-medium text-[#F1F5F9]">生成视频 {index + 1}</div>
+                      <span className="rounded-md bg-[#1E293B] px-3 py-1 text-body-xs text-[#CBD5E1]">{taskStatusLabel(task.status)}</span>
                     </div>
                     <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#1E293B]">
                       <div className="h-full bg-[#6366F1]" style={{ width: `${Math.min(100, task.progress || (task.status === 'succeeded' ? 100 : 12))}%` }} />
@@ -3092,6 +3121,7 @@ function ComposeParamsPanel({
   onToggleAdvanced: () => void
 }) {
   const update = (patch: Partial<ComposeVideoParams>) => onChange({ ...params, ...patch })
+  const selectedModel = models.find((model) => model.id === params.model)
   return (
     <div className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
       <button type="button" onClick={onToggleAdvanced} className="mb-3 text-body-sm font-medium text-[#C4B5FD]">
@@ -3100,10 +3130,17 @@ function ComposeParamsPanel({
       {advancedOpen && (
         <div className="grid gap-3 md:grid-cols-3">
           <label>
-            <span className="mb-1 block text-body-xs text-[#64748B]">生成模型</span>
-            <select value={params.model} onChange={(event) => update({ model: event.target.value })} className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#111827] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]">
+            <span className="mb-1 block text-body-xs text-[#64748B]">生成质量</span>
+            <select value={params.model} onChange={(event) => {
+              const nextModel = models.find((model) => model.id === event.target.value)
+              update({
+                model: event.target.value,
+                duration: nextModel ? Math.min(nextModel.max_duration, Math.max(nextModel.min_duration, params.duration)) : params.duration,
+                size: nextModel && !nextModel.sizes.includes(params.size) ? (nextModel.sizes[0] || params.size) : params.size,
+              })
+            }} className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#111827] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]">
               {(models.length ? models : [{ id: params.model, label: params.model } as VideoModelConfig]).map((model) => (
-                <option key={model.id} value={model.id}>{model.label}</option>
+                <option key={model.id} value={model.id} disabled={model.available === false}>{videoQualityLabel(model.id, model.label)}{model.available === false ? '（暂未开放）' : ''}</option>
               ))}
             </select>
           </label>
@@ -3136,15 +3173,15 @@ function ComposeParamsPanel({
           <label>
             <span className="mb-1 block text-body-xs text-[#64748B]">时长</span>
             <select value={params.duration} onChange={(event) => update({ duration: Number(event.target.value) })} className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#111827] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]">
-              {[6, 10, 15, 30].map((value) => <option key={value} value={value}>{value} 秒</option>)}
+              {[6, 10, 15, 30].map((value) => <option key={value} value={value} disabled={Boolean(selectedModel && (value < selectedModel.min_duration || value > selectedModel.max_duration))}>{value} 秒</option>)}
             </select>
           </label>
           <label>
             <span className="mb-1 block text-body-xs text-[#64748B]">分辨率</span>
             <select value={params.size} onChange={(event) => update({ size: event.target.value })} className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#111827] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]">
-              <option value="1080p">1080p</option>
-              <option value="4K">4K</option>
-              <option value="720p">720p</option>
+              <option value="1080p" disabled={Boolean(selectedModel && !selectedModel.sizes.includes('1080p'))}>1080p</option>
+              <option value="4K" disabled={Boolean(!selectedModel?.sizes.includes('4K'))}>4K{selectedModel?.sizes.includes('4K') ? '' : '（暂未开放）'}</option>
+              <option value="720p" disabled={Boolean(selectedModel && !selectedModel.sizes.includes('720p'))}>720p</option>
             </select>
           </label>
           <label>

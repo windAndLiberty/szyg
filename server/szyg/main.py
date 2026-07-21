@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """szyg 智能矩阵运营系统 — 主入口"""
-import asyncio, signal, sys, logging
+import asyncio, contextlib, signal, sys, logging
 from fastapi import FastAPI
 from szyg.api.app import create_app
 from szyg.version import VERSION
@@ -15,7 +15,7 @@ def _setup_lifecycle(app: FastAPI) -> None:
 
     @app.on_event("startup")
     async def on_startup():
-        """应用启动: 初始化平台适配器 + 启动调度器后台循环"""
+        """应用启动: 初始化平台适配器。自动化循环由 workflow_routes 管理。"""
         logger.info(f"szyg v{VERSION} starting...")
 
         # Initialize platform adapter registry
@@ -29,25 +29,33 @@ def _setup_lifecycle(app: FastAPI) -> None:
         except Exception as e:
             logger.warning(f"Platform adapter init skipped: {e}")
 
-        # Start scheduler background loop
-        try:
-            from szyg.scheduler_engine import get_scheduler
-            scheduler = get_scheduler()
-            await scheduler.start()
-            logger.info("Scheduler background loop started")
-        except Exception as e:
-            logger.warning(f"Scheduler loop start failed: {e}")
+        async def comment_retry_worker():
+            """Requeue only previously confirmed delayed comments."""
+            from szyg.comment_engine import process_due_comments
+
+            while True:
+                await asyncio.sleep(30)
+                try:
+                    result = await process_due_comments(limit=10)
+                    if result.get("processed"):
+                        logger.info("Marketing comment worker requeued %s item(s)", result["processed"])
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    logger.warning("Marketing comment worker iteration failed: %s", exc)
+
+        app.state.comment_retry_worker = asyncio.create_task(comment_retry_worker())
 
     @app.on_event("shutdown")
     async def on_shutdown():
-        """应用关闭: 停止调度器 + 释放平台适配器资源"""
+        """应用关闭: 释放平台适配器资源。"""
         logger.info("szyg shutting down...")
 
-        try:
-            from szyg.scheduler_engine import get_scheduler
-            await get_scheduler().stop()
-        except Exception as e:
-            logger.warning("Error stopping scheduler during shutdown: %s", e)
+        worker = getattr(app.state, "comment_retry_worker", None)
+        if worker:
+            worker.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await worker
 
         try:
             from szyg.platforms.registry import get_registry

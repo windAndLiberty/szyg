@@ -13,6 +13,7 @@ Usage:
 """
 import asyncio
 import logging
+import os
 import time
 from typing import Optional
 
@@ -59,8 +60,39 @@ class BrowserPool:
             from playwright.async_api import async_playwright
             self._playwright = await async_playwright().start()
         from szyg.platforms.anti_detect import get_launch_config_native
-        cfg = get_launch_config_native(headless=self._headless)
-        self._browser = await self._playwright.chromium.launch(**cfg)
+        if self._headless and os.name == "nt":
+            cfg = {
+                "headless": True,
+                "channel": "msedge",
+                "args": [
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-proxy-server",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                ],
+            }
+        else:
+            cfg = get_launch_config_native(headless=self._headless)
+        try:
+            self._browser = await self._playwright.chromium.launch(**cfg)
+        except Exception as exc:
+            if not self._headless:
+                raise
+            logger.warning(
+                "BrowserPool: bundled headless Chromium failed (%s), falling back to system Edge",
+                exc,
+            )
+            fallback_cfg = {
+                "headless": True,
+                "channel": "msedge",
+                "args": [
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-proxy-server",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                ],
+            }
+            self._browser = await self._playwright.chromium.launch(**fallback_cfg)
         try:
             pid = self._browser._impl_obj._process.pid if hasattr(self._browser, '_impl_obj') and hasattr(self._browser._impl_obj, '_process') else '?'
         except Exception:

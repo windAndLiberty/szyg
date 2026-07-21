@@ -100,9 +100,8 @@ class VersionLockedBrowserPool:
         self._lock = asyncio.Lock()
         self._cleanup_task: Optional[asyncio.Task] = None
         self._running = False
-        self._storage_root = Path(storage_root or os.path.join(
-            os.path.dirname(__file__), "..", "..", "storage", "profiles"
-        )).resolve()
+        default_profiles = Path(os.environ.get("SZYG_DATA_DIR", "data")) / "browser_profiles"
+        self._storage_root = Path(storage_root or default_profiles).resolve()
         self._chromium_exe: Optional[str] = None  # Cached executable path
 
     def _resolve_chromium_path(self) -> str | None:
@@ -111,7 +110,12 @@ class VersionLockedBrowserPool:
             return self._chromium_exe
 
         # 1. Bundled: server/szyg/storage/chromium/
-        bundled_base = Path(__file__).resolve().parent.parent / "storage" / "chromium"
+        bundled_base = Path(
+            os.environ.get(
+                "SZYG_CHROMIUM_DIR",
+                str(Path(__file__).resolve().parent.parent / "storage" / "chromium"),
+            )
+        )
         if bundled_base.exists():
             for d in sorted(bundled_base.iterdir(), reverse=True):
                 if d.is_dir() and d.name.startswith("chromium-"):

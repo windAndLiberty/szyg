@@ -1,11 +1,19 @@
 {
   "name": "szyg",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "szyg 智能矩阵运营系统",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win portable"
+    "build:frontend": "npm --prefix ../szyg-frontend run build",
+    "build:backend": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-backend-runtime.ps1",
+    "build:config": "..\\.venv\\Scripts\\python.exe scripts/build-release-config.py ../config.yaml runtime/config.yaml",
+    "build:runtime": "npm run build:frontend && npm run build:backend && npm run build:config",
+    "audit:source": "node scripts/audit-release.cjs source",
+    "audit:dist": "node scripts/audit-release.cjs dist",
+    "build:dir": "npm run audit:source && npm run build:runtime && electron-builder --win dir && npm run audit:dist",
+    "build": "npm run audit:source && npm run build:runtime && electron-builder --win zip && npm run audit:dist",
+    "build:release": "node scripts/assert-signing.cjs && npm run build"
   },
   "build": {
     "appId": "com.szyg.app",
@@ -13,32 +21,39 @@
     "directories": {
       "output": "dist"
     },
+    "compression": "store",
     "files": [
       "main.js",
-      "preload.js",
-      "../server/**/*",
-      "../data/**/*",
-      "../config.yaml"
+      "preload.js"
     ],
     "extraResources": [
       {
-        "from": "../server",
-        "to": "server",
-        "filter": ["**/*"]
+        "from": "runtime/backend/szyg-backend",
+        "to": "backend"
       },
       {
-        "from": "../data",
-        "to": "data"
+        "from": "../szyg-frontend/dist",
+        "to": "frontend"
       },
       {
         "from": "../server/szyg/storage/chromium",
-        "to": "server/szyg/storage/chromium"
+        "to": "runtime/chromium"
+      },
+      {
+        "from": "../runtime/llama",
+        "to": "runtime/llama"
+      },
+      {
+        "from": "runtime/config.yaml",
+        "to": "config.yaml"
       }
     ],
     "win": {
-      "target": "portable",
-      "icon": null
-    }
+      "target": "zip",
+      "icon": null,
+      "verifyUpdateCodeSignature": true
+    },
+    "artifactName": "SZYG-${version}-windows-${arch}.${ext}"
   },
   "devDependencies": {
     "electron": "^33.4.0",

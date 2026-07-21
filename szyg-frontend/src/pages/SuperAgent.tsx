@@ -12,6 +12,7 @@ import {
   createVideo,
   pollVideoTask,
   getErrorMessage,
+  toUserFacingMessage,
   getCurrentUser,
   type HermesEvent,
 } from '@/lib/api'
@@ -20,6 +21,11 @@ import WelcomeState from '@/components/superagent/WelcomeState'
 import ChatMessageView from '@/components/superagent/ChatMessageView'
 
 const DEFAULT_MODEL = 'doubao-seed-2-0-pro-260215'
+
+type HermesRuntimeStatus = {
+  memory?: { enabled?: boolean }
+  skills?: { count?: number }
+}
 
 // 生成意图识别：后端 hermes/chat 不产出 image/video 事件，
 // 生成走独立 REST 端点 (/api/image/generate、/api/video/create + 轮询)。
@@ -54,9 +60,11 @@ export default function SuperAgent() {
   const [caseCards, setCaseCards] = useState<CaseCard[]>([])
   const [caseCardsLoading, setCaseCardsLoading] = useState(false)
   const [historyCollapsed, setHistoryCollapsed] = useState(false)
+  const [hermesRuntime, setHermesRuntime] = useState<HermesRuntimeStatus | null>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
   const streamMsgIdRef = useRef<string | null>(null)
   const streamBufRef = useRef<string>('')
+  const pendingSessionIdRef = useRef(`szyg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`)
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -108,6 +116,14 @@ export default function SuperAgent() {
   }, [loadConversations])
 
   useEffect(() => {
+    let active = true
+    apiGet<HermesRuntimeStatus>('/api/skills/runtime')
+      .then((status) => { if (active) setHermesRuntime(status) })
+      .catch(() => { if (active) setHermesRuntime(null) })
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
     if (messages.length === 0) loadCaseCards()
   }, [messages.length, loadCaseCards])
 
@@ -122,6 +138,7 @@ export default function SuperAgent() {
 
   const newConversation = useCallback(() => {
     setActiveConvId(null)
+    pendingSessionIdRef.current = `szyg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
     setMessages([])
     loadCaseCards()
   }, [loadCaseCards])
@@ -280,7 +297,7 @@ export default function SuperAgent() {
             const r = JSON.parse(res)
             if (r && r.error) {
               status = 'error'
-              res = r.error
+              res = toUserFacingMessage(r.error)
             }
           } catch {
             /* keep raw */
@@ -301,10 +318,10 @@ export default function SuperAgent() {
         }
         case 'error':
           ensureStreamMsg()
-          appendText('\n⚠️ ' + (ev.content || ''))
+          appendText('\n⚠️ ' + toUserFacingMessage(ev.content, '当前操作未完成，请稍后重试'))
           break
         case 'status':
-          setStatusText(ev.content || '')
+          setStatusText(toUserFacingMessage(ev.content, '正在处理'))
           break
         default:
           break
@@ -420,6 +437,7 @@ export default function SuperAgent() {
           await streamHermesChat({
             model: DEFAULT_MODEL,
             messages: apiMessages,
+            session_id: activeConvId || pendingSessionIdRef.current,
             onEvent: handleEvent,
           })
         }
@@ -476,6 +494,8 @@ export default function SuperAgent() {
             streaming={streaming}
             caseCards={caseCards}
             caseCardsLoading={caseCardsLoading}
+            skillCount={hermesRuntime?.skills?.count ?? 0}
+            memoryEnabled={Boolean(hermesRuntime?.memory?.enabled)}
           />
         ) : (
           <>

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, useRef, type ClipboardEvent, type MouseEvent } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef, type ClipboardEvent, type KeyboardEvent, type MouseEvent } from 'react'
 import { Link } from 'react-router'
 import { motion } from 'framer-motion'
 import {
@@ -6,6 +6,10 @@ import {
   Video as VideoIcon,
   FileText as TextIcon,
   Mic as MicIcon,
+  UserRound,
+  Package,
+  Palette,
+  Volume2,
   ExternalLink,
   Copy,
   Check,
@@ -37,6 +41,13 @@ import {
   openGeneratedMedia,
   deleteGeneratedMedia,
   getVideoConfig,
+  fetchDigitalHumanConfig,
+  uploadDigitalHumanAsset,
+  removeDigitalHumanAsset,
+  createDigitalHumanVideo,
+  type DigitalHumanAsset,
+  type DigitalHumanAssetRole,
+  type DigitalHumanConfig,
   type GenerationHistoryItem,
   type GenerationHistoryType,
   type TtsResult,
@@ -56,13 +67,17 @@ import {
 } from '@/lib/contentDraftStore'
 import { resolveGeneratedAssetUrl } from '@/lib/generatedAssets'
 
-type Tab = 'image' | 'video' | 'copy' | 'voice'
+type Tab = 'image' | 'video' | 'digital-human' | 'copy' | 'voice'
 type ImageStyle = 'none' | 'realistic' | 'product' | 'xiaohongshu_cover' | 'douyin_cover' | 'anime' | 'oil' | 'watercolor' | 'cyberpunk' | 'minimal'
 type ImageSize = '1920x1920' | '2560x1440' | '1440x2560' | '2048x2048' | '2304x1728' | '3072x1296'
+
+// Seedance 2.5 接入完成后只需开启此开关，现有数字人口播实现会重新显示。
+const DIGITAL_HUMAN_ENABLED = false
 
 const TABS: { key: Tab; label: string; icon: typeof ImageIcon }[] = [
   { key: 'image', label: '图片生成', icon: ImageIcon },
   { key: 'video', label: '视频生成', icon: VideoIcon },
+  { key: 'digital-human', label: '数字人口播', icon: UserRound },
   { key: 'copy', label: '文案生成', icon: TextIcon },
   { key: 'voice', label: '语音合成', icon: MicIcon },
 ]
@@ -155,6 +170,7 @@ type ReferenceAsset = {
 function historyTypeForTab(tab: Tab): GenerationHistoryType {
   if (tab === 'voice') return 'audio'
   if (tab === 'copy') return 'text'
+  if (tab === 'digital-human') return 'video'
   return tab
 }
 
@@ -364,6 +380,7 @@ export default function ContentProduction() {
   const [activeTab, setActiveTab] = useState<Tab>('image')
   const [historyOpen, setHistoryOpen] = useState(false)
   const [referenceToast, setReferenceToast] = useState('')
+  const [featureNotice, setFeatureNotice] = useState('')
 
   useEffect(() => {
     const onCopied = (event: Event) => {
@@ -374,6 +391,20 @@ export default function ContentProduction() {
     window.addEventListener('szyg-reference-copied', onCopied)
     return () => window.removeEventListener('szyg-reference-copied', onCopied)
   }, [])
+
+  useEffect(() => {
+    if (!featureNotice) return
+    const timer = window.setTimeout(() => setFeatureNotice(''), 2800)
+    return () => window.clearTimeout(timer)
+  }, [featureNotice])
+
+  const selectTab = (tab: Tab) => {
+    if (tab === 'digital-human' && !DIGITAL_HUMAN_ENABLED) {
+      setFeatureNotice('数字人口播暂时不可用，后续开放')
+      return
+    }
+    setActiveTab(tab)
+  }
 
   return (
     <motion.div
@@ -388,10 +419,14 @@ export default function ContentProduction() {
           {TABS.map((tab) => (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              type="button"
+              data-unavailable={tab.key === 'digital-human' && !DIGITAL_HUMAN_ENABLED ? 'true' : undefined}
+              onClick={() => selectTab(tab.key)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-body-sm transition-all ${
                 activeTab === tab.key
                   ? 'bg-[#6366F1]/20 text-[#6366F1] border border-[#6366F1]/30'
+                  : tab.key === 'digital-human' && !DIGITAL_HUMAN_ENABLED
+                    ? 'cursor-not-allowed text-[#475569] hover:bg-[#111827] hover:text-[#64748B]'
                   : 'text-[#94A3B8] hover:bg-[#1E293B] hover:text-[#F1F5F9]'
               }`}
             >
@@ -414,6 +449,7 @@ export default function ContentProduction() {
       <div className="flex-1 overflow-auto p-6">
         {activeTab === 'image' && <ImageGeneration />}
         {activeTab === 'video' && <VideoGeneration />}
+        {DIGITAL_HUMAN_ENABLED && activeTab === 'digital-human' && <DigitalHumanGeneration />}
         {activeTab === 'copy' && <CopyGeneration />}
         {activeTab === 'voice' && <VoiceSynthesis />}
       </div>
@@ -435,6 +471,11 @@ export default function ContentProduction() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+      {featureNotice && (
+        <div className="fixed bottom-6 right-6 z-[60] max-w-sm rounded-lg border border-[#F59E0B]/30 bg-[#17130A] px-4 py-3 text-body-sm text-[#FCD34D] shadow-2xl shadow-black/40">
+          {featureNotice}
         </div>
       )}
     </motion.div>
@@ -1130,7 +1171,8 @@ const FALLBACK_VIDEO_MODEL_PROFILES: Record<VideoModel, VideoModelConfig> = {
   'doubao-seedance-1.5-pro': {
     id: 'doubao-seedance-1.5-pro',
     provider_model: 'doubao-seedance-1-5-pro-251215',
-    label: 'Doubao-Seedance 1.5',
+    label: '基础模式',
+    available: true,
     sizes: ['720p', '1080p'],
     min_duration: 4,
     max_duration: 12,
@@ -1139,7 +1181,8 @@ const FALLBACK_VIDEO_MODEL_PROFILES: Record<VideoModel, VideoModelConfig> = {
   'doubao-seedance-2.0-fast': {
     id: 'doubao-seedance-2.0-fast',
     provider_model: 'doubao-seedance-2.0-fast',
-    label: 'Doubao-Seedance 2.0 Fast',
+    label: '快速模式',
+    available: true,
     sizes: ['720p'],
     min_duration: 4,
     max_duration: 15,
@@ -1148,7 +1191,8 @@ const FALLBACK_VIDEO_MODEL_PROFILES: Record<VideoModel, VideoModelConfig> = {
   'doubao-seedance-2.0': {
     id: 'doubao-seedance-2.0',
     provider_model: 'doubao-seedance-2.0',
-    label: 'Doubao-Seedance 2.0',
+    label: '高质量模式',
+    available: true,
     sizes: ['720p', '1080p'],
     min_duration: 4,
     max_duration: 15,
@@ -1157,13 +1201,420 @@ const FALLBACK_VIDEO_MODEL_PROFILES: Record<VideoModel, VideoModelConfig> = {
   'doubao-seedance-2.5': {
     id: 'doubao-seedance-2.5',
     provider_model: 'doubao-seedance-2.5',
-    label: 'Doubao-Seedance 2.5',
+    label: '专业模式',
+    available: false,
     sizes: ['720p', '1080p', '4K'],
     min_duration: 3,
     max_duration: 30,
     native_audio: true,
   },
 }
+
+// Seedance 2.5 digital presenter workspace.
+const DIGITAL_HUMAN_DRAFT_KEY = 'szyg:digital-human:draft:v1'
+
+type DigitalHumanTask = {
+  taskId: string
+  model: string
+  status: 'queued' | 'running' | 'succeeded' | 'failed'
+  progress: number
+  videoUrl?: string
+  localPath?: string
+  error?: string
+  recorded?: boolean
+  adopted?: boolean
+  materialId?: string
+}
+
+const DIGITAL_HUMAN_ASSET_SLOTS: Array<{
+  role: DigitalHumanAssetRole
+  label: string
+  accept: string
+  multiple: boolean
+  icon: typeof ImageIcon
+}> = [
+  { role: 'avatar_reference', label: '人物参考', accept: 'image/*', multiple: true, icon: UserRound },
+  { role: 'product_reference', label: '产品素材', accept: 'image/*,video/*', multiple: true, icon: Package },
+  { role: 'background_reference', label: '背景', accept: 'image/*,video/*', multiple: false, icon: Palette },
+  { role: 'motion_reference', label: '动作参考', accept: 'video/*', multiple: false, icon: VideoIcon },
+  { role: 'voice_reference', label: '声音参考', accept: 'audio/*', multiple: false, icon: Volume2 },
+  { role: 'brand_asset', label: '品牌标识', accept: 'image/*', multiple: false, icon: ImageIcon },
+]
+
+const DIGITAL_HUMAN_ROLE_NAMES: Record<DigitalHumanAssetRole, string> = {
+  avatar_reference: '人物',
+  product_reference: '产品',
+  background_reference: '背景',
+  motion_reference: '动作',
+  voice_reference: '声音',
+  brand_asset: '品牌',
+}
+
+function withDigitalHumanAliases(items: DigitalHumanAsset[]): DigitalHumanAsset[] {
+  const counters = new Map<DigitalHumanAssetRole, number>()
+  const used = new Set<string>()
+  return items.map((item) => {
+    const prefix = DIGITAL_HUMAN_ROLE_NAMES[item.role]
+    const current = String(item.alias || '').trim().replace(/^@/, '')
+    const currentMatch = current.match(new RegExp(`^${prefix}(\\d+)$`))
+    if (currentMatch && !used.has(current)) {
+      counters.set(item.role, Math.max(counters.get(item.role) || 0, Number(currentMatch[1])))
+      used.add(current)
+      return { ...item, alias: current }
+    }
+    let next = (counters.get(item.role) || 0) + 1
+    while (used.has(`${prefix}${next}`)) next += 1
+    const alias = `${prefix}${next}`
+    counters.set(item.role, next)
+    used.add(alias)
+    return { ...item, alias }
+  })
+}
+
+function DigitalHumanAssetThumbnail({ asset, className = 'h-9 w-9' }: { asset: DigitalHumanAsset; className?: string }) {
+  if (asset.kind === 'image') return <img src={asset.url} alt="" className={`${className} shrink-0 rounded-md object-cover`} />
+  if (asset.kind === 'video') return <video src={asset.url} muted preload="metadata" className={`${className} shrink-0 rounded-md bg-black object-cover`} />
+  return <span className={`${className} flex shrink-0 items-center justify-center rounded-md bg-[#1E293B]`}><MicIcon className="h-4 w-4 text-[#FBBF24]" /></span>
+}
+
+function DigitalHumanGeneration() {
+  const [config, setConfig] = useState<DigitalHumanConfig | null>(null)
+  const [script, setScript] = useState('')
+  const [backgroundPrompt, setBackgroundPrompt] = useState('简洁明亮的现代商业空间，背景干净，突出人物和产品')
+  const [assets, setAssets] = useState<DigitalHumanAsset[]>([])
+  const [duration, setDuration] = useState('15')
+  const [size, setSize] = useState<'720p' | '1080p' | '4K'>('1080p')
+  const [ratio, setRatio] = useState<'9:16' | '16:9' | '1:1'>('9:16')
+  const [style, setStyle] = useState('professional')
+  const [customStyle, setCustomStyle] = useState('')
+  const [avatarPosition, setAvatarPosition] = useState<'center' | 'left' | 'right' | 'full'>('center')
+  const [nativeAudio, setNativeAudio] = useState(true)
+  const [uploadingRole, setUploadingRole] = useState<DigitalHumanAssetRole | null>(null)
+  const [task, setTask] = useState<DigitalHumanTask | null>(null)
+  const [error, setError] = useState('')
+  const [generating, setGenerating] = useState(false)
+  const [mentionRange, setMentionRange] = useState<{ start: number; end: number; query: string } | null>(null)
+  const [mentionIndex, setMentionIndex] = useState(0)
+  const scriptTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const fieldClass = 'h-10 w-full rounded-lg border border-[#334155] bg-[#0B1220] px-3 text-body-sm text-[#E2E8F0] outline-none transition-colors focus:border-[#6366F1]'
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DIGITAL_HUMAN_DRAFT_KEY)
+      if (!raw) return
+      const saved = JSON.parse(raw) as Record<string, unknown>
+      setScript(String(saved.script || ''))
+      setBackgroundPrompt(String(saved.backgroundPrompt || '简洁明亮的现代商业空间，背景干净，突出人物和产品'))
+      if (Array.isArray(saved.assets)) setAssets(withDigitalHumanAliases(saved.assets as DigitalHumanAsset[]))
+      if (typeof saved.duration === 'number' || typeof saved.duration === 'string') setDuration(String(saved.duration))
+      if (saved.size === '720p' || saved.size === '1080p' || saved.size === '4K') setSize(saved.size)
+      if (saved.ratio === '9:16' || saved.ratio === '16:9' || saved.ratio === '1:1') setRatio(saved.ratio)
+      if (typeof saved.style === 'string') setStyle(saved.style)
+      if (typeof saved.customStyle === 'string') setCustomStyle(saved.customStyle)
+      if (saved.avatarPosition === 'center' || saved.avatarPosition === 'left' || saved.avatarPosition === 'right' || saved.avatarPosition === 'full') setAvatarPosition(saved.avatarPosition)
+      if (typeof saved.nativeAudio === 'boolean') setNativeAudio(saved.nativeAudio)
+      if (saved.task && typeof saved.task === 'object') setTask(saved.task as DigitalHumanTask)
+    } catch {
+      localStorage.removeItem(DIGITAL_HUMAN_DRAFT_KEY)
+    }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem(DIGITAL_HUMAN_DRAFT_KEY, JSON.stringify({
+      script, backgroundPrompt, assets, duration, size, ratio, style, customStyle, avatarPosition, nativeAudio, task,
+    }))
+  }, [script, backgroundPrompt, assets, duration, size, ratio, style, customStyle, avatarPosition, nativeAudio, task])
+
+  useEffect(() => {
+    fetchDigitalHumanConfig().then(setConfig).catch((err) => setError(getErrorMessage(err, '数字人口播配置加载失败')))
+  }, [])
+
+  useEffect(() => {
+    if (!task || !['queued', 'running'].includes(task.status)) return
+    let cancelled = false
+    const poll = async () => {
+      try {
+        const result = await pollVideoTask(task.taskId, task.model)
+        if (cancelled) return
+        const status = result.status as DigitalHumanTask['status']
+        const next: DigitalHumanTask = {
+          ...task,
+          status,
+          progress: result.progress ?? (status === 'succeeded' ? 100 : 50),
+          videoUrl: result.video_url || task.videoUrl,
+          localPath: result.local_path || task.localPath,
+          error: result.error || '',
+        }
+        if (status === 'succeeded' && result.local_path && !task.recorded) {
+          const recorded = await recordGenerationHistory({
+            type: 'video', path: result.local_path, url: result.video_url, title: '数字人口播', prompt: script,
+            summary: `数字人口播 · ${duration}秒 · ${ratio}`,
+            meta: { source: 'digital_human', mode: 'professional_presenter', asset_ids: assets.map((item) => item.id) },
+          })
+          next.recorded = true
+          next.adopted = recorded.item.adopted
+          next.materialId = recorded.item.material_id
+          notifyGenerationHistoryUpdated('video')
+        }
+        setTask(next)
+      } catch (err) {
+        if (!cancelled) setTask((current) => current ? { ...current, status: 'failed', error: getErrorMessage(err, '查询任务失败') } : current)
+      }
+    }
+    void poll()
+    const timer = window.setInterval(poll, 5000)
+    return () => { cancelled = true; window.clearInterval(timer) }
+  }, [task?.taskId, task?.status, task?.recorded, task?.model, script, duration, ratio, assets, config?.model_label])
+
+  const avatar = assets.find((item) => item.role === 'avatar_reference' && item.kind === 'image')
+  const background = assets.find((item) => item.role === 'background_reference')
+  const product = assets.find((item) => item.role === 'product_reference' && item.kind === 'image')
+  const brand = assets.find((item) => item.role === 'brand_asset' && item.kind === 'image')
+  const aspectRatio = ratio === '9:16' ? '9 / 16' : ratio === '16:9' ? '16 / 9' : '1 / 1'
+  const mentionOptions = useMemo(() => {
+    if (!mentionRange) return []
+    const query = mentionRange.query.toLowerCase()
+    return assets.filter((item) => {
+      const alias = String(item.alias || '').toLowerCase()
+      return !query || alias.includes(query) || item.name.toLowerCase().includes(query)
+    })
+  }, [assets, mentionRange])
+
+  useEffect(() => { setMentionIndex(0) }, [mentionRange?.query, assets.length])
+
+  const updateMentionRange = useCallback((value: string, cursor: number | null) => {
+    if (cursor === null || assets.length === 0) return setMentionRange(null)
+    const match = value.slice(0, cursor).match(/@([^@\s，。！？；：,.!?;:]*)$/)
+    if (!match) return setMentionRange(null)
+    setMentionRange({ start: cursor - match[0].length, end: cursor, query: match[1] })
+  }, [assets.length])
+
+  const insertAssetMention = useCallback((asset: DigitalHumanAsset) => {
+    const textarea = scriptTextareaRef.current
+    const cursor = textarea?.selectionStart ?? script.length
+    const start = mentionRange?.start ?? cursor
+    const end = mentionRange?.end ?? cursor
+    const before = script.slice(0, start)
+    const after = script.slice(end)
+    const prefix = !mentionRange && before && !/\s$/.test(before) ? ' ' : ''
+    const suffix = after && !/^\s/.test(after) ? ' ' : ''
+    const token = `@${asset.alias || DIGITAL_HUMAN_ROLE_NAMES[asset.role]}`
+    const next = `${before}${prefix}${token} ${suffix}${after}`
+    const nextCursor = before.length + prefix.length + token.length + 1
+    setScript(next)
+    setMentionRange(null)
+    requestAnimationFrame(() => {
+      textarea?.focus()
+      textarea?.setSelectionRange(nextCursor, nextCursor)
+    })
+  }, [mentionRange, script])
+
+  const handleScriptKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!mentionRange || mentionOptions.length === 0) return
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      const direction = event.key === 'ArrowDown' ? 1 : -1
+      setMentionIndex((current) => (current + direction + mentionOptions.length) % mentionOptions.length)
+      return
+    }
+    if (event.key === 'Enter' || event.key === 'Tab') {
+      event.preventDefault()
+      insertAssetMention(mentionOptions[mentionIndex] || mentionOptions[0])
+      return
+    }
+    if (event.key === 'Escape') setMentionRange(null)
+  }
+
+  const handleUpload = async (role: DigitalHumanAssetRole, files: FileList | null) => {
+    if (!files?.length) return
+    setUploadingRole(role)
+    setError('')
+    try {
+      const slot = DIGITAL_HUMAN_ASSET_SLOTS.find((item) => item.role === role)
+      const replacedAssets = slot?.multiple ? [] : assets.filter((item) => item.role === role)
+      const retainedCount = slot?.multiple ? assets.length : assets.filter((item) => item.role !== role).length
+      const maxAssets = config?.max_assets || 50
+      if (retainedCount + files.length > maxAssets) throw new Error(`最多添加 ${maxAssets} 个参考素材`)
+      const uploaded: DigitalHumanAsset[] = []
+      for (const file of Array.from(files)) uploaded.push(await uploadDigitalHumanAsset(file, role))
+      setAssets((current) => withDigitalHumanAliases(slot?.multiple ? [...current, ...uploaded] : [...current.filter((item) => item.role !== role), ...uploaded]))
+      await Promise.allSettled(replacedAssets.map((item) => removeDigitalHumanAsset(item.id)))
+    } catch (err) {
+      setError(getErrorMessage(err, '素材上传失败'))
+    } finally {
+      setUploadingRole(null)
+    }
+  }
+
+  const handleRemoveAsset = async (asset: DigitalHumanAsset) => {
+    setAssets((current) => current.filter((item) => item.id !== asset.id))
+    try { await removeDigitalHumanAsset(asset.id) } catch { /* already absent */ }
+  }
+
+  const normalizeDuration = (rawValue = duration) => {
+    if (!rawValue.trim()) return null
+    const value = Math.min(30, Math.max(4, Math.round(Number(rawValue))))
+    if (!Number.isFinite(value)) return null
+    setDuration(String(value))
+    return value
+  }
+
+  const handleGenerate = async () => {
+    if (!script.trim()) return setError('请输入口播内容')
+    if (!avatar) return setError('请上传人物参考图片')
+    if (style === 'custom' && !customStyle.trim()) return setError('请输入自定义视觉风格')
+    const availableAliases = new Set(assets.map((item) => String(item.alias || '')))
+    const referencedAliases = Array.from(script.matchAll(/@(人物|产品|背景|动作|声音|品牌)\d+/g), (match) => match[0].slice(1))
+    const missingAliases = Array.from(new Set(referencedAliases.filter((alias) => !availableAliases.has(alias))))
+    if (missingAliases.length) return setError(`引用素材已被移除：${missingAliases.map((alias) => `@${alias}`).join('、')}`)
+    if (!config?.configured) return setError('数字人口播服务暂未开放')
+    const durationValue = normalizeDuration()
+    if (durationValue === null) return setError('请输入 4~30 秒的视频时长')
+    setGenerating(true)
+    setError('')
+    try {
+      const result = await createDigitalHumanVideo({
+        script: script.trim(), asset_ids: assets.map((item) => item.id),
+        asset_aliases: Object.fromEntries(assets.map((item) => [item.id, String(item.alias || '')])),
+        duration: durationValue, size, ratio, native_audio: nativeAudio,
+        style: style === 'custom' ? customStyle.trim() : style,
+        avatar_position: avatarPosition, background_prompt: backgroundPrompt.trim(),
+      })
+      setTask({ taskId: result.task_id, model: result.model, status: 'queued', progress: 5 })
+    } catch (err) {
+      setError(getErrorMessage(err, '数字人口播提交失败'))
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const handleAdoption = async () => {
+    if (!task?.videoUrl && !task?.localPath) return
+    if (task.adopted) {
+      await unadoptMaterial({ path: task.localPath, url: task.videoUrl, material_id: task.materialId })
+      setTask({ ...task, adopted: false, materialId: '' })
+      return
+    }
+    const result = await adoptGeneratedAsset({ path: task.localPath, url: task.videoUrl, type: 'video', title: '数字人口播' })
+    setTask({ ...task, adopted: true, materialId: String(result.material?.id || '') })
+  }
+
+  return (
+    <div className="mx-auto grid w-full max-w-[1440px] gap-6 xl:grid-cols-[minmax(0,1fr)_440px]">
+      <section className="min-w-0 space-y-6">
+        <div>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <label className="text-body-sm font-medium text-[#E2E8F0]">口播内容</label>
+            <span className="text-body-xs text-[#64748B]">{script.length}/3000</span>
+          </div>
+          <div className="relative">
+            <textarea
+              ref={scriptTextareaRef}
+              value={script}
+              maxLength={3000}
+              onChange={(event) => {
+                setScript(event.target.value)
+                updateMentionRange(event.target.value, event.target.selectionStart)
+              }}
+              onSelect={(event) => updateMentionRange(event.currentTarget.value, event.currentTarget.selectionStart)}
+              onKeyDown={handleScriptKeyDown}
+              placeholder="输入产品介绍或口播要求，输入 @ 可引用素材"
+              className="min-h-40 w-full resize-y rounded-lg border border-[#334155] bg-[#0B1220] px-4 py-3 text-body-sm leading-7 text-[#F8FAFC] outline-none transition-colors placeholder:text-[#64748B] focus:border-[#6366F1]"
+            />
+            {mentionRange && mentionOptions.length > 0 && (
+              <div className="absolute left-3 right-3 top-full z-30 mt-2 max-h-64 overflow-y-auto rounded-lg border border-[#334155] bg-[#111827] p-1.5 shadow-[0_18px_48px_rgba(0,0,0,0.45)]">
+                {mentionOptions.map((asset, index) => (
+                  <button
+                    key={asset.id}
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => insertAssetMention(asset)}
+                    className={`flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left transition-colors ${index === mentionIndex ? 'bg-[#6366F1]/18' : 'hover:bg-[#1E293B]'}`}
+                  >
+                    <DigitalHumanAssetThumbnail asset={asset} />
+                    <span className="min-w-0 flex-1"><span className="block text-body-sm font-medium text-[#F1F5F9]">@{asset.alias}</span><span className="mt-0.5 block truncate text-body-xs text-[#64748B]">{asset.name}</span></span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {assets.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {assets.map((asset) => (
+                <div key={asset.id} className="group flex max-w-64 items-center rounded-lg border border-[#334155] bg-[#111827] p-1.5 transition-colors hover:border-[#6366F1]/70 hover:bg-[#151D2D]">
+                  <button type="button" title={`引用 @${asset.alias} · ${asset.name}`} onClick={() => insertAssetMention(asset)} className="flex min-w-0 flex-1 items-center gap-2 rounded-md pr-2 text-left">
+                    <DigitalHumanAssetThumbnail asset={asset} className="h-8 w-8" />
+                    <span className="min-w-0"><span className="block text-body-xs font-medium text-[#E2E8F0]">@{asset.alias}</span><span className="block truncate text-[11px] text-[#64748B]">{asset.name}</span></span>
+                  </button>
+                  <button type="button" title="移除素材" onClick={() => void handleRemoveAsset(asset)} className="rounded p-1 text-[#64748B] transition-colors hover:bg-[#EF4444]/10 hover:text-[#F87171]"><X className="h-3.5 w-3.5" /></button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <span className="text-body-sm font-medium text-[#E2E8F0]">参考素材</span>
+            <span className="text-body-xs text-[#64748B]">{assets.length}/{config?.max_assets || 50}</span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {DIGITAL_HUMAN_ASSET_SLOTS.map((slot) => {
+              const count = assets.filter((item) => item.role === slot.role).length
+              const busy = uploadingRole === slot.role
+              return (
+                <label key={slot.role} className="group flex h-20 cursor-pointer items-center gap-3 rounded-lg border border-dashed border-[#334155] bg-[#0B1220] px-4 transition-colors hover:border-[#6366F1]/70 hover:bg-[#111827]">
+                  <span className="rounded-md bg-[#1E293B] p-2 text-[#94A3B8] group-hover:text-[#C4B5FD]">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <slot.icon className="h-4 w-4" />}</span>
+                  <span className="min-w-0"><span className="block text-body-sm text-[#E2E8F0]">{slot.label}</span><span className="mt-1 block text-body-xs text-[#64748B]">{count ? `${count}项` : '添加素材'}</span></span>
+                  <input type="file" className="hidden" accept={slot.accept} multiple={slot.multiple} onChange={(event) => void handleUpload(slot.role, event.target.files)} />
+                </label>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <label className="space-y-2 text-body-xs text-[#94A3B8]">时长<div className="relative"><input type="number" min={4} max={30} step={1} value={duration} placeholder="4~30" onChange={(event) => setDuration(event.target.value)} onBlur={(event) => { if (event.currentTarget.value.trim()) normalizeDuration(event.currentTarget.value) }} className={`${fieldClass} pr-9`} /><span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-body-xs text-[#64748B]">秒</span></div></label>
+          <label className="space-y-2 text-body-xs text-[#94A3B8]">分辨率<select value={size} onChange={(event) => setSize(event.target.value as typeof size)} className={fieldClass}>{(config?.sizes || ['720p', '1080p', '4K']).map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+          <label className="space-y-2 text-body-xs text-[#94A3B8]">比例<select value={ratio} onChange={(event) => setRatio(event.target.value as typeof ratio)} className={fieldClass}><option value="9:16">9:16 竖屏</option><option value="16:9">16:9 横屏</option><option value="1:1">1:1 方形</option></select></label>
+          <label className="space-y-2 text-body-xs text-[#94A3B8]">人物位置<select value={avatarPosition} onChange={(event) => setAvatarPosition(event.target.value as typeof avatarPosition)} className={fieldClass}><option value="center">居中半身</option><option value="left">左侧讲解</option><option value="right">右侧讲解</option><option value="full">全身展示</option></select></label>
+          <label className="space-y-2 text-body-xs text-[#94A3B8]">原生声音<select value={nativeAudio ? 'on' : 'off'} onChange={(event) => setNativeAudio(event.target.value === 'on')} className={fieldClass}><option value="on">开启</option><option value="off">关闭</option></select></label>
+        </div>
+        <div className="grid items-start gap-3 lg:grid-cols-[minmax(260px,0.8fr)_1.2fr]">
+          <div className="space-y-2 text-body-xs text-[#94A3B8]">
+            <label htmlFor="digital-human-style">视觉风格</label>
+            <select id="digital-human-style" value={style} onChange={(event) => setStyle(event.target.value)} className={fieldClass}><option value="professional">专业商务</option><option value="lifestyle">生活方式</option><option value="ecommerce">电商口播</option><option value="education">知识讲解</option><option value="technology">科技品牌</option><option value="custom">自定义</option></select>
+            {style === 'custom' && <input value={customStyle} maxLength={300} onChange={(event) => setCustomStyle(event.target.value)} placeholder="例如：自然纪录片质感，暖色晨光，手持镜头" className={fieldClass} />}
+          </div>
+          <label className="space-y-2 text-body-xs text-[#94A3B8]">背景描述<input value={backgroundPrompt} onChange={(event) => setBackgroundPrompt(event.target.value)} className={fieldClass} /></label>
+        </div>
+        {error && <div className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 px-4 py-3 text-body-sm text-[#FCA5A5]">{error}</div>}
+        {!config?.configured && config && <div className="rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/10 px-4 py-3 text-body-sm text-[#FCD34D]">数字人口播服务暂未开放</div>}
+        <button type="button" disabled={generating || uploadingRole !== null || !config?.configured} onClick={() => void handleGenerate()} className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#6366F1] px-5 text-body-sm font-medium text-white transition-colors hover:bg-[#5558E8] disabled:cursor-not-allowed disabled:bg-[#334155] disabled:text-[#94A3B8]">{generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}生成数字人口播</button>
+      </section>
+
+      <aside className="min-w-0 xl:sticky xl:top-0 xl:self-start">
+        <div className="mb-3 flex items-center justify-between"><span className="text-body-sm font-medium text-[#E2E8F0]">画面预览</span><span className={`rounded-full px-2.5 py-1 text-body-xs ${config?.configured ? 'bg-[#10B981]/15 text-[#6EE7B7]' : 'bg-[#F59E0B]/15 text-[#FCD34D]'}`}>{config?.configured ? '可生成' : '暂未开放'}</span></div>
+        <div className="mx-auto w-full max-w-[400px] overflow-hidden rounded-lg border border-[#334155] bg-[#090D16] shadow-[0_24px_70px_rgba(0,0,0,0.35)]" style={{ aspectRatio }}>
+          <div className="relative h-full w-full overflow-hidden bg-[linear-gradient(145deg,#182235,#0A0F19)]">
+            {background?.kind === 'image' && <img src={background.url} alt="" className="absolute inset-0 h-full w-full object-cover" />}
+            {background?.kind === 'video' && <video src={background.url} className="absolute inset-0 h-full w-full object-cover" autoPlay muted loop />}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/10" />
+            {avatar ? <img src={avatar.url} alt="数字人预览" className={`absolute bottom-0 max-h-[88%] max-w-[78%] object-contain drop-shadow-[0_18px_28px_rgba(0,0,0,0.45)] ${avatarPosition === 'left' ? 'left-[3%]' : avatarPosition === 'right' ? 'right-[3%]' : 'left-1/2 -translate-x-1/2'} ${avatarPosition === 'full' ? 'h-[92%]' : 'h-[78%]'}`} /> : <div className="absolute inset-0 flex items-center justify-center text-[#475569]"><UserRound className="h-20 w-20" /></div>}
+            {product && <img src={product.url} alt="产品预览" className="absolute bottom-[9%] right-[5%] h-[22%] w-[28%] rounded-md border border-white/20 bg-white/90 object-contain p-1.5 shadow-xl" />}
+            {brand && <img src={brand.url} alt="品牌标识" className="absolute left-[5%] top-[4%] max-h-[8%] max-w-[28%] object-contain" />}
+            {script && <div className="absolute bottom-[3%] left-[8%] right-[8%] line-clamp-2 text-center text-[13px] leading-5 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">{script}</div>}
+          </div>
+        </div>
+        {task && <div className={`mt-4 overflow-hidden rounded-lg border ${adoptionCardClass(task.adopted)} bg-[#0B1220]`}>
+          {task.status === 'succeeded' && task.videoUrl ? <video src={resolveGeneratedAssetUrl(task.videoUrl)} controls className="aspect-video w-full bg-black object-contain" /> : <div className="flex aspect-video items-center justify-center px-6 text-center"><div className="w-full max-w-xs">{task.status !== 'failed' && <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin text-[#818CF8]" />}<div className="text-body-sm text-[#CBD5E1]">{task.status === 'failed' ? task.error || '生成失败' : '正在生成数字人口播'}</div>{task.status !== 'failed' && <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#1E293B]"><div className="h-full rounded-full bg-[#6366F1] transition-all" style={{ width: `${Math.max(8, task.progress)}%` }} /></div>}</div></div>}
+          {task.status === 'succeeded' && <div className="flex items-center justify-end gap-2 p-3"><button type="button" onClick={() => void openGeneratedMedia({ path: task.localPath, url: task.videoUrl })} className="rounded-md border border-[#334155] px-3 py-1.5 text-body-xs text-[#CBD5E1] hover:bg-[#1E293B]">打开</button><AdoptionActionButton adopted={task.adopted} onClick={() => void handleAdoption()} /></div>}
+        </div>}
+      </aside>
+    </div>
+  )
+}
+
 type VideoTaskItem = {
   taskId: string
   status: string
@@ -1224,12 +1675,24 @@ function VideoGeneration() {
   )
   const minDuration = currentVideoProfile?.min_duration || 3
   const maxDuration = currentVideoProfile?.max_duration || 15
+  const professionalAvailable = (videoModels.find((model) => model.id === 'doubao-seedance-2.5') || FALLBACK_VIDEO_MODEL_PROFILES['doubao-seedance-2.5']).available !== false
 
   useEffect(() => {
     let cancelled = false
     getVideoConfig()
       .then((config) => {
-        if (!cancelled) setVideoModels(config.models || [])
+        if (cancelled) return
+        const models = config.models || []
+        setVideoModels(models)
+        const selected = models.find((model) => model.id === videoModel)
+        if (selected?.available === false) {
+          const fallback = models.find((model) => model.id === config.default_model && model.available !== false)
+            || models.find((model) => model.available !== false)
+          if (fallback) {
+            setVideoModel(fallback.id as VideoModel)
+            if (!fallback.sizes.includes(videoSize)) setVideoSize(config.defaults?.size || fallback.sizes[0] || '720p')
+          }
+        }
       })
       .catch(() => {
         if (!cancelled) setVideoModels([])
@@ -1399,7 +1862,7 @@ function VideoGeneration() {
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) return
     if (videoSize === '4K' && videoModel !== 'doubao-seedance-2.5') {
-      setError('4K 需要切换到 Seedance 2.5 商业大片模式。')
+      setError('4K 画质需要切换到专业模式。')
       return
     }
     if (duration < minDuration || duration > maxDuration) {
@@ -1524,10 +1987,11 @@ function VideoGeneration() {
               onChange={(event) => setVideoModel(event.target.value as VideoModel)}
               className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
             >
-              <option value="doubao-seedance-1.5-pro">开发验证模式 Seedance 1.5</option>
-              <option value="doubao-seedance-2.0-fast">社媒快速模式</option>
-              <option value="doubao-seedance-2.0">高质量模式</option>
-              <option value="doubao-seedance-2.5">商业大片模式 Seedance 2.5</option>
+              {(videoModels.length ? videoModels : Object.values(FALLBACK_VIDEO_MODEL_PROFILES)).map((model) => (
+                <option key={model.id} value={model.id} disabled={model.available === false}>
+                  {model.id === 'doubao-seedance-2.0-fast' ? '社媒快速模式' : model.label}{model.available === false ? '（暂未开放）' : ''}
+                </option>
+              ))}
             </select>
           </label>
 
@@ -1538,13 +2002,13 @@ function VideoGeneration() {
               onChange={(event) => {
                 const nextSize = event.target.value
                 setVideoSize(nextSize)
-                if (nextSize === '4K') setVideoModel('doubao-seedance-2.5')
+                if (nextSize === '4K' && professionalAvailable) setVideoModel('doubao-seedance-2.5')
               }}
               className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
             >
               <option value="720p">720p</option>
               <option value="1080p">1080p</option>
-              <option value="4K">4K（Seedance 2.5）</option>
+              <option value="4K" disabled={!professionalAvailable}>4K{professionalAvailable ? '' : '（暂未开放）'}</option>
             </select>
           </label>
 
@@ -1634,13 +2098,13 @@ function VideoGeneration() {
 
         {videoSize === '4K' && (
           <div className="mt-4 rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/10 p-3 text-body-xs text-[#FCD34D]">
-            4K 将按 Seedance 2.5 商业大片模式提交。请确认当前火山账号和地域已开通对应视频生成模型。
+            4K 画质需要专业生成能力；服务暂未开放时将无法提交。
           </div>
         )}
 
         <button
           onClick={handleGenerate}
-          disabled={loading || !prompt.trim()}
+          disabled={loading || !prompt.trim() || currentVideoProfile.available === false}
           className="mt-4 flex items-center gap-2 px-6 py-2.5 bg-[#6366F1] hover:bg-[#5558E6] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-body-sm text-white transition-colors"
         >
           {loading || optimizing ? (

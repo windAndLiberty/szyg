@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, Workflow } from 'lucide-react'
 import { navGroups } from '@/lib/navConfig'
 import { useLayout, SIDEBAR_WIDTH_EXPANDED, SIDEBAR_WIDTH_COLLAPSED } from '@/lib/layout'
 import { cn } from '@/lib/utils'
+import { useI18n } from '@/lib/i18n'
 
 const sidebarVariants = {
   expanded: { width: SIDEBAR_WIDTH_EXPANDED },
@@ -13,6 +14,7 @@ const sidebarVariants = {
 
 export default function Sidebar() {
   const { collapsed, setCollapsed } = useLayout()
+  const { t } = useI18n()
   const location = useLocation()
 
   // 自动展开当前路由所属分组
@@ -65,7 +67,7 @@ export default function Sidebar() {
                   szyg
                 </span>
                 <span className="text-[10px] text-[#64748B] whitespace-nowrap -mt-0.5">
-                  超级数字员工
+                  {t('超级数字员工')}
                 </span>
               </motion.div>
             )}
@@ -102,7 +104,7 @@ export default function Sidebar() {
                         transition={{ duration: 0.2 }}
                         className="text-sm font-medium whitespace-nowrap overflow-hidden"
                       >
-                        {group.label}
+                        {t(group.label)}
                       </motion.span>
                     )}
                   </AnimatePresence>
@@ -111,7 +113,7 @@ export default function Sidebar() {
                   <button
                     onClick={() => toggleGroup(group.id)}
                     className="p-1 mr-1 rounded text-[#64748B] hover:text-[#94A3B8] hover:bg-[rgba(255,255,255,0.03)] transition-colors shrink-0"
-                    aria-label={isExpanded ? '折叠' : '展开'}
+                    aria-label={t(isExpanded ? '折叠' : '展开')}
                   >
                     <motion.div animate={{ rotate: isExpanded ? 0 : -90 }} transition={{ duration: 0.2 }}>
                       <ChevronDown className="w-3.5 h-3.5" />
@@ -151,7 +153,7 @@ export default function Sidebar() {
                               />
                             )}
                             <ChildIcon className="w-4 h-4 shrink-0" />
-                            <span className="text-[13px] whitespace-nowrap truncate">{child.label}</span>
+                            <span className="text-[13px] whitespace-nowrap truncate">{t(child.label)}</span>
                             {child.implemented && (
                               <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#10B981] shrink-0" />
                             )}
@@ -178,7 +180,7 @@ export default function Sidebar() {
           ) : (
             <div className="flex items-center gap-2">
               <ChevronLeft className="w-5 h-5" />
-              <span className="text-sm">收起</span>
+              <span className="text-sm">{t('收起')}</span>
             </div>
           )}
         </button>

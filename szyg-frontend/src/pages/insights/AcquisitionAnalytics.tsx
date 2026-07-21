@@ -53,7 +53,7 @@ export default function AcquisitionAnalytics() {
         setCommentStats(commentStatsData || {})
         setConversions(conversionData.conversions || [])
       } catch (e) {
-        setError(e instanceof Error ? e.message : '获客分析数据加载失败')
+        setError(e instanceof Error ? e.message : '获客洞察数据加载失败')
       } finally {
         setLoading(false)
       }
@@ -80,7 +80,7 @@ export default function AcquisitionAnalytics() {
   const successRate = sent + failed > 0 ? `${Math.round((sent / (sent + failed)) * 100)}%` : '-'
 
   return (
-    <PageShell title="获客分析" subtitle="复盘目标发现、评论执行、线索识别和转化阶段表现。" icon={TrendingUp}>
+    <PageShell title="获客洞察" subtitle="复盘目标发现、评论执行、线索识别和转化阶段表现。" icon={TrendingUp}>
       {error && <div className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 px-4 py-3 text-sm text-[#FCA5A5]">{error}</div>}
 
       {loading ? (

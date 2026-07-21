@@ -492,24 +492,29 @@ SQLite 表:
 
 ---
 
-## feature: F-016 知识库·知识管理+记忆
+## feature: F-016 知识库·知识管理
 
 ### purpose
-实现知识管理+长期记忆页面：文档上传→向量化→RAG检索，Agent对话记忆管理。
+实现企业知识管理：保留用户上传的源文件，统一解析为 Markdown，建立 RAG 索引并全局提供给 Hermes 超级员工。
 
 ### depends_on
 无
 
 ### relevant_files
 - szyg-frontend/src/pages/knowledge/KnowledgeBase.tsx (重写)
-- szyg-frontend/src/pages/knowledge/Memory.tsx (重写)
-- server/szyg/agent_core/knowledge.py
-- server/szyg/api/memory_routes.py
+- server/szyg/knowledge_service.py
+- server/szyg/api/frontend_routes.py
+- server/szyg/api/hermes_chat.py
+- server/szyg/mcp_servers/knowledge_mcp.py
 
 ### acceptance
-- [ ] AC-1: 知识管理：文档上传(.txt/.md/.pdf)→解析分块→向量化存入SQLite
-- [ ] AC-2: RAG检索：输入问题→检索相关分块→展示结果+相似度
-- [ ] AC-3: 长期记忆：Agent对话记忆管理→搜索→删除
+- [ ] AC-1: 支持文本、Markdown、JSON、CSV、PDF、Word、Excel、PPT、图片、录音和视频源文件上传
+- [ ] AC-2: 源文件保存在 Windows 文档目录，后端统一生成可预览的 Markdown
+- [ ] AC-3: 图片使用多模态模型解析；视频抽帧并转写；录音转写；PPT 同时解析文本、表格和图片
+- [ ] AC-4: 文档按标题和段落分块，存入 SQLite FTS5；配置 embedding 模型后叠加语义向量索引
+- [ ] AC-5: 知识管理页展示解析进度、错误、源文件、Markdown、分类、统计和检索试问
+- [ ] AC-6: Hermes 对每次有效用户问题自动检索企业知识，并在回答中标注实际采用的资料来源
+- [ ] AC-7: 对话记忆完全使用 Hermes 内核能力，SZYG 不再维护独立记忆页面、配置、模型或 CRUD 路由
 
 ---
 

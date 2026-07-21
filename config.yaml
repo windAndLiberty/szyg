@@ -8,6 +8,14 @@
 # ⚠️  生产环境: 删除此文件中的真实 key，仅保留 ${VAR} 引用
 
 # =============================================================================
+# SZYG 云端控制中心
+# =============================================================================
+cloud:
+  enabled: "${SZYG_CLOUD_ENABLED:true}"
+  control_url: "${SZYG_CONTROL_URL:https://szyg.qdtracing.com}"
+  app_version: "1.0.2"
+
+# =============================================================================
 # LLM 后端
 # =============================================================================
 llm:
@@ -164,21 +172,21 @@ video:
     models:
       doubao-seedance-1.5-pro:
         provider_model: "doubao-seedance-1-5-pro-251215"
-        label: "Doubao-Seedance 1.5"
+        label: "基础模式"
         sizes: ["720p", "1080p"]
         min_duration: 4
         max_duration: 12
         native_audio: true
       doubao-seedance-2.0-fast:
         provider_model: "doubao-seedance-2.0-fast"
-        label: "Doubao-Seedance 2.0 Fast"
+        label: "快速模式"
         sizes: ["720p"]
         min_duration: 4
         max_duration: 15
         native_audio: true
       doubao-seedance-2.0:
         provider_model: "doubao-seedance-2.0"
-        label: "Doubao-Seedance 2.0"
+        label: "高质量模式"
         sizes: ["720p", "1080p"]
         min_duration: 4
         max_duration: 15
@@ -186,11 +194,28 @@ video:
       doubao-seedance-2.5:
         # 未开通时保持为空；配置为真实 ep-xxxx 后即可启用原生 4K/30s 档位。
         provider_model: "doubao-seedance-2.5"
-        label: "Doubao-Seedance 2.5"
+        label: "专业模式"
+        available: false
         sizes: ["720p", "1080p", "4K"]
         min_duration: 3
         max_duration: 30
         native_audio: true
+
+# =============================================================================
+# 数字人口播
+# =============================================================================
+digital_human:
+  provider: volcengine
+  model_label: "专业口播"
+  model: "doubao-seedance-2.5"
+  # 开通后填写真实 ep-xxxx；未配置时保留编辑体验，但不会伪生成或降级。
+  endpoint: "${SEEDANCE_25_ENDPOINT:}"
+  require_endpoint: true
+  sizes: ["720p", "1080p", "4K"]
+  max_duration: 30
+  max_assets: 50
+  max_upload_mb: 80
+  max_inline_asset_mb: 12
 
 # =============================================================================
 # 内容生成
@@ -198,6 +223,61 @@ video:
 content:
   graphic:
     multimodal_model: "ep-20260714133840-lckqb"
+
+# =============================================================================
+# 企业知识库
+# =============================================================================
+knowledge:
+  # 留空时使用 Documents\SZYG\Knowledge；可由系统设置覆盖。
+  storage_dir: ""
+  db_path: ""
+  vision_model: "ep-20260714133840-lckqb"
+  normalize_model: "doubao-seed-2-0-lite-260428"
+  # 未配置嵌入模型时使用 SQLite FTS5；配置后自动叠加语义向量召回。
+  embedding_model: ""
+  max_file_bytes: 1073741824
+
+# =============================================================================
+# 营销获客
+# =============================================================================
+marketing:
+  comment_generation_model: "doubao-seed-2-0-lite-260428"
+
+# =============================================================================
+# 智能情报
+# =============================================================================
+intelligence:
+  analysis_model: "doubao-seed-2-0-lite-260428"
+  query_all_enabled_platforms: true
+  max_external_samples: 45
+  max_publish_records: 100
+  evidence_limit: 5
+  max_query_keywords: 2
+  platform_search_timeout_seconds: 18
+  collection_timeout_seconds: 65
+  model_timeout_seconds: 45
+  collectors:
+    douyin: browser_session
+    xhs: browser_session
+    kuaishou: browser_session
+    bilibili: public_page
+    weibo: browser_session
+    public_web: public_feed
+
+# =============================================================================
+# AI 自动化方案
+# =============================================================================
+workflow:
+  ai:
+    planner_model: "doubao-seed-2-0-lite-260428"
+    reasoning_effort: "minimal"
+  skills:
+    auto_learn: true
+    guard_agent_created: true
+
+# Hermes 在创建能力文件时读取此根配置；工作流配置保留产品侧开关。
+skills:
+  guard_agent_created: true
 
 # =============================================================================
 # 内容发布
@@ -209,22 +289,6 @@ publishing:
       note: 20
     xhs:
       note: 20
-
-# =============================================================================
-# 知识库 & Memory
-# =============================================================================
-knowledge:
-  db_path: "./data/knowledge.db"              # 知识库 SQLite 路径
-  chunk_size: 500                             # 文档分块大小(字符)
-  chunk_overlap: 50                           # 块间重叠
-
-memory:
-  db_path: "./data/memory.db"                 # 记忆库 SQLite 路径
-  enable_fts: true                            # 启用全文检索
-  embedding_dim: 768                          # 向量维度(预留)
-  similarity_threshold: 0.75                  # 相似度阈值
-  max_history_per_session: 20                 # 每会话最大历史
-  auto_summarize_after: 10                    # 自动摘要阈值
 
 # =============================================================================
 # SOP 工作流

@@ -32,8 +32,8 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CommentItem:
     """评论队列条目"""
-    id: str
     platform: str
+    id: str = ""
     video_id: str = ""
     video_title: str = ""
     video_url: str = ""
@@ -77,13 +77,20 @@ class CommentStats:
 class CommentQueue:
     """持久化评论队列 (JSON 文件存储)"""
 
-    MAX_SIZE = 10000
+    MAX_ACTIVE_BATCHES = 300
+    MAX_ARCHIVED_BATCHES = 3000
+    ARCHIVE_RETENTION_DAYS = 180
+    TERMINAL_STATUSES = {"sent", "failed", "skipped", "cancelled"}
 
-    def __init__(self, storage_path: str = ""):
+    def __init__(self, storage_path: str = "", archive_path: str = ""):
         self._path = Path(storage_path) if storage_path else DATA_DIR / "comment_queue.json"
+        self._archive_path = Path(archive_path) if archive_path else self._path.with_name("comment_queue_archive.json")
         self._items: dict[str, CommentItem] = {}
         self._lock = asyncio.Lock()
         self._load()
+        self._prune_archive()
+        if self._items:
+            self._save()
 
     def _load(self):
         if self._path.exists():
@@ -100,13 +107,123 @@ class CommentQueue:
     def _save(self):
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
+            self._archive_terminal_batches()
             data = {
-                "items": [item.__dict__ for item in list(self._items.values())[-self.MAX_SIZE:]],
+                "items": [item.__dict__ for item in self._items.values()],
                 "updated_at": datetime.now().isoformat(),
             }
-            self._path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            self._write_json(self._path, data)
         except Exception as e:
             logger.error(f"CommentQueue save failed: {e}")
+
+    @staticmethod
+    def _write_json(path: Path, data: dict) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = path.with_suffix(f"{path.suffix}.tmp")
+        temp_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        temp_path.replace(path)
+
+    @staticmethod
+    def _record_time(value: object) -> datetime:
+        raw = ""
+        if isinstance(value, CommentItem):
+            raw = value.sent_at or value.created_at
+        elif isinstance(value, dict):
+            raw = str(value.get("sent_at") or value.get("created_at") or value.get("archived_at") or "")
+        try:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00")).replace(tzinfo=None)
+        except (TypeError, ValueError):
+            return datetime.min
+
+    @staticmethod
+    def _batch_key(value: object, fallback: str = "") -> str:
+        if isinstance(value, CommentItem):
+            metadata = value.metadata if isinstance(value.metadata, dict) else {}
+            return str(metadata.get("batch_id") or f"single:{value.id or fallback}")
+        if isinstance(value, dict):
+            metadata = value.get("metadata") if isinstance(value.get("metadata"), dict) else {}
+            return str(value.get("batch_id") or metadata.get("batch_id") or f"single:{value.get('id') or fallback}")
+        return f"single:{fallback}"
+
+    def _read_archive_rows(self) -> list[dict]:
+        if not self._archive_path.exists():
+            return []
+        try:
+            payload = json.loads(self._archive_path.read_text(encoding="utf-8"))
+            return [row for row in payload.get("items", []) if isinstance(row, dict)]
+        except Exception as exc:
+            logger.warning("Comment queue archive load failed: %s", exc)
+            return []
+
+    def _bounded_archive_rows(self, rows: list[dict]) -> list[dict]:
+        cutoff = datetime.now() - timedelta(days=self.ARCHIVE_RETENTION_DAYS)
+        groups: dict[str, list[dict]] = defaultdict(list)
+        for index, row in enumerate(rows):
+            groups[self._batch_key(row, str(index))].append(row)
+
+        retained_groups = []
+        for batch_id, batch_rows in groups.items():
+            newest = max((self._record_time(row) for row in batch_rows), default=datetime.min)
+            if newest >= cutoff:
+                retained_groups.append((batch_id, newest, batch_rows))
+        retained_groups.sort(key=lambda item: item[1], reverse=True)
+
+        retained_rows: list[dict] = []
+        for _batch_id, _newest, batch_rows in retained_groups[:self.MAX_ARCHIVED_BATCHES]:
+            retained_rows.extend(batch_rows)
+        retained_rows.sort(key=self._record_time, reverse=True)
+        return retained_rows
+
+    def _write_archive_rows(self, rows: list[dict]) -> None:
+        bounded = self._bounded_archive_rows(rows)
+        self._write_json(self._archive_path, {
+            "items": bounded,
+            "updated_at": datetime.now().isoformat(),
+            "retention_days": self.ARCHIVE_RETENTION_DAYS,
+            "batch_limit": self.MAX_ARCHIVED_BATCHES,
+        })
+
+    def _prune_archive(self) -> None:
+        if not self._archive_path.exists():
+            return
+        try:
+            self._write_archive_rows(self._read_archive_rows())
+        except Exception as exc:
+            logger.warning("Comment queue archive prune failed: %s", exc)
+
+    def _archive_terminal_batches(self) -> None:
+        groups: dict[str, list[CommentItem]] = defaultdict(list)
+        for index, item in enumerate(self._items.values()):
+            groups[self._batch_key(item, str(index))].append(item)
+
+        active_groups = []
+        terminal_groups = []
+        for batch_id, batch_items in groups.items():
+            newest = max((self._record_time(item) for item in batch_items), default=datetime.min)
+            group = (batch_id, newest, batch_items)
+            if any(item.status not in self.TERMINAL_STATUSES for item in batch_items):
+                active_groups.append(group)
+            else:
+                terminal_groups.append(group)
+
+        terminal_groups.sort(key=lambda item: item[1], reverse=True)
+        terminal_capacity = max(0, self.MAX_ACTIVE_BATCHES - len(active_groups))
+        archive_groups = terminal_groups[terminal_capacity:]
+        if not archive_groups:
+            return
+
+        archived_at = datetime.now().isoformat()
+        archived_ids = {item.id for _batch_id, _newest, batch_items in archive_groups for item in batch_items}
+        archive_rows = self._read_archive_rows()
+        for _batch_id, _newest, batch_items in archive_groups:
+            for item in batch_items:
+                row = dict(item.__dict__)
+                row["batch_id"] = self._batch_key(item)
+                row["archived_at"] = archived_at
+                archive_rows.append(row)
+
+        self._write_archive_rows(archive_rows)
+        self._items = {item_id: item for item_id, item in self._items.items() if item_id not in archived_ids}
 
     async def add(self, item: CommentItem) -> str:
         async with self._lock:
@@ -151,11 +268,33 @@ class CommentQueue:
         items.sort(key=lambda i: i.created_at, reverse=True)
         return items[offset:offset + limit]
 
+    async def list_archived(self, status: str = "", platform: str = "",
+                            limit: int = 50, offset: int = 0) -> list[dict]:
+        items = self._read_archive_rows()
+        if status:
+            items = [item for item in items if item.get("status") == status]
+        if platform:
+            items = [item for item in items if item.get("platform") == platform]
+        items.sort(key=self._record_time, reverse=True)
+        return items[offset:offset + limit]
+
+    def archive_stats(self) -> dict:
+        items = self._read_archive_rows()
+        batches = {self._batch_key(item, str(index)) for index, item in enumerate(items)}
+        return {
+            "total_items": len(items),
+            "total_batches": len(batches),
+            "batch_limit": self.MAX_ARCHIVED_BATCHES,
+            "retention_days": self.ARCHIVE_RETENTION_DAYS,
+        }
+
     async def due(self, limit: int = 20) -> list[CommentItem]:
         now = datetime.now()
         due_items: list[CommentItem] = []
         for item in self._items.values():
             if item.status not in {"delayed", "retrying"} or not item.next_run_at:
+                continue
+            if not item.human_confirmed:
                 continue
             try:
                 if datetime.fromisoformat(item.next_run_at) <= now:
@@ -555,6 +694,8 @@ class MarketingAutomationPolicy:
             return {"decision": "needs_human", "status": "needs_human", "code": "account_risk"}
         if any(word in text for word in ["timeout", "超时", "未找到", "button", "selector", "network", "net::"]):
             return {"decision": "delay_retry", "status": "retrying", "code": "transient_platform_error"}
+        if any(word in text for word in ["结果未确认", "send_unverified", "未标记为成功"]):
+            return {"decision": "delay_retry", "status": "retrying", "code": "send_unverified"}
         return {"decision": "failed", "status": "failed", "code": "send_failed"}
 
 
@@ -691,15 +832,35 @@ async def generate_comments_with_llm(
     video_desc: str = "",
     count: int = 3,
     strategy: str = "balanced",
+    shared_across_targets: bool = False,
 ) -> list[str]:
-    """使用 LLM 生成评论 (通过 Hermes 内核)"""
-    try:
-        from szyg.api.hermes_chat import _call_llm_direct
-    except ImportError:
-        # Fallback: simple template-based generation
-        return _template_comments(video_title, count)
+    """Generate context-specific comments with the configured lightweight model."""
+    from szyg.config.loader import load_config
+    from szyg.integrations.volcengine_client import VolcEngineClient
 
-    prompt = f"""为以下视频生成 {count} 条真人风格的评论区留言:
+    count = max(1, min(int(count or 3), 5))
+    config = load_config()
+    model = str(
+        (config.get("marketing") or {}).get("comment_generation_model")
+        or "doubao-seed-2-0-lite-260428"
+    )
+
+    shared_rules = """
+批量共用规则:
+- 输入包含多个目标视频，每条候选评论必须能原样用于全部目标
+- 只围绕所有标题共同具备的主题表达，不引用只属于某一个视频的产品名、人物、情节或结论
+- 不提“这几个视频”“以上内容”或目标数量，让评论放在任意单个评论区都自然
+- 无法确认的细节宁可不写，严禁补充输入中没有的人物、时间、经历或观看情节
+""" if shared_across_targets else ""
+    grounding_rule = (
+        "- 每条评论必须围绕多个标题共有的具体主题，不得挑选单个目标的独有细节"
+        if shared_across_targets
+        else "- 每条都必须引用标题或简介中的一个具体信息点"
+    )
+
+    prompt = f"""你正在为真实公开平台生成评论候选。只使用下面给出的本次输入，忽略任何无关人物、情节和先前话题。
+
+为以下视频生成 {count} 条真人风格的评论区留言:
 
 视频标题: {video_title}
 视频简介: {video_desc or '无'}
@@ -712,19 +873,37 @@ async def generate_comments_with_llm(
 - 不要用"总的来说""值得注意的是"等模板句式
 - 不要包含微信号/QQ/链接等引流内容
 
-直接返回评论列表，每行一条，编号 1. 2. 3."""
+补充约束:
+{grounding_rule}
+- 各条评论的表达角度必须不同，不能只是替换近义词
+- 不虚构没有提供的观看细节、使用体验或产品效果
+- 禁止"收藏了"、"学到了"、"太有用了"等脱离内容也成立的万能评论
+{shared_rules}
+
+只返回包含恰好 {count} 条评论的 JSON：{{"comments":["评论1","评论2"]}}"""
 
     try:
-        response = await _call_llm_direct(prompt, temperature=0.85)
-        lines = []
-        for line in response.strip().split("\n"):
-            line = re.sub(r'^\d+[.、)\s]+', '', line).strip()
-            if line and len(line) >= 5:
-                lines.append(line)
-        return lines[:count]
+        response = await VolcEngineClient(timeout=60).responses_text(
+            [{
+                "role": "user",
+                "content": [{"type": "input_text", "text": prompt}],
+            }],
+            model=model,
+            max_output_tokens=800,
+            reasoning_effort="minimal",
+        )
+        raw = str((response.get("message") or {}).get("content") or "").strip()
+        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.IGNORECASE)
+        match = re.search(r"\{[\s\S]*\}", raw)
+        payload = json.loads(match.group(0) if match else raw)
+        comments = [str(item).strip() for item in payload.get("comments", []) if str(item).strip()]
+        unique = list(dict.fromkeys(comments))
+        if len(unique) < count:
+            raise ValueError("模型返回的有效评论数量不足")
+        return unique[:count]
     except Exception as e:
-        logger.warning(f"LLM generate failed: {e}, using template fallback")
-        return _template_comments(video_title, count)
+        logger.warning("Comment generation failed with %s: %s", model, e)
+        raise RuntimeError("评论生成暂时不可用，请稍后重试") from e
 
 
 async def _call_llm_direct(prompt: str, temperature: float = 0.85) -> str:
@@ -823,13 +1002,57 @@ async def batch_send(
     for comment_data in comments:
         text = comment_data.get("text", comment_data.get("comment_text", ""))
         original = text
+        queue_item_id = str(comment_data.get("queue_item_id") or "")
+        human_confirmed = bool(comment_data.get("human_confirmed"))
         execution = _start_marketing_execution(platform, comment_data, original) if create_execution else {}
+        existing_item = await queue.get(queue_item_id) if queue_item_id else None
+        base_metadata = dict(existing_item.metadata) if existing_item and isinstance(existing_item.metadata, dict) else {}
+        if execution:
+            base_metadata["execution_id"] = execution.get("run_id", "")
         validate_step = _execution_step(execution, "validate", "Validate marketing comment", "validate_comment")
+
+        if not human_confirmed:
+            item = CommentItem(
+                id=queue_item_id,
+                platform=platform,
+                video_id=comment_data.get("video_id", ""),
+                video_title=comment_data.get("video_title", ""),
+                video_url=comment_data.get("video_url", ""),
+                comment_text=original,
+                original_text=original,
+                status="needs_human",
+                risk_level="medium",
+                risk_codes=["confirmation_required"],
+                decision="needs_human",
+                error_msg="发送前需要人工确认",
+                human_confirmed=False,
+                strategy=strategy,
+                metadata=dict(base_metadata),
+            )
+            await queue.add(item)
+            _finish_execution_step(execution, validate_step, "needs_human", item.error_msg, "confirmation_required")
+            _complete_marketing_execution(
+                execution,
+                "needs_human",
+                {"status": "needs_human", "queue_item_id": item.id},
+                "confirmation_required",
+                item.error_msg,
+            )
+            results.append({
+                "id": item.id,
+                "execution_id": execution.get("run_id", "") if execution else "",
+                "status": "needs_human",
+                "decision": "needs_human",
+                "risk_codes": item.risk_codes,
+                "reason": [item.error_msg],
+            })
+            continue
 
         original_check = preflight_check(original)
         if set(original_check.get("risk_codes") or []) & HUMAN_REQUIRED_CODES:
             _finish_execution_step(execution, validate_step, "needs_human", "敏感内容需要人工确认", "sensitive_action")
             item = CommentItem(
+                id=queue_item_id,
                 platform=platform,
                 video_id=comment_data.get("video_id", ""),
                 video_title=comment_data.get("video_title", ""),
@@ -840,8 +1063,10 @@ async def batch_send(
                 risk_level=original_check["risk_level"],
                 risk_codes=original_check.get("risk_codes", []),
                 decision="needs_human",
+                human_confirmed=human_confirmed,
+                strategy=strategy,
                 error_msg="; ".join(original_check["risks"]),
-                metadata={"execution_id": execution.get("run_id", "")} if execution else {},
+                metadata=dict(base_metadata),
             )
             await queue.add(item)
             _complete_marketing_execution(execution, "needs_human", {
@@ -888,6 +1113,7 @@ async def batch_send(
         if check.get("decision") == "needs_human":
             _finish_execution_step(execution, None, "needs_human", "修复后仍需人工确认", "sensitive_action")
             item = CommentItem(
+                id=queue_item_id,
                 platform=platform,
                 video_id=comment_data.get("video_id", ""),
                 video_title=comment_data.get("video_title", ""),
@@ -898,10 +1124,12 @@ async def batch_send(
                 risk_level=check["risk_level"],
                 risk_codes=check.get("risk_codes", []),
                 decision="needs_human",
+                human_confirmed=human_confirmed,
+                strategy=strategy,
                 repair_attempts=repair_attempts,
                 repaired_text=text if text != original else "",
                 error_msg="; ".join(check["risks"]),
-                metadata={"execution_id": execution.get("run_id", "")} if execution else {},
+                metadata=dict(base_metadata),
             )
             await queue.add(item)
             _complete_marketing_execution(execution, "needs_human", {
@@ -922,6 +1150,7 @@ async def batch_send(
         if check.get("decision") == "skip" or check["risk_level"] == "high":
             _finish_execution_step(execution, None, "success", "评论被自动跳过")
             item = CommentItem(
+                id=queue_item_id,
                 platform=platform,
                 video_id=comment_data.get("video_id", ""),
                 video_title=comment_data.get("video_title", ""),
@@ -932,10 +1161,12 @@ async def batch_send(
                 risk_level=check["risk_level"],
                 risk_codes=check.get("risk_codes", []),
                 decision="skip",
+                human_confirmed=human_confirmed,
+                strategy=strategy,
                 repair_attempts=repair_attempts,
                 repaired_text=text if text != original else "",
                 error_msg="; ".join(check["risks"]),
-                metadata={"execution_id": execution.get("run_id", "")} if execution else {},
+                metadata=dict(base_metadata),
             )
             await queue.add(item)
             _complete_marketing_execution(execution, "success", {
@@ -959,6 +1190,7 @@ async def batch_send(
             next_run = (datetime.now() + timedelta(hours=1)).isoformat()
             _finish_execution_step(execution, rate_step, "success", "触发频率限制，已延后发送")
             item = CommentItem(
+                id=queue_item_id,
                 platform=platform,
                 video_id=comment_data.get("video_id", ""),
                 video_title=comment_data.get("video_title", ""),
@@ -973,7 +1205,9 @@ async def batch_send(
                 repaired_text=text if text != original else "",
                 next_run_at=next_run,
                 error_msg="Rate limit exceeded",
-                metadata={"execution_id": execution.get("run_id", "")} if execution else {},
+                human_confirmed=human_confirmed,
+                strategy=strategy,
+                metadata=dict(base_metadata),
             )
             await queue.add(item)
             _complete_marketing_execution(execution, "success", {
@@ -994,6 +1228,7 @@ async def batch_send(
 
         # 发送 — 优先使用 AcquisitionAdapter
         send_step = _execution_step(execution, "send", "Send marketing comment", "send_comment")
+        send_result: dict = {}
         try:
             send_result = {"success": True}
             if acq_adapter:
@@ -1010,6 +1245,7 @@ async def batch_send(
                 )
             await limiter.record(platform)
             item = CommentItem(
+                id=queue_item_id,
                 platform=platform,
                 video_id=comment_data.get("video_id", ""),
                 video_title=comment_data.get("video_title", ""),
@@ -1020,12 +1256,13 @@ async def batch_send(
                 risk_level=check["risk_level"],
                 risk_codes=check.get("risk_codes", []),
                 decision="auto_send" if repair_attempts == 0 else "auto_repair_then_send",
+                human_confirmed=human_confirmed,
                 repair_attempts=repair_attempts,
                 repaired_text=text if text != original else "",
                 platform_result=send_result if isinstance(send_result, dict) else {"result": str(send_result)},
                 strategy=strategy,
                 sent_at=datetime.now().isoformat(),
-                metadata={"execution_id": execution.get("run_id", "")} if execution else {},
+                metadata=dict(base_metadata),
             )
             await queue.add(item)
             _finish_execution_step(execution, send_step, "success", "评论已发送")
@@ -1046,13 +1283,29 @@ async def batch_send(
             })
         except Exception as e:
             error_text = str(e)[:200]
-            classified = MarketingAutomationPolicy.classify_send_error(error_text)
+            explicit_status = str(send_result.get("status") or "")
+            explicit_code = str(send_result.get("error_code") or "")
+            if explicit_status == "needs_human":
+                classified = {
+                    "decision": "needs_human",
+                    "status": "needs_human",
+                    "code": explicit_code or "account_risk",
+                }
+            elif explicit_code == "send_unverified":
+                classified = {
+                    "decision": "delay_retry",
+                    "status": "retrying",
+                    "code": "send_unverified",
+                }
+            else:
+                classified = MarketingAutomationPolicy.classify_send_error(error_text)
             status = classified["status"]
             next_run = (datetime.now() + timedelta(minutes=20)).isoformat() if status == "retrying" else ""
             risk_codes = check.get("risk_codes", [])
             if classified["code"] not in risk_codes:
                 risk_codes = [*risk_codes, classified["code"]]
             item = CommentItem(
+                id=queue_item_id,
                 platform=platform,
                 video_id=comment_data.get("video_id", ""),
                 video_title=comment_data.get("video_title", ""),
@@ -1063,11 +1316,14 @@ async def batch_send(
                 risk_level=check["risk_level"],
                 risk_codes=risk_codes,
                 decision=classified["decision"],
+                human_confirmed=human_confirmed,
+                strategy=strategy,
                 repair_attempts=repair_attempts,
                 repaired_text=text if text != original else "",
                 next_run_at=next_run,
                 error_msg=error_text,
-                metadata={"execution_id": execution.get("run_id", "")} if execution else {},
+                platform_result=send_result if isinstance(send_result, dict) else {},
+                metadata=dict(base_metadata),
             )
             await queue.add(item)
             step_status = "needs_human" if status == "needs_human" else "failed"
@@ -1095,7 +1351,7 @@ async def batch_send(
 
 
 async def process_due_comments(limit: int = 20, strategy: str = "balanced", deai: bool = True) -> dict:
-    """Send delayed/retrying queue items whose next_run_at has arrived."""
+    """Queue confirmed delayed/retrying items whose next_run_at has arrived."""
     queue = get_comment_queue()
     due_items = await queue.due(limit)
     processed: list[dict] = []
@@ -1107,32 +1363,31 @@ async def process_due_comments(limit: int = 20, strategy: str = "balanced", deai
             metadata={**item.metadata, "retry_count": retry_count, "processing_started_at": datetime.now().isoformat()},
         )
         try:
-            results = await batch_send(
-                item.platform,
-                [{
-                    "video_id": item.video_id,
-                    "video_title": item.video_title,
-                    "video_url": item.video_url,
-                    "text": item.comment_text,
-                    "comment_text": item.comment_text,
-                }],
-                item.strategy or strategy,
-                deai,
-            )
-            result = results[0] if results else {"status": "failed", "error": "empty retry result"}
-            new_item_id = result.get("id", "")
-            if new_item_id and new_item_id != item.id:
-                await queue.delete(new_item_id)
+            from szyg.execution_kernel import get_execution_kernel
+
+            run = get_execution_kernel().create_marketing_comment_run({
+                "platform": item.platform,
+                "video_id": item.video_id,
+                "video_title": item.video_title,
+                "video_url": item.video_url,
+                "text": item.comment_text,
+                "queue_item_id": item.id,
+                "human_confirmed": True,
+                "strategy": item.strategy or strategy,
+                "deai": deai,
+            })
             await queue.update(
                 item.id,
-                status=result.get("status", "failed"),
-                decision=result.get("decision", item.decision),
-                next_run_at=result.get("next_run_at", ""),
-                error_msg=result.get("error", result.get("reason", "")),
-                sent_at=datetime.now().isoformat() if result.get("status") == "sent" else item.sent_at,
-                metadata={**item.metadata, "retry_count": retry_count, "last_retry_at": datetime.now().isoformat()},
+                status="pending",
+                next_run_at="",
+                metadata={
+                    **item.metadata,
+                    "execution_id": run["id"],
+                    "retry_count": retry_count,
+                    "last_retry_at": datetime.now().isoformat(),
+                },
             )
-            processed.append({"id": item.id, "status": result.get("status", "failed"), "result": result})
+            processed.append({"id": item.id, "status": "pending", "execution_id": run["id"]})
         except Exception as exc:
             error_text = str(exc)[:200]
             next_run = (datetime.now() + timedelta(minutes=20)).isoformat()
@@ -1145,6 +1400,76 @@ async def process_due_comments(limit: int = 20, strategy: str = "balanced", deai
             )
             processed.append({"id": item.id, "status": "retrying", "error": error_text, "next_run_at": next_run})
     return {"total_due": len(due_items), "processed": len(processed), "items": processed}
+
+
+async def enqueue_confirmed_comment(
+    platform: str,
+    comment_data: dict,
+    strategy: str = "balanced",
+    deai: bool = False,
+    delay_seconds: int = 0,
+) -> dict:
+    """Persist a confirmed comment before handing it to the execution kernel."""
+    text = str(comment_data.get("text") or comment_data.get("comment_text") or "").strip()
+    if not text:
+        raise ValueError("评论内容不能为空")
+
+    check = preflight_check(text)
+    if check.get("decision") in {"needs_human", "skip"} or check.get("risk_level") == "high":
+        raise ValueError("评论包含高风险内容，请修改后重新预检")
+
+    queue = get_comment_queue()
+    delay_seconds = max(0, int(delay_seconds or 0))
+    delayed_until = (datetime.now() + timedelta(seconds=delay_seconds)).isoformat() if delay_seconds else ""
+    item = CommentItem(
+        platform=platform,
+        video_id=str(comment_data.get("video_id") or ""),
+        video_title=str(comment_data.get("video_title") or ""),
+        video_url=str(comment_data.get("video_url") or ""),
+        comment_text=text,
+        original_text=text,
+        status="delayed" if delay_seconds else "pending",
+        risk_level=str(check.get("risk_level") or "low"),
+        risk_codes=list(check.get("risk_codes") or []),
+        decision=str(check.get("decision") or "auto_send"),
+        human_confirmed=True,
+        strategy=strategy,
+        next_run_at=delayed_until,
+        metadata={"batch_id": str(comment_data.get("batch_id") or "")},
+    )
+    await queue.add(item)
+
+    if delay_seconds:
+        return {
+            "id": item.id,
+            "execution_id": "",
+            "status": "delayed",
+            "next_run_at": delayed_until,
+            "decision": item.decision,
+            "risk_level": item.risk_level,
+        }
+
+    from szyg.execution_kernel import get_execution_kernel
+
+    run = get_execution_kernel().create_marketing_comment_run({
+        "platform": platform,
+        "video_id": item.video_id,
+        "video_title": item.video_title,
+        "video_url": item.video_url,
+        "text": text,
+        "queue_item_id": item.id,
+        "human_confirmed": True,
+        "strategy": strategy,
+        "deai": deai,
+    })
+    await queue.update(item.id, metadata={**item.metadata, "execution_id": run["id"]})
+    return {
+        "id": item.id,
+        "execution_id": run["id"],
+        "status": "pending",
+        "decision": item.decision,
+        "risk_level": item.risk_level,
+    }
 
 
 # ── Execution Kernel Bridge ──────────────────────────────────────────────

@@ -1,5 +1,7 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage } = require('electron')
+const { app, BrowserWindow, Tray, Menu, nativeImage, session, shell } = require('electron')
 const { spawn } = require('child_process')
+const crypto = require('crypto')
+const fs = require('fs')
 const path = require('path')
 const http = require('http')
 const net = require('net')
@@ -12,12 +14,22 @@ const isDev = process.env.NODE_ENV === 'development'
 const enableDevTools = isDev || process.env.SZYG_DEBUG === '1'
 const PORT = 8000
 const FRONTEND_PORT = 5173
+const PRODUCTION_CONTROL_URL = 'https://szyg.qdtracing.com'
 
 let mainWindow = null
 let tray = null
 let backendProcess = null
 let comfyuiProcess = null
 let isQuitting = false
+const desktopToken = crypto.randomBytes(32).toString('hex')
+
+function getProjectRoot() {
+  return isDev ? path.join(__dirname, '..') : process.resourcesPath
+}
+
+function getRuntimeDataDir() {
+  return isDev ? path.join(getProjectRoot(), 'data') : path.join(app.getPath('userData'), 'data')
+}
 
 // ── Single instance lock ──
 const gotLock = app.requestSingleInstanceLock()
@@ -41,14 +53,14 @@ app.on('second-instance', () => {
 
 // ── Backend management ──
 function findPython() {
-  const fs = require('fs')
-  const projectRoot = path.join(__dirname, '..')
+  const projectRoot = getProjectRoot()
+  const localAppData = process.env.LOCALAPPDATA || path.join(app.getPath('home'), 'AppData', 'Local')
 
   const candidates = [
-    // 1. Project .venv (D:\szyg\.venv — has all deps)
+    // 1. Project virtual environment
     path.join(projectRoot, '.venv', 'Scripts', 'python.exe'),
     // 2. hermes-agent venv (fallback, has CUDA + most deps)
-    path.join(process.env.USERPROFILE || 'C:\\Users\\Administrator', 'AppData', 'Local', 'hermes', 'hermes-agent', 'venv', 'Scripts', 'python.exe'),
+    path.join(localAppData, 'hermes', 'hermes-agent', 'venv', 'Scripts', 'python.exe'),
     // 3. PATH fallback
     'python',
     'python3',
@@ -79,25 +91,62 @@ function isPortInUse(port) {
 
 async function startBackend() {
   if (await isPortInUse(PORT)) {
-    console.log(`Backend already running on port ${PORT}, skipping spawn`)
-    return
+    if (isDev) {
+      console.log(`Backend already running on port ${PORT}, skipping spawn`)
+      return
+    }
+    throw new Error(`Local service port ${PORT} is already in use`)
   }
 
-  const python = findPython()
-  const projectRoot = path.join(__dirname, '..')
+  const projectRoot = getProjectRoot()
+  const runtimeDataDir = getRuntimeDataDir()
   const serverDir = path.join(projectRoot, 'server')
+  const backendExecutable = path.join(process.resourcesPath, 'backend', 'szyg-backend.exe')
   const env = {
     ...process.env,
     PYTHONPATH: serverDir,
-    SZYG_DATA_DIR: path.join(projectRoot, 'data'),
+    SZYG_DATA_DIR: runtimeDataDir,
+    SZYG_CLOUD_ENABLED: isDev ? (process.env.SZYG_CLOUD_ENABLED || 'false') : 'true',
+    SZYG_CONTROL_URL: isDev ? (process.env.SZYG_CONTROL_URL || '') : PRODUCTION_CONTROL_URL,
+    SZYG_LOCAL_AUTH_ENABLED: isDev ? (process.env.SZYG_LOCAL_AUTH_ENABLED || 'false') : 'false',
+    SZYG_PRODUCTION: isDev ? 'false' : 'true',
+    SZYG_DESKTOP_TOKEN: desktopToken,
+    SZYG_SECRET_KEY: isDev ? (process.env.SZYG_SECRET_KEY || '') : crypto.randomBytes(48).toString('base64url'),
+    SZYG_CONFIG_PATH: path.join(projectRoot, 'config.yaml'),
+    SZYG_FRONTEND_DIST: isDev
+      ? path.join(projectRoot, 'szyg-frontend', 'dist')
+      : path.join(process.resourcesPath, 'frontend'),
+    SZYG_LLAMA_RUNTIME_DIR: isDev
+      ? path.join(projectRoot, 'runtime', 'llama')
+      : path.join(process.resourcesPath, 'runtime', 'llama'),
+    SZYG_LOCAL_MODEL_DIR: path.join(runtimeDataDir, 'local_models'),
+    SZYG_CHROMIUM_DIR: isDev
+      ? path.join(projectRoot, 'server', 'szyg', 'storage', 'chromium')
+      : path.join(process.resourcesPath, 'runtime', 'chromium'),
+    SZYG_CORS_ORIGINS: isDev
+      ? 'http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:8000'
+      : 'http://127.0.0.1:8000',
   }
 
-  console.log(`Starting backend: ${python} - ${serverDir}`)
-  console.log(`PYTHONPATH: ${serverDir}`)
-  backendProcess = spawn(python, ['-m', 'uvicorn', 'szyg.api.app:create_app', '--host', '127.0.0.1', '--port', String(PORT), '--factory'], {
+  let command
+  let args
+  if (isDev) {
+    command = findPython()
+    args = ['-m', 'uvicorn', 'szyg.api.app:create_app', '--host', '127.0.0.1', '--port', String(PORT), '--factory']
+  } else {
+    if (!fs.existsSync(backendExecutable)) {
+      throw new Error('The bundled backend runtime is missing')
+    }
+    command = backendExecutable
+    args = []
+  }
+
+  console.log(`Starting backend: ${command}`)
+  backendProcess = spawn(command, args, {
     cwd: projectRoot,
     env,
     stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
   })
 
   backendProcess.stdout.on('data', (d) => console.log(`[backend] ${d}`))
@@ -121,7 +170,13 @@ function stopBackend() {
 function waitForBackend(retries = 30) {
   return new Promise((resolve, reject) => {
     function check(i) {
-      const req = http.get(`http://127.0.0.1:${PORT}/api/health`, (res) => {
+      const endpoint = isDev ? '/api/health' : '/api/config'
+      const req = http.get({
+        hostname: '127.0.0.1',
+        port: PORT,
+        path: endpoint,
+        headers: isDev ? {} : { 'X-SZYG-Desktop-Token': desktopToken },
+      }, (res) => {
         if (res.statusCode === 200) return resolve()
         if (i > 0) setTimeout(() => check(i - 1), 500)
         else reject(new Error('Backend not ready'))
@@ -138,11 +193,15 @@ function waitForBackend(retries = 30) {
 
 // ── ComfyUI management ──
 const COMFYUI_PORT = 8188
-const COMFYUI_DIR = 'D:\\ComfyUI'
-const COMFYUI_PYTHON = path.join(COMFYUI_DIR, '.venv', 'Scripts', 'python.exe')
+const COMFYUI_DIR = process.env.SZYG_COMFYUI_DIR || ''
+const COMFYUI_PYTHON = COMFYUI_DIR ? path.join(COMFYUI_DIR, '.venv', 'Scripts', 'python.exe') : ''
 
 function startComfyUI() {
   const fs = require('fs')
+  if (!COMFYUI_DIR) {
+    console.log('ComfyUI is not configured - skipping')
+    return
+  }
   if (!fs.existsSync(COMFYUI_PYTHON)) {
     console.log(`ComfyUI Python not found: ${COMFYUI_PYTHON} — skipping`)
     return
@@ -203,7 +262,17 @@ function waitForComfyUI(retries = 40) {
 }
 
 // ── Window ──
-function createWindow() {
+async function createWindow() {
+  if (!isDev) {
+    await session.defaultSession.cookies.set({
+      url: `http://127.0.0.1:${PORT}`,
+      name: 'szyg_desktop_token',
+      value: desktopToken,
+      httpOnly: true,
+      sameSite: 'strict',
+    })
+  }
+
   mainWindow = new BrowserWindow({
     width: 1300,
     height: 760,
@@ -216,6 +285,9 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
+      webSecurity: true,
+      spellcheck: false,
     },
   })
 
@@ -228,10 +300,25 @@ function createWindow() {
     })
   }
 
-  // Log page console to terminal for debugging white screen
-  mainWindow.webContents.on('console-message', (_, level, message) => {
-    const levels = ['VERBOSE', 'INFO', 'WARN', 'ERROR']
-    console.log(`[renderer ${levels[level] || '?'}] ${message}`)
+  if (enableDevTools) {
+    mainWindow.webContents.on('console-message', (_, level, message) => {
+      const levels = ['VERBOSE', 'INFO', 'WARN', 'ERROR']
+      console.log(`[renderer ${levels[level] || '?'}] ${message}`)
+    })
+  }
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const allowed = isDev
+      ? url.startsWith(`http://localhost:${FRONTEND_PORT}`)
+      : url.startsWith(`http://127.0.0.1:${PORT}`)
+    if (!allowed && !url.startsWith('data:')) {
+      event.preventDefault()
+      if (/^https?:\/\//i.test(url)) shell.openExternal(url)
+    }
   })
 
   // Show errors if page fails to load
@@ -318,7 +405,7 @@ app.whenReady().then(async () => {
   } catch (e) {
     console.error('ComfyUI failed to start:', e.message)
   }
-  createWindow()
+  await createWindow()
 })
 
 app.on('before-quit', () => {

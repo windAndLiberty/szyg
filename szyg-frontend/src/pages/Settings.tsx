@@ -1,9 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Settings,
-  Bot,
-  Brain,
   Plug,
   User,
   Sun,
@@ -17,9 +15,9 @@ import {
   Plus,
   Trash2,
   Database,
-  Code,
-  Sparkles,
-  Loader2,
+  Info,
+  LogOut,
+  Laptop,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,32 +27,22 @@ import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useAsync } from '@/lib/hooks'
+import { useTheme } from '@/lib/theme'
+import { useI18n } from '@/lib/i18n'
 import {
   apiGet,
-  apiPut,
   apiDel,
   getCurrentUser,
-  fetchLocalLlmStatus,
-  startLocalLlm,
-  stopLocalLlm,
-  chatLocalLlm,
-  downloadLocalLlm8b,
-  deleteLocalLlm8b,
-  type LocalLlmStatus,
+  fetchCloudSession,
+  logoutCloud,
+  type CloudSession,
 } from '@/lib/api'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-type SettingsTab = 'general' | 'ai' | 'agents' | 'integrations' | 'account'
-
-interface AgentToggle {
-  id: string
-  name: string
-  description: string
-  enabled: boolean
-}
+type SettingsTab = 'general' | 'integrations' | 'account'
 
 interface TeamMember {
   id: string
@@ -72,13 +60,9 @@ const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number]
 
 const settingsTabs: { id: SettingsTab; label: string; icon: typeof Settings }[] = [
   { id: 'general', label: '通用设置', icon: Settings },
-  { id: 'ai', label: 'AI 模型', icon: Brain },
-  { id: 'agents', label: '数字员工', icon: Bot },
   { id: 'integrations', label: '集成配置', icon: Plug },
   { id: 'account', label: '账户管理', icon: User },
 ]
-
-const llmModels: string[] = []
 
 const notificationEvents = [
   { id: 'task_complete', label: '任务执行完成', checked: true },
@@ -95,122 +79,55 @@ const notificationEvents = [
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general')
   const [unsaved, setUnsaved] = useState(false)
+  const [notice, setNotice] = useState('')
+  const noticeTimerRef = useRef<number | null>(null)
+
+  const showNotice = (message: string) => {
+    if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current)
+    setNotice(message)
+    noticeTimerRef.current = window.setTimeout(() => setNotice(''), 2800)
+  }
+
+  useEffect(() => () => {
+    if (noticeTimerRef.current) window.clearTimeout(noticeTimerRef.current)
+  }, [])
 
   /* General */
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('dark')
-  const [language, setLanguage] = useState('中文')
+  const { theme, setTheme } = useTheme()
+  const { locale, setLocale, t } = useI18n()
   const [emailNotifs, setEmailNotifs] = useState(true)
   const [browserNotifs, setBrowserNotifs] = useState(true)
   const [notifEvents, setNotifEvents] = useState(notificationEvents)
 
-  /* AI Model */
-  const { data: cfgData } = useAsync<{ llm?: { default_backend?: string; volcengine?: { default_model?: string; endpoints?: Record<string, string> }; ollama?: { default_model?: string } } }>(
-    () => apiGet('/api/config'),
-  )
-  const realModels: string[] = (() => {
-    const llm = cfgData?.llm
-    if (!llm) return []
-    const list: string[] = []
-    const eps = llm.volcengine?.endpoints
-    if (eps) list.push(...Object.values(eps).filter(Boolean))
-    if (llm.volcengine?.default_model) list.push(llm.volcengine.default_model)
-    if (llm.ollama?.default_model) list.push(llm.ollama.default_model)
-    return Array.from(new Set(list))
-  })()
-  const [selectedModel, setSelectedModel] = useState('')
-  useEffect(() => {
-    if (realModels.length && !selectedModel) setSelectedModel(realModels[0])
-  }, [realModels, selectedModel])
-  const [customEndpoint, setCustomEndpoint] = useState('')
-  const [customApiKey, setCustomApiKey] = useState('')
-  const [aiTemperature, setAiTemperature] = useState(0.5)
-  const [maxTokens, setMaxTokens] = useState(4000)
-  const [localStatus, setLocalStatus] = useState<LocalLlmStatus | null>(null)
-  const [localBusy, setLocalBusy] = useState(false)
-  const [localPrompt, setLocalPrompt] = useState('请把这句话改写得更自然：我们已经收到您的需求，会尽快处理。')
-  const [localResult, setLocalResult] = useState('')
-  const [localError, setLocalError] = useState('')
-  const [showLocalAdvanced, setShowLocalAdvanced] = useState(false)
-
-  async function loadLocalStatus() {
-    try {
-      setLocalStatus(await fetchLocalLlmStatus())
-    } catch (err) {
-      setLocalError(err instanceof Error ? err.message : '本地小模型状态读取失败')
-    }
-  }
-
-  useEffect(() => {
-    loadLocalStatus()
-    const timer = window.setInterval(loadLocalStatus, 8000)
-    return () => window.clearInterval(timer)
-  }, [])
-
-  async function runLocalAction(action: 'start' | 'stop' | 'test' | 'download' | 'delete') {
-    setLocalBusy(true)
-    setLocalError('')
-    try {
-      if (action === 'start') {
-        await startLocalLlm()
-      } else if (action === 'stop') {
-        await stopLocalLlm()
-      } else if (action === 'download') {
-        await downloadLocalLlm8b()
-      } else if (action === 'delete') {
-        await deleteLocalLlm8b()
-      } else {
-        const result = await chatLocalLlm(localPrompt)
-        if (!result.success) throw new Error(result.message || '测试失败')
-        setLocalResult(result.message)
-      }
-      await loadLocalStatus()
-    } catch (err) {
-      setLocalError(err instanceof Error ? err.message : '操作失败')
-    } finally {
-      setLocalBusy(false)
-    }
-  }
-
-  /* Digital Agents */
-  const { data: agentsData, reload: reloadAgents } = useAsync<{ data: { id: string; name: string; emoji: string; color: string; enabled: boolean }[] }>(
-    () => apiGet('/api/data/agents/list'),
-  )
-  const [agents, setAgents] = useState<AgentToggle[]>([])
-  useEffect(() => {
-    if (agentsData?.data) {
-      setAgents(agentsData.data.map((a) => ({
-        id: a.id,
-        name: `${a.emoji ?? ''} ${a.name}`,
-        description: 'AI 员工（可启用/禁用）',
-        enabled: a.enabled,
-      })))
-    }
-  }, [agentsData])
-
   /* Integrations */
   const [supabaseUrl, setSupabaseUrl] = useState('')
   const [supabaseKey, setSupabaseKey] = useState('')
-  const [supabaseConnected, setSupabaseConnected] = useState(false)
+  const supabaseConnected = false
   const [webSearchEnabled, setWebSearchEnabled] = useState(false)
   const [webSearchProvider, setWebSearchProvider] = useState('Serper.dev')
   const [webSearchKey, setWebSearchKey] = useState('')
-  const [thirdPartyApiKey, setThirdPartyApiKey] = useState('')
-
   /* Account */
   const currentUser = getCurrentUser()
   const [profileName, setProfileName] = useState(currentUser?.username ?? 'admin')
   const [profileEmail] = useState(`${currentUser?.username ?? 'admin'}@szyg.local`)
   const [profileRole, setProfileRole] = useState('系统管理员')
-  const { data: teamData, reload: reloadTeam } = useAsync<{ data: { id: number; username: string; role: string; email: string; status: string }[] }>(
+  const { data: cloudSession, reload: reloadCloudSession } = useAsync<CloudSession>(fetchCloudSession)
+  useEffect(() => {
+    if (cloudSession?.user) {
+      setProfileName(cloudSession.user.display_name)
+      setProfileRole(cloudSession.user.role === 'admin' ? '系统管理员' : '内测用户')
+    }
+  }, [cloudSession])
+  const { data: teamData, reload: reloadTeam } = useAsync<{ data: { id: number | string; username?: string | null; name?: string | null; role?: string | null; email?: string | null; status?: string | null }[] }>(
     () => apiGet('/api/data/team/list'),
   )
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
   useEffect(() => {
-    if (teamData?.data) {
+    if (Array.isArray(teamData?.data)) {
       setTeamMembers(teamData.data.map((m) => ({
         id: String(m.id),
-        name: m.username,
-        email: m.email,
+        name: String(m.name || m.username || '未命名成员').trim() || '未命名成员',
+        email: String(m.email || '未设置邮箱'),
         role: m.role === 'admin' ? '系统管理员' : '普通成员',
         status: m.status === 'active' ? 'active' : 'pending',
       })))
@@ -218,20 +135,6 @@ export default function SettingsPage() {
   }, [teamData])
 
   /* -- handlers -- */
-  const toggleAgent = async (id: string) => {
-    const target = agents.find((a) => a.id === id)
-    if (!target) return
-    const nextEnabled = !target.enabled
-    setAgents((prev) => prev.map((a) => (a.id === id ? { ...a, enabled: nextEnabled } : a)))
-    setUnsaved(true)
-    try {
-      await apiPut(`/api/data/agents/${id}`, { enabled: nextEnabled })
-    } catch {
-      /* 回滚由下次 reload 修正 */
-      reloadAgents()
-    }
-  }
-
   const handleNotifEventToggle = (id: string) => {
     setNotifEvents((prev) =>
       prev.map((e) => (e.id === id ? { ...e, checked: !e.checked } : e))
@@ -263,18 +166,22 @@ export default function SettingsPage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="max-w-[1000px] mx-auto pb-28"
+      className="w-full pb-28"
     >
       {/* Page Header */}
-      <motion.div variants={cardVariant} className="mb-8">
+      <motion.div variants={cardVariant} className="mb-6">
         <p className="text-body-lg text-[#94A3B8]">
-          配置你的超级数字员工系统参数
+          {t('配置你的超级数字员工系统参数')}
         </p>
       </motion.div>
 
-      {/* Settings Navigation */}
-      <motion.div variants={cardVariant} className="mb-8">
-        <div className="flex items-center gap-1 p-1 bg-[#1A2235] rounded-xl border border-[#1E293B] overflow-x-auto">
+      <div className="grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-start">
+        {/* Settings Navigation */}
+        <motion.aside variants={cardVariant} className="min-w-0 lg:sticky lg:top-6">
+          <nav
+            className="flex items-center gap-1 overflow-x-auto border-b border-[#1E293B] pb-3 lg:flex-col lg:items-stretch lg:overflow-visible lg:border-b-0 lg:border-r lg:pb-0 lg:pr-5"
+            aria-label={t('系统配置')}
+          >
           {settingsTabs.map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
@@ -282,28 +189,32 @@ export default function SettingsPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
+                aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'relative flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 shrink-0',
-                  isActive ? 'text-[#F1F5F9]' : 'text-[#64748B] hover:text-[#94A3B8]'
+                  'group relative flex shrink-0 items-center gap-3 rounded-lg px-3.5 py-3 text-sm font-medium transition-all duration-200 lg:w-full',
+                  isActive
+                    ? 'bg-[#6366F1]/10 text-[#E0E7FF]'
+                    : 'text-[#64748B] hover:bg-[#1A2235]/70 hover:text-[#CBD5E1]'
                 )}
               >
                 {isActive && (
                   <motion.div
                     layoutId="settingsTabIndicator"
-                    className="absolute inset-0 bg-[#1A2235] border border-[#334155] rounded-lg"
+                    className="absolute bottom-0 left-3 right-3 h-0.5 rounded-full bg-[#6366F1] lg:bottom-2 lg:left-0 lg:right-auto lg:top-2 lg:h-auto lg:w-0.5"
                     transition={{ duration: 0.2, ease: [0.45, 0.05, 0.55, 0.95] as [number, number, number, number] }}
                   />
                 )}
-                <Icon className="w-4 h-4 relative z-10" />
-                <span className="relative z-10 whitespace-nowrap">{tab.label}</span>
+                <Icon className={cn('relative z-10 h-4 w-4', isActive ? 'text-[#818CF8]' : 'text-[#64748B] group-hover:text-[#94A3B8]')} />
+                <span className="relative z-10 whitespace-nowrap">{t(tab.label)}</span>
               </button>
             )
           })}
-        </div>
-      </motion.div>
+          </nav>
+        </motion.aside>
 
-      {/* Tab Content */}
-      <AnimatePresence mode="wait">
+        {/* Tab Content */}
+        <motion.section variants={cardVariant} className="min-w-0 max-w-[900px]">
+          <AnimatePresence mode="wait">
         {/* ==================== TAB 1: 通用设置 ==================== */}
         {activeTab === 'general' && (
           <motion.div
@@ -316,36 +227,37 @@ export default function SettingsPage() {
           >
             {/* Appearance */}
             <motion.div variants={cardVariant}>
-              <h2 className="text-heading-sm text-[#F1F5F9] mb-1">外观</h2>
+              <h2 className="text-heading-sm text-[#F1F5F9] mb-1">{t('外观')}</h2>
               <p className="text-body-sm text-[#64748B] mb-4">
-                自定义超级数字员工系统的外观风格。
+                {t('自定义超级数字员工系统的外观风格。')}
               </p>
               <div className="glass-card rounded-[16px] border border-[#1E293B] p-5 space-y-5">
                 {/* Theme */}
                 <div>
-                  <Label className="text-heading-sm text-[#F1F5F9] block mb-1">主题选择</Label>
-                  <p className="text-body-sm text-[#64748B] mb-3">选择你喜欢的配色方案</p>
+                  <Label className="text-heading-sm text-[#F1F5F9] block mb-1">{t('主题选择')}</Label>
+                  <p className="text-body-sm text-[#64748B] mb-3">{t('选择你喜欢的配色方案')}</p>
                   <div className="flex items-center gap-2 p-1 bg-[#0D1321] rounded-xl border border-[#1E293B] w-fit">
                     {([
-                      { value: 'light', icon: Sun, label: 'Light' },
-                      { value: 'dark', icon: Moon, label: 'Dark' },
-                      { value: 'system', icon: Monitor, label: 'System' },
-                    ] as const).map((t) => {
-                      const Icon = t.icon
-                      const isActive = theme === t.value
+                      { value: 'light', icon: Sun, label: '亮色' },
+                      { value: 'dark', icon: Moon, label: '深色' },
+                      { value: 'system', icon: Monitor, label: '跟随系统' },
+                    ] as const).map((option) => {
+                      const Icon = option.icon
+                      const isActive = theme === option.value
                       return (
                         <button
-                          key={t.value}
-                          onClick={() => { setTheme(t.value); setUnsaved(true) }}
+                          key={option.value}
+                          onClick={() => setTheme(option.value)}
+                          aria-pressed={isActive}
                           className={cn(
-                            'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                            'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6366F1]/30',
                             isActive
                               ? 'bg-[#1A2235] text-[#F1F5F9] border border-[#334155]'
                               : 'text-[#64748B] hover:text-[#94A3B8]'
                           )}
                         >
                           <Icon className="w-4 h-4" />
-                          {t.label}
+                          {t(option.label)}
                         </button>
                       )
                     })}
@@ -356,17 +268,17 @@ export default function SettingsPage() {
 
                 {/* Language */}
                 <div>
-                  <Label className="text-heading-sm text-[#F1F5F9] block mb-1">语言</Label>
-                  <p className="text-body-sm text-[#64748B] mb-3">界面显示语言</p>
+                  <Label className="text-heading-sm text-[#F1F5F9] block mb-1">{t('语言')}</Label>
+                  <p className="text-body-sm text-[#64748B] mb-3">{t('界面显示语言')}</p>
                   <div className="relative max-w-[240px]">
                     <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B] pointer-events-none" />
                     <select
-                      value={language}
-                      onChange={(e) => { setLanguage(e.target.value); setUnsaved(true) }}
+                      value={locale}
+                      onChange={(e) => setLocale(e.target.value === 'en-US' ? 'en-US' : 'zh-CN')}
                       className="w-full h-10 pl-10 pr-8 rounded-[10px] bg-[#0D1321] border border-[#1E293B] text-sm text-[#F1F5F9] focus:outline-none focus:border-[#6366F1] appearance-none"
                     >
-                      <option>中文</option>
-                      <option>English</option>
+                      <option value="zh-CN">中文</option>
+                      <option value="en-US">English</option>
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B] pointer-events-none" />
                   </div>
@@ -376,19 +288,19 @@ export default function SettingsPage() {
 
             {/* Notifications */}
             <motion.div variants={cardVariant}>
-              <h2 className="text-heading-sm text-[#F1F5F9] mb-1">通知</h2>
+              <h2 className="text-heading-sm text-[#F1F5F9] mb-1">{t('通知')}</h2>
               <p className="text-body-sm text-[#64748B] mb-4">
-                控制你如何接收系统更新通知。
+                {t('控制你如何接收系统更新通知。')}
               </p>
               <div className="glass-card rounded-[16px] border border-[#1E293B] p-5 space-y-5">
                 {/* Email Notifications */}
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="text-heading-sm text-[#F1F5F9] block mb-0.5">
-                      Email 通知
+                      {t('Email 通知')}
                     </Label>
                     <p className="text-body-sm text-[#64748B]">
-                      接收任务完成、Agent 异常等邮件提醒
+                      {t('接收任务完成、员工异常等邮件提醒')}
                     </p>
                   </div>
                   <Switch
@@ -404,10 +316,10 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="text-heading-sm text-[#F1F5F9] block mb-0.5">
-                      浏览器通知
+                      {t('浏览器通知')}
                     </Label>
                     <p className="text-body-sm text-[#64748B]">
-                      在桌面显示重要事件的浏览器推送通知
+                      {t('在桌面显示重要事件的浏览器推送通知')}
                     </p>
                   </div>
                   <Switch
@@ -422,7 +334,7 @@ export default function SettingsPage() {
                 {/* Notification Events */}
                 <div>
                   <Label className="text-heading-sm text-[#F1F5F9] block mb-0.5">
-                    通知事件列表
+                    {t('通知事件列表')}
                   </Label>
                   <div className="mt-3 space-y-2">
                     {notifEvents.map((evt) => (
@@ -441,7 +353,7 @@ export default function SettingsPage() {
                         >
                           {evt.checked && <Check className="w-3 h-3 text-white" />}
                         </div>
-                        <span className="text-body-md text-[#94A3B8]">{evt.label}</span>
+                        <span className="text-body-md text-[#94A3B8]">{t(evt.label)}</span>
                       </label>
                     ))}
                   </div>
@@ -451,285 +363,7 @@ export default function SettingsPage() {
           </motion.div>
         )}
 
-        {/* ==================== TAB 2: AI 模型 ==================== */}
-        {activeTab === 'ai' && (
-          <motion.div
-            key="ai"
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            exit={{ opacity: 0 }}
-            className="space-y-6"
-          >
-            {/* AI Model Config */}
-            <motion.div variants={cardVariant}>
-              <h2 className="text-heading-sm text-[#F1F5F9] mb-1">AI 模型配置</h2>
-              <p className="text-body-sm text-[#64748B] mb-4">
-                配置驱动数字员工pipeline的大语言模型参数。
-              </p>
-              <div className="glass-card rounded-[16px] border border-[#1E293B] p-5 space-y-4">
-                {/* Model Selector */}
-                <div>
-                  <Label className="text-heading-sm text-[#F1F5F9] block mb-1">AI 模型选择</Label>
-                  <p className="text-body-sm text-[#64748B] mb-3">
-                    选择驱动数字员工pipeline的大语言模型
-                  </p>
-                  <div className="relative max-w-[320px]">
-                    <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6366F1] pointer-events-none" />
-                    <select
-                      value={selectedModel}
-                      onChange={(e) => { setSelectedModel(e.target.value); setUnsaved(true) }}
-                      className="w-full h-10 pl-10 pr-8 rounded-[10px] bg-[#0D1321] border border-[#1E293B] text-sm text-[#F1F5F9] focus:outline-none focus:border-[#6366F1] appearance-none"
-                    >
-                      {(realModels.length ? realModels : llmModels).map((m) => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B] pointer-events-none" />
-                  </div>
-                </div>
-
-                {/* Custom Endpoint (conditional) */}
-                {selectedModel === 'Custom Endpoint' && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    className="space-y-3 pt-2"
-                  >
-                    <div>
-                      <Label className="text-body-sm text-[#94A3B8] mb-1.5 block">自定义 API URL</Label>
-                      <Input
-                        value={customEndpoint}
-                        onChange={(e) => { setCustomEndpoint(e.target.value); setUnsaved(true) }}
-                        placeholder="https://api.custom-llm.com/v1"
-                        className="bg-[#0D1321] border-[#1E293B] text-[#F1F5F9]"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-body-sm text-[#94A3B8] mb-1.5 block">API Key</Label>
-                      <Input
-                        type="password"
-                        value={customApiKey}
-                        onChange={(e) => { setCustomApiKey(e.target.value); setUnsaved(true) }}
-                        placeholder="sk-..."
-                        className="bg-[#0D1321] border-[#1E293B] text-[#F1F5F9]"
-                      />
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-[#334155] text-[#94A3B8] hover:text-[#F1F5F9]"
-                    >
-                      测试连接
-                    </Button>
-                  </motion.div>
-                )}
-
-                <Separator className="bg-[#1E293B]" />
-
-                {/* Temperature */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <Label className="text-heading-sm text-[#F1F5F9]">AI 创意度 (Temperature)</Label>
-                    <span className="text-body-sm text-[#6366F1] font-mono">{aiTemperature.toFixed(1)}</span>
-                  </div>
-                  <p className="text-body-sm text-[#64748B] mb-3">
-                    数值越高输出越具创意，但一致性可能降低
-                  </p>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.1}
-                    value={aiTemperature}
-                    onChange={(e) => { setAiTemperature(Number(e.target.value)); setUnsaved(true) }}
-                    className="w-full accent-[#6366F1]"
-                  />
-                  <div className="flex justify-between text-body-sm text-[#64748B] mt-1">
-                    <span>精确</span>
-                    <span>创意</span>
-                  </div>
-                </div>
-
-                <Separator className="bg-[#1E293B]" />
-
-                {/* Max Tokens */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <Label className="text-heading-sm text-[#F1F5F9]">最大输出长度</Label>
-                    <span className="text-body-sm text-[#6366F1] font-mono">{maxTokens.toLocaleString()} tokens</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={1000}
-                    max={8000}
-                    step={500}
-                    value={maxTokens}
-                    onChange={(e) => { setMaxTokens(Number(e.target.value)); setUnsaved(true) }}
-                    className="w-full accent-[#6366F1]"
-                  />
-                  <div className="flex justify-between text-body-sm text-[#64748B] mt-1">
-                    <span>1,000</span>
-                    <span>8,000</span>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div variants={cardVariant}>
-              <h2 className="text-heading-sm text-[#F1F5F9] mb-1">本地小模型</h2>
-              <p className="text-body-sm text-[#64748B] mb-4">
-                用于摘要、分类、改写等简单任务，主力对话仍由云端 API 模型完成。
-              </p>
-              <div className="glass-card rounded-[16px] border border-[#1E293B] p-5 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={localStatus?.runtime_ready ? 'success' : 'warning'}>
-                        {localStatus?.runtime_ready ? '已就绪' : '未启动'}
-                      </Badge>
-                      <span className="text-body-sm text-[#94A3B8]">
-                        {localStatus?.server?.available ? '本地运行组件已安装' : '本地运行组件未安装'}
-                      </span>
-                    </div>
-                    <div className="mt-2 text-body-sm text-[#64748B]">
-                      轻量模型：{localStatus?.models?.['qwen3-4b']?.installed ? '已安装' : '未安装'}
-                      <span className="mx-2 text-[#334155]">/</span>
-                      增强模型：{localStatus?.models?.['qwen3-8b']?.installed ? '已安装' : localStatus?.download?.running ? `下载中 ${localStatus.download.percent || 0}%` : '未安装'}
-                    </div>
-                    <div className="mt-1 text-body-sm text-[#64748B]">
-                      运行方式：{localStatus?.server?.backend === 'vulkan' ? '显卡加速' : localStatus?.server?.backend === 'cpu' ? '基础模式' : '自动选择'}
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => runLocalAction('start')} disabled={localBusy || localStatus?.runtime_ready}>
-                      {localBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                      启用
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => runLocalAction('stop')} disabled={localBusy || !localStatus?.runtime_ready}>
-                      停止
-                    </Button>
-                  </div>
-                </div>
-
-                {localError && (
-                  <div className="rounded-[10px] border border-[#7F1D1D] bg-[#450A0A]/40 px-3 py-2 text-body-sm text-[#FCA5A5]">
-                    {localError}
-                  </div>
-                )}
-
-                <Separator className="bg-[#1E293B]" />
-
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 max-md:grid-cols-1">
-                  <Input
-                    value={localPrompt}
-                    onChange={(event) => setLocalPrompt(event.target.value)}
-                    placeholder="输入一句话测试本地小模型"
-                    className="bg-[#0D1321] border-[#1E293B] text-[#F1F5F9]"
-                  />
-                  <Button variant="outline" onClick={() => runLocalAction('test')} disabled={localBusy || !localPrompt.trim()}>
-                    测试一句话
-                  </Button>
-                </div>
-                {localResult && (
-                  <div className="rounded-[10px] border border-[#1E293B] bg-[#0D1321] px-3 py-2 text-body-sm leading-6 text-[#CBD5E1]">
-                    {localResult}
-                  </div>
-                )}
-
-                <Separator className="bg-[#1E293B]" />
-
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="text-heading-sm text-[#F1F5F9]">增强模型</div>
-                    <p className="mt-1 text-body-sm text-[#64748B]">
-                      适合更长文本和更复杂的分类、改写任务，可按需下载。
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => runLocalAction('download')}
-                      disabled={localBusy || localStatus?.models?.['qwen3-8b']?.installed || localStatus?.download?.running}
-                    >
-                      {localStatus?.download?.running ? '下载中' : '下载增强模型'}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => runLocalAction('delete')}
-                      disabled={localBusy || !localStatus?.models?.['qwen3-8b']?.installed}
-                    >
-                      删除增强模型
-                    </Button>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setShowLocalAdvanced((value) => !value)}
-                  className="text-body-sm text-[#64748B] hover:text-[#CBD5E1]"
-                >
-                  {showLocalAdvanced ? '收起高级信息' : '查看高级信息'}
-                </button>
-                {showLocalAdvanced && (
-                  <div className="space-y-2 rounded-[10px] border border-[#1E293B] bg-[#0D1321] p-3 text-body-sm text-[#94A3B8]">
-                    <div>服务地址：{localStatus?.base_url || '-'}</div>
-                    <div>当前运行方式：{localStatus?.server?.backend || '-'}</div>
-                    <div>运行组件：{localStatus?.server?.path || '-'}</div>
-                    <div>CPU 组件：{localStatus?.runtimes?.cpu?.path || '-'}</div>
-                    <div>显卡加速组件：{localStatus?.runtimes?.vulkan?.path || '-'}</div>
-                    <div>显卡加速可用：{localStatus?.acceleration?.vulkan?.available ? '是' : '否'}</div>
-                    <div>日志路径：{localStatus?.server?.log_path || '-'}</div>
-                    <div className="break-all">轻量模型：{localStatus?.models?.['qwen3-4b']?.path || '-'}</div>
-                    <div className="break-all">增强模型：{localStatus?.models?.['qwen3-8b']?.path || '-'}</div>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {/* ==================== TAB 3: 数字员工 ==================== */}
-        {activeTab === 'agents' && (
-          <motion.div
-            key="agents"
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            exit={{ opacity: 0 }}
-            className="space-y-6"
-          >
-            {/* Agent Toggles */}
-            <motion.div variants={cardVariant}>
-              <h2 className="text-heading-sm text-[#F1F5F9] mb-1">数字员工开关</h2>
-              <p className="text-body-sm text-[#64748B] mb-4">
-                启用或禁用各类 Agent。禁用的 Agent 将在pipeline中被跳过。
-              </p>
-              <div className="glass-card rounded-[16px] border border-[#1E293B] p-5 divide-y divide-[#1E293B]">
-                {agents.map((agent) => (
-                  <div
-                    key={agent.id}
-                    className="flex items-center justify-between py-4 first:pt-0 last:pb-0"
-                  >
-                    <div className="mr-4">
-                      <p className="text-body-md font-medium text-[#F1F5F9]">{agent.name}</p>
-                      <p className="text-body-sm text-[#64748B]">{agent.description}</p>
-                    </div>
-                    <Switch
-                      checked={agent.enabled}
-                      onCheckedChange={() => toggleAgent(agent.id)}
-                      className="data-[state=checked]:bg-[#6366F1] shrink-0"
-                    />
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {/* ==================== TAB 4: 集成配置 ==================== */}
+        {/* ==================== TAB 2: 集成配置 ==================== */}
         {activeTab === 'integrations' && (
           <motion.div
             key="integrations"
@@ -742,22 +376,20 @@ export default function SettingsPage() {
             {/* Supabase */}
             <motion.div variants={cardVariant}>
               <h2 className="text-heading-sm text-[#F1F5F9] mb-1">Supabase</h2>
-              <p className="text-body-sm text-[#64748B] mb-4">
-                数据库与存储后端连接配置。
-              </p>
+              <p className="text-body-sm text-[#64748B] mb-4">{t('数据库与存储后端连接配置。')}</p>
               <div className="glass-card rounded-[16px] border border-[#1E293B] p-5 space-y-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Database className="w-5 h-5 text-[#3ECF8E]" />
-                    <span className="text-heading-sm text-[#F1F5F9]">Supabase 连接</span>
+                    <span className="text-heading-sm text-[#F1F5F9]">{t('Supabase 连接')}</span>
                   </div>
                   {supabaseConnected ? (
                     <Badge className="bg-[rgba(16,185,129,0.15)] text-[#10B981] border-[#10B981]">
-                      <Check className="w-3 h-3 mr-1" /> 已连接
+                      <Check className="w-3 h-3 mr-1" /> {t('已连接')}
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="text-[#64748B] border-[#334155]">
-                      未连接
+                      {t('未连接')}
                     </Badge>
                   )}
                 </div>
@@ -782,28 +414,26 @@ export default function SettingsPage() {
                   />
                 </div>
                 <Button
-                  onClick={() => setSupabaseConnected(true)}
+                  onClick={() => showNotice(t('Supabase 连接配置尚未开放'))}
                   className="bg-[#3ECF8E] hover:bg-[#4EE99D] text-black font-medium"
                 >
-                  测试连接
+                  {t('测试连接')}
                 </Button>
               </div>
             </motion.div>
 
             {/* Web Search */}
             <motion.div variants={cardVariant}>
-              <h2 className="text-heading-sm text-[#F1F5F9] mb-1">Web Search</h2>
-              <p className="text-body-sm text-[#64748B] mb-4">
-                网络搜索集成，增强数字员工的信息获取能力。
-              </p>
+              <h2 className="text-heading-sm text-[#F1F5F9] mb-1">联网搜索</h2>
+              <p className="text-body-sm text-[#64748B] mb-4">{t('网络搜索集成，增强数字员工的信息获取能力。')}</p>
               <div className="glass-card rounded-[16px] border border-[#1E293B] p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <Label className="text-heading-sm text-[#F1F5F9] block mb-0.5">
-                      Web Search 集成
+                      {t('联网搜索服务')}
                     </Label>
                     <p className="text-body-sm text-[#64748B]">
-                      允许数字员工实时搜索网络信息
+                      {t('允许数字员工实时搜索网络信息')}
                     </p>
                   </div>
                   <Switch
@@ -820,27 +450,27 @@ export default function SettingsPage() {
                     className="space-y-3 pt-2"
                   >
                     <div>
-                      <Label className="text-body-sm text-[#94A3B8] mb-1.5 block">Provider</Label>
+                      <Label className="text-body-sm text-[#94A3B8] mb-1.5 block">搜索服务</Label>
                       <div className="relative max-w-[240px]">
                         <select
                           value={webSearchProvider}
                           onChange={(e) => { setWebSearchProvider(e.target.value); setUnsaved(true) }}
                           className="w-full h-10 px-3 pr-8 rounded-[10px] bg-[#0D1321] border border-[#1E293B] text-sm text-[#F1F5F9] focus:outline-none focus:border-[#6366F1] appearance-none"
                         >
-                          <option>Serper.dev</option>
-                          <option>Exa.ai</option>
-                          <option>Custom</option>
+                          <option value="Serper.dev">标准搜索</option>
+                          <option value="Exa.ai">深度搜索</option>
+                          <option value="Custom">企业自定义</option>
                         </select>
                         <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B] pointer-events-none" />
                       </div>
                     </div>
                     <div>
-                      <Label className="text-body-sm text-[#94A3B8] mb-1.5 block">API Key</Label>
+                      <Label className="text-body-sm text-[#94A3B8] mb-1.5 block">服务凭证</Label>
                       <Input
                         type="password"
                         value={webSearchKey}
                         onChange={(e) => { setWebSearchKey(e.target.value); setUnsaved(true) }}
-                        placeholder="Enter API key"
+                        placeholder="输入服务凭证"
                         className="bg-[#0D1321] border-[#1E293B] text-[#F1F5F9]"
                       />
                     </div>
@@ -849,33 +479,10 @@ export default function SettingsPage() {
               </div>
             </motion.div>
 
-            {/* Third-Party API Key */}
-            <motion.div variants={cardVariant}>
-              <h2 className="text-heading-sm text-[#F1F5F9] mb-1">第三方 API Key</h2>
-              <p className="text-body-sm text-[#64748B] mb-4">
-                其他外部服务的 API Key 配置。
-              </p>
-              <div className="glass-card rounded-[16px] border border-[#1E293B] p-5 space-y-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Code className="w-5 h-5 text-[#6366F1]" />
-                  <span className="text-heading-sm text-[#F1F5F9]">通用 API Key</span>
-                </div>
-                <div>
-                  <Label className="text-body-sm text-[#94A3B8] mb-1.5 block">API Key</Label>
-                  <Input
-                    type="password"
-                    value={thirdPartyApiKey}
-                    onChange={(e) => { setThirdPartyApiKey(e.target.value); setUnsaved(true) }}
-                    placeholder="sk-..."
-                    className="bg-[#0D1321] border-[#1E293B] text-[#F1F5F9]"
-                  />
-                </div>
-              </div>
-            </motion.div>
           </motion.div>
         )}
 
-        {/* ==================== TAB 5: 账户管理 ==================== */}
+        {/* ==================== TAB 3: 账户管理 ==================== */}
         {activeTab === 'account' && (
           <motion.div
             key="account"
@@ -885,10 +492,24 @@ export default function SettingsPage() {
             exit={{ opacity: 0 }}
             className="space-y-6"
           >
+            {cloudSession?.configured && cloudSession.authenticated && (
+              <motion.div variants={cardVariant}>
+                <div className="glass-card rounded-[16px] border border-[#26334B] p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="grid h-11 w-11 place-items-center rounded-lg bg-[rgba(99,102,241,0.16)] text-[#A5B4FC]"><Laptop className="h-5 w-5" /></div>
+                      <div><p className="text-sm font-medium text-[#F1F5F9]">当前设备已授权</p><p className="mt-1 text-xs text-[#64748B]">{cloudSession.device?.name || 'Windows PC'}</p></div>
+                    </div>
+                    <Badge className="border-[#10B981]/40 bg-[#10B981]/10 text-[#6EE7B7]">在线</Badge>
+                  </div>
+                  <button onClick={async () => { await logoutCloud(); await reloadCloudSession(); window.location.reload() }} className="mt-5 inline-flex items-center gap-2 text-sm text-[#94A3B8] transition-colors hover:text-[#F1F5F9]"><LogOut className="h-4 w-4" />退出登录</button>
+                </div>
+              </motion.div>
+            )}
             {/* Profile */}
             <motion.div variants={cardVariant}>
-              <h2 className="text-heading-sm text-[#F1F5F9] mb-1">个人信息</h2>
-              <p className="text-body-sm text-[#64748B] mb-4">管理你的个人资料信息。</p>
+              <h2 className="text-heading-sm text-[#F1F5F9] mb-1">{t('个人信息')}</h2>
+              <p className="text-body-sm text-[#64748B] mb-4">{t('管理你的个人资料信息。')}</p>
               <div className="glass-card rounded-[16px] border border-[#1E293B] p-5 space-y-5">
                 {/* Avatar + Name */}
                 <div className="flex items-center gap-4">
@@ -897,7 +518,7 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <p className="text-heading-sm text-[#F1F5F9]">{profileName}</p>
-                    <p className="text-body-sm text-[#64748B]">{profileEmail}</p>
+                    <p className="text-body-sm text-[#64748B]">{cloudSession?.user?.email || profileEmail}</p>
                   </div>
                 </div>
 
@@ -905,7 +526,7 @@ export default function SettingsPage() {
 
                 {/* Name */}
                 <div>
-                  <Label className="text-body-sm text-[#94A3B8] mb-1.5 block">姓名</Label>
+                  <Label className="text-body-sm text-[#94A3B8] mb-1.5 block">{t('姓名')}</Label>
                   <Input
                     value={profileName}
                     onChange={(e) => { setProfileName(e.target.value); setUnsaved(true) }}
@@ -915,28 +536,21 @@ export default function SettingsPage() {
 
                 {/* Email */}
                 <div>
-                  <Label className="text-body-sm text-[#94A3B8] mb-1.5 block">邮箱</Label>
+                  <Label className="text-body-sm text-[#94A3B8] mb-1.5 block">{t('邮箱')}</Label>
                   <Input
-                    value={profileEmail}
+                    value={cloudSession?.user?.email || profileEmail}
                     disabled
                     className="bg-[#0D1321] border-[#1E293B] text-[#64748B] cursor-not-allowed"
                   />
-                  <p className="text-body-sm text-[#64748B] mt-1">由 OAuth 提供商管理</p>
+                  <p className="text-body-sm text-[#64748B] mt-1">{t('由登录服务统一管理')}</p>
                 </div>
 
                 {/* Role */}
                 <div>
-                  <Label className="text-body-sm text-[#94A3B8] mb-1.5 block">角色</Label>
+                  <Label className="text-body-sm text-[#94A3B8] mb-1.5 block">{t('角色')}</Label>
                   <div className="relative max-w-[240px]">
-                    <select
-                      value={profileRole}
-                      onChange={(e) => { setProfileRole(e.target.value); setUnsaved(true) }}
-                      className="w-full h-10 px-3 pr-8 rounded-[10px] bg-[#0D1321] border border-[#1E293B] text-sm text-[#F1F5F9] focus:outline-none focus:border-[#6366F1] appearance-none"
-                    >
-                      <option>系统管理员</option>
-                      <option>数字员工配置员</option>
-                      <option>数据分析师</option>
-                      <option>普通用户</option>
+                    <select value={profileRole} disabled className="w-full h-10 px-3 pr-8 rounded-[10px] bg-[#0D1321] border border-[#1E293B] text-sm text-[#94A3B8] appearance-none cursor-not-allowed">
+                      <option value={profileRole}>{t(profileRole)}</option>
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B] pointer-events-none" />
                   </div>
@@ -948,28 +562,16 @@ export default function SettingsPage() {
             <motion.div variants={cardVariant}>
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-heading-sm text-[#F1F5F9] mb-1">团队成员</h2>
-                  <p className="text-body-sm text-[#64748B]">管理团队成员与访问权限。</p>
+                  <h2 className="text-heading-sm text-[#F1F5F9] mb-1">{t('团队成员')}</h2>
+                  <p className="text-body-sm text-[#64748B]">{t('管理团队成员与访问权限。')}</p>
                 </div>
                 <Button
                   size="sm"
                   className="bg-[#6366F1] hover:bg-[#818CF8] text-white"
-                  onClick={() => {
-                    setTeamMembers((prev) => [
-                      ...prev,
-                      {
-                        id: `new-${Date.now()}`,
-                        name: '新成员',
-                        email: 'pending@szyg.com',
-                        role: '普通用户',
-                        status: 'pending',
-                      },
-                    ])
-                    setUnsaved(true)
-                  }}
+                  onClick={() => showNotice(t('团队成员邀请功能尚未开放'))}
                 >
                   <Plus className="w-4 h-4 mr-1.5" />
-                  添加成员
+                  {t('添加成员')}
                 </Button>
               </div>
               <div className="glass-card rounded-[16px] border border-[#1E293B] overflow-hidden">
@@ -981,10 +583,10 @@ export default function SettingsPage() {
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#6366F1] to-[#8B5CF6] flex items-center justify-center text-sm font-semibold text-white">
-                          {member.name.charAt(0)}
+                          {(member.name || '成员').trim().charAt(0) || '成'}
                         </div>
                         <div>
-                          <p className="text-body-md font-medium text-[#F1F5F9]">{member.name}</p>
+                          <p className="text-body-md font-medium text-[#F1F5F9]">{t(member.name)}</p>
                           <p className="text-body-sm text-[#64748B]">{member.email}</p>
                         </div>
                       </div>
@@ -998,9 +600,9 @@ export default function SettingsPage() {
                               : 'border-[#F59E0B] text-[#F59E0B] bg-[rgba(245,158,11,0.1)]'
                           )}
                         >
-                          {member.status === 'active' ? '活跃' : '待激活'}
+                          {t(member.status === 'active' ? '活跃' : '待激活')}
                         </Badge>
-                        <span className="text-body-sm text-[#94A3B8]">{member.role}</span>
+                        <span className="text-body-sm text-[#94A3B8]">{t(member.role)}</span>
                         <button
                           onClick={async () => {
                             setTeamMembers((prev) => prev.filter((m) => m.id !== member.id))
@@ -1017,6 +619,23 @@ export default function SettingsPage() {
                 </div>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+          </AnimatePresence>
+        </motion.section>
+      </div>
+
+      <AnimatePresence>
+        {notice && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.98 }}
+            className="fixed right-6 top-20 z-50 flex max-w-sm items-center gap-2 rounded-lg border border-[#334155] bg-[#111827]/95 px-4 py-3 text-sm text-[#E2E8F0] shadow-card-lift backdrop-blur-md"
+            role="status"
+          >
+            <Info className="h-4 w-4 shrink-0 text-[#818CF8]" />
+            {notice}
           </motion.div>
         )}
       </AnimatePresence>
@@ -1038,10 +657,10 @@ export default function SettingsPage() {
                 className="text-[#94A3B8] hover:text-[#F1F5F9]"
               >
                 <RotateCcw className="w-4 h-4 mr-2" />
-                恢复默认
+                {t('恢复默认')}
               </Button>
               <div className="flex items-center gap-3">
-                <span className="text-body-sm text-[#F59E0B]">有未保存的更改</span>
+                <span className="text-body-sm text-[#F59E0B]">{t('有未保存的更改')}</span>
                 <motion.div
                   animate={{
                     boxShadow: [
@@ -1058,7 +677,7 @@ export default function SettingsPage() {
                     className="bg-[#6366F1] hover:bg-[#818CF8] text-white"
                   >
                     <Save className="w-4 h-4 mr-2" />
-                    保存更改
+                    {t('保存更改')}
                   </Button>
                 </motion.div>
               </div>

@@ -11,6 +11,7 @@ Acquisition REST API — 流量引擎 + 客户转化 完整 REST 端点
 import asyncio
 import json
 import logging
+import uuid
 from datetime import datetime
 from typing import Optional
 
@@ -65,6 +66,7 @@ class InterceptRequest(BaseModel):
     comment_count: int = 5
     strategy: str = "balanced"
     deai: bool = True
+    confirmed: bool = False
 
 
 class BatchCommentRequest(BaseModel):
@@ -72,6 +74,33 @@ class BatchCommentRequest(BaseModel):
     comments: list[dict]
     strategy: str = "balanced"
     deai: bool = True
+    confirmed: bool = False
+
+
+class EnqueueCommentRequest(BaseModel):
+    platform: str
+    video_id: str = ""
+    video_title: str = ""
+    video_url: str = ""
+    text: str = Field(..., min_length=1)
+    strategy: str = "balanced"
+    deai: bool = False
+    confirmed: bool = False
+
+
+class EnqueueBatchCommentTarget(BaseModel):
+    platform: str
+    video_id: str = ""
+    video_title: str = ""
+    video_url: str = ""
+
+
+class EnqueueBatchCommentRequest(BaseModel):
+    targets: list[EnqueueBatchCommentTarget] = Field(..., min_length=1, max_length=5)
+    text: str = Field(..., min_length=1)
+    strategy: str = "balanced"
+    deai: bool = False
+    confirmed: bool = False
 
 
 class GenerateCommentRequest(BaseModel):
@@ -79,6 +108,7 @@ class GenerateCommentRequest(BaseModel):
     video_description: str = ""
     count: int = 3
     strategy: str = "balanced"
+    shared_across_targets: bool = False
 
 
 class DeAIRequest(BaseModel):
@@ -144,6 +174,25 @@ class StrategyRequest(BaseModel):
     strategy: str = "balanced"
 
 
+def _search_platform_statuses(platforms: list[str]) -> list[dict]:
+    """Expose collector state so an empty platform never looks like a silent failure."""
+    from szyg.integrations.acquisition_adapters import get_acquisition_adapter
+
+    statuses: list[dict] = []
+    for platform in platforms:
+        try:
+            diagnostics = get_acquisition_adapter(platform).search_diagnostics()
+        except Exception:
+            diagnostics = {}
+        statuses.append({
+            "platform": platform,
+            "status": diagnostics.get("status") or "unknown",
+            "error_code": diagnostics.get("error_code") or "",
+            "message": diagnostics.get("message") or "",
+        })
+    return statuses
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # 📈 流量引擎 — 视频搜索
 # ═══════════════════════════════════════════════════════════════════════
@@ -173,7 +222,12 @@ async def search_videos(req: SearchRequest):
                 "quality_score": v.quality_score,
                 "score_detail": v.score_detail,
             })
-    return {"keyword": req.keyword, "total": len(all_videos), "videos": all_videos}
+    return {
+        "keyword": req.keyword,
+        "total": len(all_videos),
+        "videos": all_videos,
+        "platforms": _search_platform_statuses(req.platforms),
+    }
 
 
 @router.post("/search/aggregate")
@@ -184,6 +238,7 @@ async def search_aggregated(req: SearchRequest):
     return {
         "keyword": req.keyword,
         "total": len(targets),
+        "platforms": _search_platform_statuses(req.platforms),
         "targets": [
             {
                 "video_id": t.video_id, "platform": t.platform,
@@ -206,6 +261,8 @@ async def search_aggregated(req: SearchRequest):
 @router.post("/intercept")
 async def run_intercept(req: InterceptRequest):
     """一键截流流水线: 搜索→筛选→生成→发送"""
+    if not req.confirmed:
+        raise HTTPException(status_code=400, detail="发送评论前需要人工确认")
     engine = _get_intercept()
     result = await engine.run_pipeline(
         keyword=req.keyword,
@@ -213,6 +270,7 @@ async def run_intercept(req: InterceptRequest):
         comment_count=req.comment_count,
         strategy=req.strategy,
         deai=req.deai,
+        confirmed=req.confirmed,
     )
     return result
 
@@ -225,13 +283,17 @@ async def find_targets(req: SearchRequest):
     return {
         "keyword": req.keyword,
         "total": len(targets),
+        "platforms": _search_platform_statuses(req.platforms),
         "targets": [
             {
                 "video_id": t.video_id, "platform": t.platform,
-                "title": t.title, "author": t.author,
+                "title": t.title, "description": t.description,
+                "author": t.author, "author_followers": t.author_followers,
                 "quality_score": t.quality_score,
                 "score_detail": t.score_detail,
-                "url": t.url, "comments_count": t.comments_count,
+                "url": t.url, "cover": t.cover,
+                "plays": t.plays, "likes": t.likes,
+                "comments_count": t.comments_count, "shares": t.shares,
             }
             for t in targets
         ]
@@ -254,7 +316,7 @@ async def generate_comments(req: GenerateCommentRequest):
     """AI 生成评论"""
     from szyg.comment_engine import generate_comments_with_llm
     comments = await generate_comments_with_llm(
-        req.video_title, req.video_description, req.count, req.strategy
+        req.video_title, req.video_description, req.count, req.strategy, req.shared_across_targets
     )
     return {"comments": comments, "count": len(comments)}
 
@@ -278,8 +340,11 @@ async def preflight(req: PreflightRequest):
 @router.post("/comments/batch-send")
 async def batch_send(req: BatchCommentRequest):
     """批量发送评论"""
+    if not req.confirmed:
+        raise HTTPException(status_code=400, detail="发送评论前需要人工确认")
     from szyg.comment_engine import batch_send
-    results = await batch_send(req.platform, req.comments, req.strategy, req.deai)
+    comments = [{**item, "human_confirmed": True} for item in req.comments]
+    results = await batch_send(req.platform, comments, req.strategy, req.deai)
     counts = {}
     for item in results:
         status = item.get("status", "unknown")
@@ -297,13 +362,90 @@ async def batch_send(req: BatchCommentRequest):
     }
 
 
+@router.post("/comments/enqueue")
+async def enqueue_comment(req: EnqueueCommentRequest):
+    """Persist one explicitly confirmed comment and execute it asynchronously."""
+    if not req.confirmed:
+        raise HTTPException(status_code=400, detail="发送评论前需要人工确认")
+    from szyg.comment_engine import enqueue_confirmed_comment
+
+    try:
+        result = await enqueue_confirmed_comment(
+            req.platform,
+            {
+                "video_id": req.video_id,
+                "video_title": req.video_title,
+                "video_url": req.video_url,
+                "text": req.text,
+            },
+            strategy=req.strategy,
+            deai=req.deai,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "item": result}
+
+
+@router.post("/comments/enqueue-batch")
+async def enqueue_comment_batch(req: EnqueueBatchCommentRequest):
+    """Queue one confirmed comment for multiple targets with staggered execution."""
+    if not req.confirmed:
+        raise HTTPException(status_code=400, detail="群发评论前需要人工确认")
+    from szyg.comment_engine import enqueue_confirmed_comment
+
+    batch_id = f"comment_batch_{uuid.uuid4().hex[:10]}"
+    items = []
+    for index, target in enumerate(req.targets):
+        try:
+            item = await enqueue_confirmed_comment(
+                target.platform,
+                {
+                    "video_id": target.video_id,
+                    "video_title": target.video_title,
+                    "video_url": target.video_url,
+                    "text": req.text,
+                    "batch_id": batch_id,
+                },
+                strategy=req.strategy,
+                deai=req.deai,
+                delay_seconds=index * 45,
+            )
+            items.append({**item, "platform": target.platform, "video_title": target.video_title})
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "batch_id": batch_id, "items": items}
+
+
 @router.get("/comments/queue")
-async def comment_queue(status: str = "", platform: str = "",
+async def comment_queue(status: str = "", platform: str = "", archived: bool = False,
                         limit: int = 50, offset: int = 0):
     """评论队列列表"""
     queue = _get_queue()
+    if archived:
+        items = await queue.list_archived(status, platform, limit, offset)
+        payload = []
+        for item in items:
+            metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+            payload.append({
+                **item,
+                "batch_id": str(item.get("batch_id") or metadata.get("batch_id") or ""),
+                "target_url": str(item.get("video_url") or item.get("target_url") or ""),
+                "archived": True,
+            })
+        return {
+            "items": payload,
+            "total": len(items),
+            "archive": queue.archive_stats(),
+        }
     items = await queue.list(status, platform, limit, offset)
-    return {"items": [i.__dict__ for i in items], "total": len(items)}
+    payload = []
+    for item in items:
+        row = dict(item.__dict__)
+        metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+        row["batch_id"] = str(metadata.get("batch_id") or "")
+        row["target_url"] = str(row.get("video_url") or "")
+        payload.append(row)
+    return {"items": payload, "total": len(items)}
 
 
 @router.get("/comments/stats")
@@ -316,6 +458,7 @@ async def comment_stats():
     return {
         "queue": stats.__dict__,
         "rate_limits": rate_status,
+        "archive": queue.archive_stats(),
     }
 
 

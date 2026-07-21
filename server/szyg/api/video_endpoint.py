@@ -40,7 +40,7 @@ PROMPT_OPTIMIZE_MODEL = "doubao-seed-2-0-lite-260428"
 VIDEO_MODEL_PROFILES = {
     "doubao-video": {
         "model": SEEDANCE_15_MODEL,
-        "label": "Seedance 1.5 Pro",
+        "label": "基础模式",
         "sizes": {"720p"},
         "min_duration": 4,
         "max_duration": 12,
@@ -48,7 +48,7 @@ VIDEO_MODEL_PROFILES = {
     },
     "doubao-seedance-1.5-pro": {
         "model": SEEDANCE_15_MODEL,
-        "label": "Seedance 1.5 Pro",
+        "label": "基础模式",
         "sizes": {"720p"},
         "min_duration": 4,
         "max_duration": 12,
@@ -56,7 +56,7 @@ VIDEO_MODEL_PROFILES = {
     },
     "doubao-seedance-2.0-fast": {
         "model": "doubao-seedance-2.0-fast",
-        "label": "Seedance 2.0 Fast",
+        "label": "快速模式",
         "sizes": {"720p"},
         "min_duration": 4,
         "max_duration": 15,
@@ -64,7 +64,7 @@ VIDEO_MODEL_PROFILES = {
     },
     "doubao-seedance-2.0": {
         "model": "doubao-seedance-2.0",
-        "label": "Seedance 2.0",
+        "label": "高质量模式",
         "sizes": {"720p", "1080p"},
         "min_duration": 4,
         "max_duration": 15,
@@ -72,7 +72,8 @@ VIDEO_MODEL_PROFILES = {
     },
     "doubao-seedance-2.5": {
         "model": SEEDANCE_25_MODEL,
-        "label": "Seedance 2.5",
+        "label": "专业模式",
+        "available": False,
         "sizes": {"720p", "1080p", "4K"},
         "min_duration": 3,
         "max_duration": 30,
@@ -130,6 +131,7 @@ def _configured_video_profiles() -> dict[str, dict[str, Any]]:
             **base,
             "model": str(item.get("provider_model") or item.get("model") or base.get("model") or model_id),
             "label": str(item.get("label") or base.get("label") or model_id),
+            "available": bool(item.get("available", base.get("available", True))),
             "sizes": set(sizes if isinstance(sizes, (list, tuple, set)) else [sizes]),
             "min_duration": int(item.get("min_duration") or base.get("min_duration") or 3),
             "max_duration": int(item.get("max_duration") or base.get("max_duration") or 15),
@@ -298,6 +300,7 @@ def _video_profile(model: str) -> dict:
     return _configured_video_profiles().get(model) or {
         "model": model,
         "label": model,
+        "available": False,
         "sizes": {"720p", "1080p"},
         "min_duration": 3,
         "max_duration": 15,
@@ -307,6 +310,8 @@ def _video_profile(model: str) -> dict:
 
 def _validate_video_params(duration: int, size: str, ratio: str, count: int, model: str = DEFAULT_VIDEO_MODEL, native_audio: bool = False):
     profile = _video_profile(model)
+    if not profile.get("available", True):
+        raise HTTPException(400, f"{profile['label']}暂未开放，请选择其他生成模式")
     if duration not in ALLOWED_DURATIONS:
         raise HTTPException(400, "时长仅支持 3-30 秒")
     if duration < profile["min_duration"]:
@@ -316,7 +321,7 @@ def _validate_video_params(duration: int, size: str, ratio: str, count: int, mod
     if size not in ALLOWED_SIZES:
         raise HTTPException(400, "分辨率仅支持 720p、1080p 或 4K")
     if size not in profile["sizes"]:
-        raise HTTPException(400, f"{profile['label']} 当前不支持 {size}，请切换 Seedance 2.5 商业大片模式")
+        raise HTTPException(400, f"{profile['label']} 当前不支持 {size}，请切换专业模式")
     if ratio not in ALLOWED_RATIOS:
         raise HTTPException(400, "视频比例仅支持 16:9、1:1 或 9:16")
     if count < 1 or count > MAX_OUTPUTS:
@@ -329,6 +334,18 @@ def _validate_video_params(duration: int, size: str, ratio: str, count: int, mod
 async def video_config():
     defaults = _configured_video_defaults()
     profiles = _configured_video_profiles()
+    public_profiles_by_label: dict[str, tuple[str, dict[str, Any]]] = {}
+    for model_id, profile in profiles.items():
+        label = str(profile["label"])
+        current = public_profiles_by_label.get(label)
+        capability_score = (len(profile["sizes"]), int(profile["max_duration"]))
+        current_score = (
+            (len(current[1]["sizes"]), int(current[1]["max_duration"]))
+            if current else (-1, -1)
+        )
+        if capability_score > current_score:
+            public_profiles_by_label[label] = (model_id, profile)
+    public_profiles = list(public_profiles_by_label.values())
     return {
         "ok": True,
         "default_model": defaults["model"],
@@ -343,14 +360,14 @@ async def video_config():
         "models": [
             {
                 "id": model_id,
-                "provider_model": profile["model"],
                 "label": profile["label"],
+                "available": profile.get("available", True),
                 "sizes": sorted(profile["sizes"]),
                 "min_duration": profile["min_duration"],
                 "max_duration": profile["max_duration"],
                 "native_audio": profile["native_audio"],
             }
-            for model_id, profile in profiles.items()
+            for model_id, profile in public_profiles
         ],
     }
 
@@ -642,12 +659,12 @@ async def _analyze_assets_with_vision(req: ComposeAnalyzeRequest) -> ComposeAnal
         result = await client.chat(messages=messages, model=model, temperature=0.2, max_tokens=3000)
         raw = result.get("message", {}).get("content", "")
     except IntegrationError as exc:
-        raise HTTPException(502, f"视觉模型不可用，无法理解素材：{str(exc)[:300]}")
+        raise HTTPException(502, "素材识别服务暂时不可用，请稍后重试")
     finally:
         await client.close()
     data = _extract_json_object(raw)
     if not data:
-        raise HTTPException(502, "视觉模型返回内容无法解析")
+        raise HTTPException(502, "素材识别结果暂时无法处理，请重试")
 
     model_assets = _normalize_asset_analysis(data.get("assets"), source_assets)
     by_id = {item.id: item for item in prepared}
@@ -667,7 +684,7 @@ async def _analyze_assets_with_vision(req: ComposeAnalyzeRequest) -> ComposeAnal
         ))
     questions = _normalize_questions(data.get("questions"))
     if not questions:
-        raise HTTPException(502, "视觉模型未生成确认问题")
+        raise HTTPException(502, "暂时无法生成确认问题，请重试")
     extra_warnings = data.get("warnings") if isinstance(data.get("warnings"), list) else []
     warnings.extend(str(item) for item in extra_warnings if item)
     return ComposeAnalyzeResponse(
@@ -716,17 +733,17 @@ async def _prepare_compose_with_remote_model(req: ComposePrepareRequest) -> Comp
         raw = result.get("message", {}).get("content", "")
         data = _extract_json_object(raw)
     except IntegrationError as exc:
-        raise HTTPException(502, f"远程轻量模型不可用，无法整理成片方案：{str(exc)[:300]}")
+        raise HTTPException(502, "成片方案服务暂时不可用，请稍后重试")
     except Exception as exc:
-        raise HTTPException(502, f"远程轻量模型分镜整理失败：{str(exc)[:300]}")
+        raise HTTPException(502, "成片方案整理失败，请重试")
     finally:
         await client.close()
     if not data:
-        raise HTTPException(502, "远程轻量模型返回内容无法解析")
+        raise HTTPException(502, "成片方案暂时无法处理，请重试")
 
     storyboard = data.get("storyboard") if isinstance(data.get("storyboard"), list) else []
     if not storyboard:
-        raise HTTPException(502, "远程轻量模型未生成分镜")
+        raise HTTPException(502, "暂时未能生成分镜，请重试")
     used_assets = [asset for asset in req.analysis.assets if asset.status == "success"]
     warnings = [str(item) for item in data.get("warnings", [])] if isinstance(data.get("warnings"), list) else []
     return ComposePrepareResponse(
@@ -1254,7 +1271,7 @@ async def optimize_prompt(req: OptimizePromptRequest):
             return optimized
     if os.environ.get("SZYG_VIDEO_API_OPTIMIZE_TEMPLATE_FALLBACK", "").strip() == "1":
         return _template_optimize_prompt(req)
-    raise HTTPException(502, f"真实提示词优化模型调用失败，请检查火山 {_configured_prompt_optimize_model()} 服务或将其配置为可用的 ep-xxxx 接入点")
+    raise HTTPException(502, "提示优化服务暂时不可用，请稍后重试")
 
 
 @router.post("/storyboard", response_model=StoryboardResponse)
@@ -1273,7 +1290,7 @@ async def create_storyboard(req: StoryboardRequest):
             return generated
     if os.environ.get("SZYG_VIDEO_API_STORYBOARD_TEMPLATE_FALLBACK", "").strip() == "1":
         return _template_storyboard(req)
-    raise HTTPException(502, f"真实分镜模型调用失败，请检查火山 {_configured_storyboard_remote_model()} 服务或将其配置为可用的 ep-xxxx 接入点")
+    raise HTTPException(502, "分镜服务暂时不可用，请稍后重试")
 
 
 @router.post("/compose/analyze", response_model=ComposeAnalyzeResponse)
@@ -1348,7 +1365,7 @@ async def create_composition(req: ComposeCreateRequest):
     if not reference_assets and any(asset.type in {"image", "video"} for asset in req.prepared.used_assets):
         unsupported_features.append("visual_reference_upload")
         raise HTTPException(400, {
-            "message": "当前没有可提交给 Seedance 2.5 的视觉参考素材",
+            "message": "当前没有可用于生成视频的视觉参考素材",
             "unsupported_features": sorted(set(unsupported_features)),
         })
 

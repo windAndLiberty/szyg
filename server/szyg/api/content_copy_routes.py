@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import json
-import os
 import re
-from pathlib import Path
 from typing import Any
 
-import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from szyg.integrations.volcengine_client import VolcEngineClient
 
 
 router = APIRouter(prefix="/api/content/copy", tags=["content-copy"])
@@ -30,18 +28,6 @@ class CopyGenerateResponse(BaseModel):
     char_counts: list[int] = []
     within_range: list[bool] = []
     raw_text: str = ""
-
-
-def _load_volcengine_api_key() -> str:
-    key = os.environ.get("VOLCENGINE_API_KEY", "").strip()
-    if key:
-        return key
-    env_path = Path.cwd() / ".env"
-    if env_path.exists():
-        for line in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-            if line.strip().startswith("VOLCENGINE_API_KEY="):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return ""
 
 
 def _extract_text_from_obj(obj: Any) -> str:
@@ -93,10 +79,6 @@ class _ArkToolNotOpen(Exception):
 
 
 async def _call_ark_responses(req: CopyGenerateRequest, *, enable_web_search: bool = True) -> str:
-    api_key = _load_volcengine_api_key()
-    if not api_key:
-        raise HTTPException(500, "火山引擎 API Key 未配置")
-
     system_text = (
         "你是企业营销文案专家。请结合可用的联网搜索信息，但不要在结果中暴露模型、接口或技术细节。"
         "你的输出必须是严格 JSON，格式只能是 {\"copies\":[\"...\"]}。"
@@ -113,60 +95,19 @@ async def _call_ark_responses(req: CopyGenerateRequest, *, enable_web_search: bo
         "如果需求涉及热点、节日、行业趋势或事实，请先搜索并融入文案；"
         "如果没有必要搜索，则直接生成。"
     )
-    payload = {
-        "model": "deepseek-v4-flash-260425",
-        "stream": True,
-        "input": [
+    input_items = [
             {"role": "system", "content": [{"type": "input_text", "text": system_text}]},
             {"role": "user", "content": [{"type": "input_text", "text": user_text}]},
-        ],
-    }
-    if enable_web_search:
-        payload["tools"] = [{"type": "web_search", "max_keyword": 3}]
-
-    chunks: list[str] = []
-    completed_text = ""
-    async with httpx.AsyncClient(timeout=120, trust_env=False) as client:
-        async with client.stream(
-            "POST",
-            "https://ark.cn-beijing.volces.com/api/v3/responses",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-        ) as response:
-            if response.is_error:
-                raise HTTPException(500, f"文案生成提交失败: HTTP {response.status_code}: {(await response.aread()).decode('utf-8', errors='replace')[:300]}")
-            async for line in response.aiter_lines():
-                line = line.strip()
-                if not line.startswith("data:"):
-                    continue
-                raw = line.removeprefix("data:").strip()
-                if not raw or raw == "[DONE]":
-                    continue
-                try:
-                    event = json.loads(raw)
-                except json.JSONDecodeError:
-                    continue
-                event_type = event.get("type")
-                if event_type == "error":
-                    if event.get("code") == "ToolNotOpen":
-                        raise _ArkToolNotOpen(str(event.get("message") or "web_search not activated"))
-                    raise HTTPException(500, f"文案生成失败: {str(event.get('message') or event)[:300]}")
-                if event_type == "response.failed":
-                    err = (event.get("response") or {}).get("error") or {}
-                    if err.get("code") == "ToolNotOpen":
-                        raise _ArkToolNotOpen(str(err.get("message") or "web_search not activated"))
-                    raise HTTPException(500, f"文案生成失败: {str(err.get('message') or event)[:300]}")
-                if event_type == "response.output_text.delta" and isinstance(event.get("delta"), str):
-                    chunks.append(event["delta"])
-                elif event_type == "response.completed":
-                    completed_text = _extract_text_from_obj(event.get("response"))
-
-    text = "".join(chunks).strip() or completed_text.strip()
+    ]
+    del enable_web_search
+    client = VolcEngineClient(timeout=120)
+    try:
+        response = await client.responses_text(input_items, max_output_tokens=6000)
+    finally:
+        await client.close()
+    text = str((response.get("message") or {}).get("content") or "").strip()
     if not text:
-        raise HTTPException(500, "文案生成失败：模型未返回内容")
+        raise HTTPException(500, "文案生成失败：服务未返回内容，请重试")
     return text
 
 

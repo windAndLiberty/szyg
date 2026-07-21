@@ -39,7 +39,7 @@ async def get_execution(run_id: str):
     kernel = get_execution_kernel()
     run = kernel.get_run(run_id)
     if not run:
-        raise HTTPException(404, "Execution not found")
+        raise HTTPException(404, "任务记录不存在")
     return {
         **run,
         "steps": kernel.list_steps(run_id),
@@ -52,7 +52,7 @@ async def get_execution(run_id: str):
 async def get_execution_steps(run_id: str):
     kernel = get_execution_kernel()
     if not kernel.get_run(run_id):
-        raise HTTPException(404, "Execution not found")
+        raise HTTPException(404, "任务记录不存在")
     return {"steps": kernel.list_steps(run_id)}
 
 
@@ -60,7 +60,7 @@ async def get_execution_steps(run_id: str):
 async def get_execution_audit(run_id: str):
     kernel = get_execution_kernel()
     if not kernel.get_run(run_id):
-        raise HTTPException(404, "Execution not found")
+        raise HTTPException(404, "任务记录不存在")
     return {
         "audit": kernel.list_audit(run_id),
         "observations": kernel.list_observations(run_id),
@@ -73,7 +73,7 @@ async def pause_execution(run_id: str):
     try:
         run = kernel.pause_run(run_id)
     except KeyError:
-        raise HTTPException(404, "Execution not found")
+        raise HTTPException(404, "任务记录不存在")
     return {"ok": True, "run": run}
 
 
@@ -83,7 +83,7 @@ async def cancel_execution(run_id: str):
     try:
         run = kernel.cancel_run(run_id)
     except KeyError:
-        raise HTTPException(404, "Execution not found")
+        raise HTTPException(404, "任务记录不存在")
     return {"ok": True, "run": run}
 
 
@@ -93,7 +93,7 @@ async def resume_execution(run_id: str):
     try:
         run = kernel.resume_run(run_id)
     except KeyError:
-        raise HTTPException(404, "Execution not found")
+        raise HTTPException(404, "任务记录不存在")
     return {"ok": True, "run": run}
 
 
@@ -103,7 +103,7 @@ async def retry_execution(run_id: str):
     try:
         run = kernel.retry_run(run_id)
     except KeyError:
-        raise HTTPException(404, "Execution not found")
+        raise HTTPException(404, "任务记录不存在")
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     return {"ok": True, "run": run}

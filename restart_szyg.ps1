@@ -81,8 +81,6 @@ Write-Host "  Frontend build done."
 Write-Host "[szyg] Step 4: Start backend" -ForegroundColor Cyan
 $env:PYTHONPATH = "$root\server"
 $env:SZYG_DATA_DIR = "$root\data"
-$env:VOLCENGINE_API_KEY = "ark-149c9bff-2284-4193-a61f-8885dbb19ad5-d18be"
-$env:SZYG_ADMIN_PASSWORD = "admin123"
 $proc = Start-Process -FilePath "$root\.venv\Scripts\python.exe" `
     -ArgumentList "-m", "uvicorn", "szyg.api.app:create_app", "--host", "127.0.0.1", "--port", "$BackendPort", "--factory" `
     -WindowStyle Minimized `

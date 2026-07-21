@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import type { LucideIcon } from 'lucide-react'
 import { Sparkles, Construction } from 'lucide-react'
+import { useI18n } from '@/lib/i18n'
 
 type PlaceholderProps = {
   title: string
@@ -16,6 +17,7 @@ type PlaceholderProps = {
  * 后续 Phase B 逐个替换为真实功能页面。
  */
 export default function Placeholder({ description, icon: Icon, module }: PlaceholderProps) {
+  const { t } = useI18n()
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -44,7 +46,7 @@ export default function Placeholder({ description, icon: Icon, module }: Placeho
         transition={{ duration: 0.5, delay: 0.2 }}
         className="text-body-lg text-[#94A3B8] text-center max-w-md mb-8"
       >
-        {description}
+        {t(description)}
       </motion.p>
 
       <motion.div
@@ -56,9 +58,9 @@ export default function Placeholder({ description, icon: Icon, module }: Placeho
       >
         <Construction className="w-5 h-5 text-[#F59E0B] shrink-0" />
         <div className="flex flex-col">
-          <span className="text-body-md text-[#F1F5F9] font-medium">模块开发中</span>
+          <span className="text-body-md text-[#F1F5F9] font-medium">{t('模块开发中')}</span>
           <span className="text-body-sm text-[#64748B]">
-            {module ? `后端模块: ${module}` : '骨架阶段占位页面'}
+            {module ? module : t('骨架阶段占位页面')}
           </span>
         </div>
         <Sparkles className="w-4 h-4 text-[#6366F1] ml-2" />

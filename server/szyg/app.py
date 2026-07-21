@@ -54,9 +54,9 @@ def create_app() -> FastAPI:
     from szyg.api.hub_routes import router as hub_router
     from szyg.api.announce_routes import router as announce_router
 
-    # Content publisher & smart scheduler
+    # Content publisher. Business automation is exposed by workflow_routes.
     from szyg.api.publisher_routes import router as publisher_router
-    from szyg.api.scheduler_routes import router as scheduler_router
+    from szyg.api.intelligence_routes import router as intelligence_router
 
     app.include_router(agent_router)
     app.include_router(hub_router)
@@ -68,13 +68,14 @@ def create_app() -> FastAPI:
     from szyg.api.client_routes import router as client_router
 
     app.include_router(publisher_router)
-    app.include_router(scheduler_router)
+    app.include_router(intelligence_router)
     app.include_router(brain_router)
     app.include_router(client_router)
 
     # Optional routes (may need openai, edge_tts, etc.)
     _try_include(app, "szyg.api.routes", prefix="/v1")
     _try_include(app, "szyg.api.frontend_routes")
+    _try_include(app, "szyg.api.workflow_routes")
     _try_include(app, "szyg.api.image_endpoint")
 
     @app.get("/api/health")

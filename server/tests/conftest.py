@@ -13,7 +13,6 @@
 import asyncio
 import json
 import os
-import sqlite3
 import tempfile
 from pathlib import Path
 from typing import AsyncGenerator, Generator
@@ -90,66 +89,6 @@ def config(temp_dir: Path) -> MagicMock:
     mock_config.wechaty.puppet_token = "test-token"
 
     return mock_config
-
-
-# =============================================================================
-# Database Fixtures
-# =============================================================================
-
-
-@pytest.fixture
-def memory_db(temp_dir: Path) -> sqlite3.Connection:
-    """提供内存SQLite数据库（带FTS5支持）。"""
-    db_path = temp_dir / "test_memory.db"
-    conn = sqlite3.connect(str(db_path), check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-
-    # 创建主表
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS memories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            content TEXT NOT NULL,
-            metadata TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # 创建FTS5虚拟表用于全文搜索
-    conn.execute("""
-        CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
-            content,
-            metadata,
-            content='memories',
-            content_rowid='id'
-        )
-    """)
-
-    # 创建触发器保持FTS索引同步
-    conn.execute("""
-        CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
-            INSERT INTO memories_fts(rowid, content, metadata)
-            VALUES (new.id, new.content, new.metadata);
-        END
-    """)
-    conn.execute("""
-        CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories BEGIN
-            INSERT INTO memories_fts(memories_fts, rowid, content, metadata)
-            VALUES ('delete', old.id, old.content, old.metadata);
-        END
-    """)
-    conn.execute("""
-        CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories BEGIN
-            INSERT INTO memories_fts(memories_fts, rowid, content, metadata)
-            VALUES ('delete', old.id, old.content, old.metadata);
-            INSERT INTO memories_fts(rowid, content, metadata)
-            VALUES (new.id, new.content, new.metadata);
-        END
-    """)
-
-    conn.commit()
-    yield conn
-    conn.close()
 
 
 # =============================================================================

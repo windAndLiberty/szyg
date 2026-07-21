@@ -222,13 +222,13 @@ async def analyze_graphic(req: GraphicAnalyzeRequest):
         )
         raw = result.get("message", {}).get("content", "")
     except IntegrationError as exc:
-        raise HTTPException(502, f"远程多模态模型不可用，无法理解素材：{str(exc)[:300]}")
+        raise HTTPException(502, "素材识别服务暂时不可用，请稍后重试")
     finally:
         await client.close()
 
     data = _extract_json_object(raw)
     if not data:
-        raise HTTPException(502, "远程多模态模型返回内容无法解析")
+        raise HTTPException(502, "素材识别结果暂时无法处理，请重试")
     model_assets = _normalize_asset_analysis(data.get("assets"), req.assets)
     by_id = {item.id: item for item in prepared}
     merged: list[ComposeAssetAnalysis] = []
@@ -247,7 +247,7 @@ async def analyze_graphic(req: GraphicAnalyzeRequest):
         ))
     questions = _normalize_questions(data.get("questions"))
     if not questions:
-        raise HTTPException(502, "远程多模态模型未生成确认问题")
+        raise HTTPException(502, "暂时无法生成确认问题，请重试")
     return GraphicAnalyzeResponse(
         model=model,
         assets=merged,
@@ -308,13 +308,13 @@ async def prepare_graphic(req: GraphicPrepareRequest):
         ], model=model, max_output_tokens=3500)
         raw = result.get("message", {}).get("content", "")
     except IntegrationError as exc:
-        raise HTTPException(502, f"远程多模态模型不可用，无法生成图文草稿：{str(exc)[:300]}")
+        raise HTTPException(502, "图文生成服务暂时不可用，请稍后重试")
     finally:
         await client.close()
 
     data = _extract_json_object(raw)
     if not data or not isinstance(data.get("draft"), dict):
-        raise HTTPException(502, "远程多模态模型返回图文草稿无法解析")
+        raise HTTPException(502, "图文草稿暂时无法处理，请重试")
     draft_data = data["draft"]
     draft = GraphicDraft(
         title=str(draft_data.get("title") or "").strip(),
@@ -327,7 +327,7 @@ async def prepare_graphic(req: GraphicPrepareRequest):
         publish_notes=str(draft_data.get("publish_notes") or "").strip(),
     )
     if not draft.title or not draft.body:
-        raise HTTPException(502, "远程多模态模型未生成完整标题和正文")
+        raise HTTPException(502, "暂时未能生成完整标题和正文，请重试")
     warnings = [str(item) for item in data.get("warnings", [])] if isinstance(data.get("warnings"), list) else []
     return GraphicPrepareResponse(
         draft=draft,

@@ -120,7 +120,6 @@ class TestBuildSystemPrompt:
                     "temperature": 0.5,
                 },
                 "skills": {"list": [{"name": "copywriting", "enabled": True}]},
-                "memory": {"knowledgeBases": ["marketing_kb"]},
             }
         }
         with patch("szyg.data_path.DATA_DIR", tmp_path):
@@ -131,7 +130,7 @@ class TestBuildSystemPrompt:
             assert "内容运营" in prompt
             assert "内容创作" in prompt
             assert "copywriting" in prompt
-            assert "marketing_kb" in prompt
+            assert "marketing_kb" not in prompt
             assert temp == 0.5
 
     def test_unknown_agent_returns_default(self):

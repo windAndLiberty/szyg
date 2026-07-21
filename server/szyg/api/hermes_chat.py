@@ -132,6 +132,7 @@ class HermesChatRequest(BaseModel):
     stream: bool = True
     agent_id: str = ""  # 员工 ID: content/acquisition/conversion/ops，空=通用模式
     expert_prompt: str = ""  # AI人才市场专家 prompt（独立通道，不影响超级员工）
+    session_id: str = ""  # 对话级 Hermes 记忆作用域
 
 # ── Tools (same as before, OpenAI format) ─────────────
 
@@ -154,15 +155,15 @@ HERMES_TOOLS = [
     {"type":"function","function":{"name":"platform_post_status","description":"查询已发布内容在平台上的实时数据（播放量/点赞/评论/分享）。需要 post_id（发布时返回）。","parameters":{"type":"object","properties":{"platform":{"type":"string","description":"平台ID"},"post_id":{"type":"string","description":"发布时返回的 platform_post_id"}},"required":["platform","post_id"]}}},
 
     # Scheduler
-    {"type":"function","function":{"name":"scheduler_list","description":"列出定时任务","parameters":{"type":"object","properties":{}}}},
-    {"type":"function","function":{"name":"scheduler_create","description":"创建定时任务","parameters":{"type":"object","properties":{"name":{"type":"string"},"action":{"type":"string"},"trigger_type":{"type":"string"},"minutes":{"type":"integer"}},"required":["name","action"]}}},
-    {"type":"function","function":{"name":"scheduler_get","description":"获取指定任务的详细信息","parameters":{"type":"object","properties":{"job_id":{"type":"string","description":"任务ID"}},"required":["job_id"]}}},
-    {"type":"function","function":{"name":"scheduler_execute","description":"立即执行指定任务","parameters":{"type":"object","properties":{"job_id":{"type":"string","description":"任务ID"}},"required":["job_id"]}}},
-    {"type":"function","function":{"name":"scheduler_pause","description":"暂停定时任务","parameters":{"type":"object","properties":{"job_id":{"type":"string","description":"任务ID"}},"required":["job_id"]}}},
-    {"type":"function","function":{"name":"scheduler_resume","description":"恢复已暂停的任务","parameters":{"type":"object","properties":{"job_id":{"type":"string","description":"任务ID"}},"required":["job_id"]}}},
-    {"type":"function","function":{"name":"scheduler_delete","description":"删除定时任务","parameters":{"type":"object","properties":{"job_id":{"type":"string","description":"任务ID"}},"required":["job_id"]}}},
-    {"type":"function","function":{"name":"scheduler_history","description":"查看任务执行历史","parameters":{"type":"object","properties":{"job_id":{"type":"string","description":"可选：按任务过滤"},"limit":{"type":"integer","description":"返回条数"}}}}},
-    {"type":"function","function":{"name":"scheduler_stats","description":"获取调度器统计信息","parameters":{"type":"object","properties":{}}}},
+    {"type":"function","function":{"name":"scheduler_list","description":"列出工作流方案和运行计划","parameters":{"type":"object","properties":{}}}},
+    {"type":"function","function":{"name":"scheduler_create","description":"基于标准流程创建工作流方案","parameters":{"type":"object","properties":{"name":{"type":"string"},"template_id":{"type":"string","description":"标准流程模板ID"},"trigger_type":{"type":"string","enum":["manual","interval","daily","weekly","once"]},"minutes":{"type":"integer"}},"required":["name","template_id"]}}},
+    {"type":"function","function":{"name":"scheduler_get","description":"获取指定工作流方案","parameters":{"type":"object","properties":{"job_id":{"type":"string","description":"方案ID"}},"required":["job_id"]}}},
+    {"type":"function","function":{"name":"scheduler_execute","description":"立即运行指定工作流方案","parameters":{"type":"object","properties":{"job_id":{"type":"string","description":"方案ID"}},"required":["job_id"]}}},
+    {"type":"function","function":{"name":"scheduler_pause","description":"暂停工作流方案","parameters":{"type":"object","properties":{"job_id":{"type":"string","description":"方案ID"}},"required":["job_id"]}}},
+    {"type":"function","function":{"name":"scheduler_resume","description":"继续工作流方案","parameters":{"type":"object","properties":{"job_id":{"type":"string","description":"方案ID"}},"required":["job_id"]}}},
+    {"type":"function","function":{"name":"scheduler_delete","description":"删除工作流方案","parameters":{"type":"object","properties":{"job_id":{"type":"string","description":"方案ID"}},"required":["job_id"]}}},
+    {"type":"function","function":{"name":"scheduler_history","description":"查看工作流运行记录","parameters":{"type":"object","properties":{"job_id":{"type":"string","description":"可选：按方案过滤"},"limit":{"type":"integer","description":"返回条数"}}}}},
+    {"type":"function","function":{"name":"scheduler_stats","description":"获取工作流运行概览","parameters":{"type":"object","properties":{}}}},
 
     # Skills — Office Documents (12 tools)
     {"type":"function","function":{"name":"docx_create","description":"从Markdown生成Word文档","parameters":{"type":"object","properties":{"markdown":{"type":"string"},"output_path":{"type":"string"}},"required":["markdown","output_path"]}}},
@@ -198,7 +199,6 @@ HERMES_TOOLS = [
     {"type":"function","function":{"name":"agents_get","description":"获取指定智能体的完整系统提示词","parameters":{"type":"object","properties":{"agent_id":{"type":"string","description":"智能体ID"}},"required":["agent_id"]}}},
     {"type":"function","function":{"name":"agents_tiers","description":"列出智能体提示词层级","parameters":{"type":"object","properties":{}}}},
     {"type":"function","function":{"name":"agents_categories","description":"列出智能体分类","parameters":{"type":"object","properties":{}}}},
-    {"type":"function","function":{"name":"skills_list","description":"列出可用技能","parameters":{"type":"object","properties":{}}}},
     # Tool Marketplace (tools_mcp)
     {"type":"function","function":{"name":"tools_catalog","description":"列出工具市场所有可用AI工具","parameters":{"type":"object","properties":{"category":{"type":"string","description":"可选分类过滤"},"search":{"type":"string","description":"可选搜索关键词"}}}}},
     {"type":"function","function":{"name":"tools_categories","description":"列出工具市场所有分类","parameters":{"type":"object","properties":{}}}},
@@ -262,7 +262,7 @@ HERMES_TOOLS = [
     # ═══════════════════════════════════════════════════════════════
     # Phase B: 补齐缺失工具 — 调度引擎
     # ═══════════════════════════════════════════════════════════════
-    {"type":"function","function":{"name":"scheduler_update","description":"修改定时任务","parameters":{"type":"object","properties":{"job_id":{"type":"string","description":"任务ID"},"name":{"type":"string","description":"新名称"},"action":{"type":"string","description":"新动作"},"trigger_type":{"type":"string","description":"触发类型"},"minutes":{"type":"integer","description":"间隔分钟数"},"priority":{"type":"integer","description":"优先级1-10"}},"required":["job_id"]}}},
+    {"type":"function","function":{"name":"scheduler_update","description":"修改工作流方案名称或运行频率","parameters":{"type":"object","properties":{"job_id":{"type":"string","description":"方案ID"},"name":{"type":"string","description":"新名称"},"trigger_type":{"type":"string","enum":["manual","interval","daily","weekly","once"]},"minutes":{"type":"integer","description":"间隔分钟数"}},"required":["job_id"]}}},
 
     # ═══════════════════════════════════════════════════════════════
     # Phase B: 补齐缺失工具 — 工具管理
@@ -344,10 +344,18 @@ HERMES_TOOLS = [
     {"type":"function","function":{"name":"acq_send_dm","description":"发送私信给指定用户(目前仅支持B站)","parameters":{"type":"object","properties":{"platform":{"type":"string","description":"平台: bilibili"},"user_id":{"type":"string","description":"目标用户ID"},"text":{"type":"string","description":"私信内容"}},"required":["platform","user_id","text"]}}},
 ]
 
+# Hermes is the source of truth for memory and procedural skills. Keep these
+# schemas native so updates to Hermes capabilities flow into SZYG automatically.
+from szyg.hermes_runtime import native_skill_tool_schemas
+from szyg.hermes_capabilities import CAPABILITY_TOOL_SCHEMAS, get_hermes_capability_registry
+
+HERMES_TOOLS.extend(native_skill_tool_schemas())
+HERMES_TOOLS.extend(CAPABILITY_TOOL_SCHEMAS)
+
 SYSTEM_PROMPT = """你是 szyg 智能矩阵运营系统的超级AI员工。
 
 ## 核心能力
-你能通过函数调用调度以下子系统：
+你是一个统一的超级员工，不把内容、获客、转化和运营拆成独立角色。你会理解目标，并按需组合以下技能完成任务：
 
 **内容生成**: content_copy_generate 生成文案, ai_image_generate 生成图片, ai_video_create 生成视频, ai_tts_advanced 生成语音
 **内容发布**: content_create(标题+正文+类型) → content_submit → content_approve → platform_publish_direct
@@ -355,7 +363,7 @@ SYSTEM_PROMPT = """你是 szyg 智能矩阵运营系统的超级AI员工。
 **发布**: platform_publish_direct(platform, title, body, tags, content_type, media_urls) 直接发布到抖音/小红书/B站/快手/微信
   - content_type: post=图文短帖, video=视频, image=图文
   - media_urls: 逗号分隔的媒体URL或本地路径。视频发布时必填视频文件路径
-**调度**: scheduler_list/create 任务管理, scheduler_execute/pause/resume/delete 任务控制, scheduler_history/stats 历史统计
+**工作流**: scheduler_list/create 方案管理, scheduler_execute/pause/resume/delete 运行控制, scheduler_history/stats 记录统计
 **办公文档**: docx/xlsx/pptx 创建和读取, pdf 提取和合并, docx_to_markdown/docx_extract_text/xlsx_read/pptx_extract/pdf_extract/pdf_merge
 **设计**: canvas_get_fonts/canvas_preview_config Canvas设计资源
 **工具市场**: tools_catalog 浏览工具列表, tools_search 搜索工具, tools_categories 查看分类, tools_stats 统计信息
@@ -369,7 +377,7 @@ SYSTEM_PROMPT = """你是 szyg 智能矩阵运营系统的超级AI员工。
 **向量嵌入**: ai_embedding_create 文本向量化(知识库RAG)
 **内容管理**: content_get 查看详情, content_update 修改, content_delete 删除(管理员), content_reject 驳回(管理员), content_schedule 定时发布, content_publish 立即发布
 **平台运营**: platform_list 查看状态, platform_status 单个状态, platform_sessions 登录态详情, platform_login 触发扫码登录, platform_logout 清除登录态, platform_url 获取登录URL, platform_sync_cookies 同步浏览器Cookie
-**调度管理**: scheduler_update 修改任务
+**工作流管理**: scheduler_update 修改方案和运行频率
 **工具管理**: tool_install/uninstall 安装卸载(管理员), tool_launch/stop 启动停止
 **本地AI**: local_ollama_models/chat 本地Ollama对话, local_comfyui_generate 本地ComfyUI生图, runtime_list/launch/stop 本地进程管理
 **SOP工作流**: sop_list 列出, sop_define 定义
@@ -386,7 +394,8 @@ SYSTEM_PROMPT = """你是 szyg 智能矩阵运营系统的超级AI员工。
 **平台采集(直接调用)**: acq_platforms 查看采集平台, acq_search 搜索视频(支持bilibili/douyin/xhs/kuaishou), acq_get_comments 获取评论, acq_send_comment 发送评论, acq_batch_send_comments 批量发送, acq_send_dm 发私信(B站)
 **多平台发布(social-auto-upload)**: sau_list_platforms 查看支持的平台(抖音/小红书/快手/视频号/YouTube), sau_upload_video 上传视频, sau_upload_note 上传图文, sau_check_login 检查登录, sau_login 扫码登录
 **电脑使用**: computer_use_status 查看本机执行能力, computer_use_observe 观察当前桌面, computer_use_create_task 创建受控电脑使用任务, computer_use_task_status 查询执行证据, computer_use_cancel 取消任务。电脑使用会操作真实 Windows 应用；涉及外发、删除、付款、登录、加好友、批量操作等敏感动作时必须先征求用户确认，无法确认则转入需人工处理。
-**其他**: skills_list
+**业务能力目录**: capability_list 按领域发现私域营销、市场情报、数据洞察、素材组合、多账号发布和执行控制能力；capability_call 调用目录中的能力。涉及真实外发、视频创建、任务恢复或取消时，必须先获得用户明确确认，并传入 confirmed=true。
+**Hermes 长期能力**: memory 保存稳定偏好与环境事实；skills_list/skill_view 按需读取技能；skill_manage 将复杂、可复用且已经验证的工作方法固化或改进为技能。创建或删除技能前必须先取得用户确认。
 
 ## 智能发布工作流 (重要!)
 
@@ -508,7 +517,6 @@ def _build_system_prompt(agent_id: str = "", expert_prompt: str = "") -> tuple[s
     soul = config.get("soul", {})
     skills = config.get("skills", {}).get("list", [])
     basic = config.get("basic", {})
-    memory_cfg = config.get("memory", {})
 
     # Build role-specific prompt
     parts = [SYSTEM_PROMPT]
@@ -538,23 +546,73 @@ def _build_system_prompt(agent_id: str = "", expert_prompt: str = "") -> tuple[s
         skill_names = ", ".join(s["name"] for s in enabled_skills)
         parts.append(f"\n## 可用技能\n{skill_names}")
 
-    # Knowledge bases
-    kbs = memory_cfg.get("knowledgeBases", [])
-    if kbs:
-        parts.append(f"\n## 知识库访问\n你可以优先参考以下知识库: {', '.join(kbs)}")
-
     temperature = float(soul.get("temperature", 0.7))
     return "\n".join(parts), temperature
 
 # ── Tool execution ─────────────────────────────────────
 
-async def _execute_tool(name: str, args_str: str, auth_header: dict | None = None) -> str:
+async def _execute_tool(
+    name: str,
+    args_str: str,
+    auth_header: dict | None = None,
+    hermes_runtime=None,
+) -> str:
     """Execute szyg tool safely: allowlist + httpx params (no URL injection).
 
     Args:
         auth_header: Optional dict with Authorization header for internal API calls.
                      Enables authenticated write operations (scheduler_create, approve, etc.)
     """
+    if name == "capability_list":
+        try:
+            parsed = json.loads(args_str) if isinstance(args_str, str) else (args_str or {})
+        except (json.JSONDecodeError, TypeError, ValueError):
+            parsed = {}
+        if not isinstance(parsed, dict):
+            parsed = {}
+        items = get_hermes_capability_registry().list(
+            domain=str(parsed.get("domain") or ""),
+            search=str(parsed.get("search") or ""),
+        )
+        return json.dumps({"ok": True, "items": items, "total": len(items)}, ensure_ascii=False)
+
+    if name == "capability_call":
+        try:
+            parsed = json.loads(args_str) if isinstance(args_str, str) else (args_str or {})
+        except (json.JSONDecodeError, TypeError, ValueError):
+            parsed = {}
+        if not isinstance(parsed, dict):
+            parsed = {}
+        try:
+            capability_args = parsed.get("arguments_json") or {}
+            if isinstance(capability_args, str):
+                capability_args = json.loads(capability_args) if capability_args.strip() else {}
+            if not isinstance(capability_args, dict):
+                raise ValueError("arguments_json 必须是 JSON 对象")
+        except (json.JSONDecodeError, TypeError, ValueError) as exc:
+            return json.dumps({"ok": False, "error": f"能力参数格式不正确：{exc}"}, ensure_ascii=False)
+        capability_args["confirmed"] = parsed.get("confirmed") is True
+        return await get_hermes_capability_registry().execute(
+            str(parsed.get("capability") or ""),
+            capability_args,
+            auth_header,
+        )
+
+    if name in {"skills_list", "skill_view", "skill_manage", "memory"} or (
+        hermes_runtime is not None and hermes_runtime.handles_tool(name)
+    ):
+        try:
+            native_args = json.loads(args_str) if isinstance(args_str, str) else args_str
+        except (json.JSONDecodeError, TypeError, ValueError):
+            native_args = {}
+        if not isinstance(native_args, dict):
+            native_args = {}
+        if hermes_runtime is not None and hermes_runtime.handles_tool(name):
+            return await asyncio.to_thread(hermes_runtime.execute_tool, name, native_args)
+        from szyg.hermes_runtime import execute_native_skill_tool
+
+        return await asyncio.to_thread(execute_native_skill_tool, name, native_args)
+
     args = _sanitize_args(name, args_str)
     auth_headers = auth_header or {}
 
@@ -596,7 +654,7 @@ async def _execute_tool(name: str, args_str: str, auth_header: dict | None = Non
         "video_add_title","video_replace_audio","video_mix_audio","video_extract_frame",
         "video_fonts","video_render",
         "agents_list","agents_get","agents_tiers","agents_categories",
-        "skills_list",
+        "skills_list", "skill_view", "skill_manage", "memory",
         # Tool Marketplace
         "tools_catalog","tools_categories","tools_installed","tools_stats","tools_search",
         # OEM Branding
@@ -645,6 +703,8 @@ async def _execute_tool(name: str, args_str: str, auth_header: dict | None = Non
         # Computer Use
         "computer_use_status","computer_use_observe","computer_use_create_task",
         "computer_use_task_status","computer_use_cancel",
+        # Central business capability registry
+        "capability_list","capability_call",
     }
     if name not in ALLOWED:
         return f"错误: 工具 '{name}' 不被允许"
@@ -678,23 +738,26 @@ async def _execute_tool(name: str, args_str: str, auth_header: dict | None = Non
         elif name == "platform_health":
             r = await _aGET(f"{base}/api/platforms/health/all", timeout=30)
         elif name == "scheduler_list":
-            r = await _aGET(f"{base}/api/scheduler/jobs", timeout=30)
+            r = await _aGET(f"{base}/api/workflows/instances", timeout=30)
         elif name == "scheduler_create":
-            r = await _aPOST(f"{base}/api/scheduler/jobs", params={k: str(v) for k,v in args.items() if k in ("name","trigger_type","action","cron","interval_minutes","at_time","action_config_json","priority","tags")}, timeout=30)
+            trigger_type = str(args.get("trigger_type") or "manual")
+            schedule = {"type": trigger_type}
+            if trigger_type == "interval": schedule["interval_minutes"] = int(args.get("minutes") or 60)
+            r = await _aPOST(f"{base}/api/workflows/instances", json={"name": args.get("name", "工作流方案"), "template_id": args.get("template_id", ""), "schedule": schedule}, timeout=30)
         elif name == "scheduler_get":
-            r = await _aGET(f"{base}/api/scheduler/jobs/{args.get('job_id','')}", timeout=30)
+            r = await _aGET(f"{base}/api/workflows/instances/{args.get('job_id','')}", timeout=30)
         elif name == "scheduler_execute":
-            r = await _aPOST(f"{base}/api/scheduler/jobs/{args.get('job_id','')}/execute", timeout=60)
+            r = await _aPOST(f"{base}/api/workflows/instances/{args.get('job_id','')}/run", timeout=60)
         elif name == "scheduler_pause":
-            r = await _aPOST(f"{base}/api/scheduler/jobs/{args.get('job_id','')}/pause", timeout=30)
+            r = await _aPUT(f"{base}/api/workflows/instances/{args.get('job_id','')}", json={"status": "paused"}, timeout=30)
         elif name == "scheduler_resume":
-            r = await _aPOST(f"{base}/api/scheduler/jobs/{args.get('job_id','')}/resume", timeout=30)
+            r = await _aPUT(f"{base}/api/workflows/instances/{args.get('job_id','')}", json={"status": "active"}, timeout=30)
         elif name == "scheduler_delete":
-            r = await _aDELETE(f"{base}/api/scheduler/jobs/{args.get('job_id','')}", timeout=30)
+            r = await _aDELETE(f"{base}/api/workflows/instances/{args.get('job_id','')}", timeout=30)
         elif name == "scheduler_history":
-            r = await _aGET(f"{base}/api/scheduler/history", params={k: str(v) for k,v in args.items() if k in ("job_id","limit")}, timeout=30)
+            r = await _aGET(f"{base}/api/workflows/runs", params={"instance_id": args.get("job_id", ""), "limit": args.get("limit", 20)}, timeout=30)
         elif name == "scheduler_stats":
-            r = await _aGET(f"{base}/api/scheduler/stats", timeout=30)
+            r = await _aGET(f"{base}/api/workflows/overview", timeout=30)
         elif name == "agents_list":
             r = await _aGET(f"{base}/api/agents/list", timeout=30)
         # Tool Marketplace
@@ -765,13 +828,12 @@ async def _execute_tool(name: str, args_str: str, auth_header: dict | None = Non
         # Phase B: 补齐调度引擎
         # ═══════════════════════════════════════════════════════════════
         elif name == "scheduler_update":
-            params = {}
-            if args.get("name"): params["name"] = args["name"]
-            if args.get("action"): params["action"] = args["action"]
-            if args.get("trigger_type"): params["trigger_type"] = args["trigger_type"]
-            if args.get("minutes"): params["minutes"] = args["minutes"]
-            if args.get("priority"): params["priority"] = args["priority"]
-            r = await _aPUT(f"{base}/api/scheduler/jobs/{args.get('job_id','')}", params=params, timeout=30)
+            payload = {}
+            if args.get("name"): payload["name"] = args["name"]
+            if args.get("trigger_type"):
+                payload["schedule"] = {"type": args["trigger_type"]}
+                if args.get("trigger_type") == "interval": payload["schedule"]["interval_minutes"] = int(args.get("minutes") or 60)
+            r = await _aPUT(f"{base}/api/workflows/instances/{args.get('job_id','')}", json=payload, timeout=30)
         # ═══════════════════════════════════════════════════════════════
         # Phase B: 补齐工具管理
         # ═══════════════════════════════════════════════════════════════
@@ -1124,8 +1186,8 @@ async def _execute_volcengine_aigc(name: str, args: dict) -> str:
             if not ep:
                 return json.dumps({
                     "ok": False,
-                    "error": "图像生成未配置 — 需要在火山方舟控制台创建 doubao-image 推理接入点",
-                    "help": "前往 https://console.volcengine.com/ark → 在线推理 → 创建接入点 → 选择豆包·文生图模型",
+                    "error": "图片生成服务暂时不可用",
+                    "help": "请稍后重试或联系管理员检查服务状态",
                 }, ensure_ascii=False)
             path = await client.generate_image(
                 prompt=args.get("prompt", ""),
@@ -1266,11 +1328,11 @@ async def _execute_volcengine_aigc(name: str, args: dict) -> str:
                 "usage": result.get("usage", {}),
             }, ensure_ascii=False)
 
-        return json.dumps({"error": f"未知的AIGC工具: {name}"}, ensure_ascii=False)
+        return json.dumps({"error": "当前内容能力暂不可用"}, ensure_ascii=False)
 
     except Exception as e:
         logger.error(f"VolcEngine AIGC error [{name}]: {e}")
-        return json.dumps({"error": f"火山引擎AIGC调用失败: {str(e)[:200]}"}, ensure_ascii=False)
+        return json.dumps({"error": "内容生成服务暂时不可用，请稍后重试"}, ensure_ascii=False)
     finally:
         await client.close()
 
@@ -1457,9 +1519,6 @@ def _call_direct(name: str, args: dict) -> str:
             args.get("title",""), subtitle=args.get("subtitle",""),
             font_name=args.get("font_name",""),
         ), ensure_ascii=False)
-    if name == "skills_list":
-        from szyg.mcp_servers.skills_mcp import skills_list
-        return json.dumps(skills_list(), ensure_ascii=False)
     if name == "oem_themes":
         from szyg.mcp_servers.oem_mcp import oem_themes
         return json.dumps(oem_themes(), ensure_ascii=False)
@@ -1486,6 +1545,7 @@ DESTRUCTIVE_TOOLS = {
     "runtime_launch", "runtime_stop",
     "announce_create", "announce_delete",
     "oem_config_update",
+    "skill_manage",
 }
 
 # ── Agent iteration budget ────────────────────────────
@@ -1496,7 +1556,7 @@ FINAL_OUTPUT_TURNS = 5    # last N rounds can stream text (not just tools)
 # Tools that share a resource are serialised within the group;
 # tools with different (or no) resource run in parallel.
 TOOL_RESOURCE = {
-    # scheduler — all write to scheduler_jobs.json
+    # automation — serialize changes to workflow instances and runs
     "scheduler_create": "scheduler",
     "scheduler_update": "scheduler",
     "scheduler_delete": "scheduler",
@@ -1526,6 +1586,10 @@ TOOL_RESOURCE = {
     "tool_stop": "runtime",
     "runtime_launch": "runtime",
     "runtime_stop": "runtime",
+    # Hermes procedural memory is file-backed and must be serialized.
+    "skill_manage": "hermes_skills",
+    "memory": "hermes_memory",
+    "capability_call": "business_capability",
 }
 
 # ── Path segment allowlists for URL construction ─────────
@@ -1670,6 +1734,126 @@ async def _stream_llm_response(model: str, messages: list, temperature: float = 
                                 logger.debug("Skipping malformed SSE chunk: %s", e)
 
 
+_review_turns: dict[str, int] = {}
+_review_tasks: set[asyncio.Task] = set()
+
+
+def _execute_background_skill(name: str, args: dict) -> str:
+    from szyg.hermes_runtime import execute_native_skill_tool
+    from tools.skill_provenance import reset_current_write_origin, set_current_write_origin
+
+    token = set_current_write_origin("background_review")
+    try:
+        return execute_native_skill_tool(name, args)
+    finally:
+        reset_current_write_origin(token)
+
+
+async def _run_hermes_background_review(
+    model: str,
+    session_id: str,
+    messages: list[dict],
+    *,
+    review_memory: bool,
+    review_skills: bool,
+) -> None:
+    """Use Hermes' native review prompts and stores without replacing SZYG chat."""
+    from agent.background_review import (
+        _COMBINED_REVIEW_PROMPT,
+        _MEMORY_REVIEW_PROMPT,
+        _SKILL_REVIEW_PROMPT,
+    )
+    from szyg.hermes_runtime import HermesRuntimeSession, native_skill_tool_schemas
+
+    if review_memory and review_skills:
+        prompt = _COMBINED_REVIEW_PROMPT
+    elif review_memory:
+        prompt = _MEMORY_REVIEW_PROMPT
+    else:
+        prompt = _SKILL_REVIEW_PROMPT
+
+    runtime = HermesRuntimeSession.create(session_id, include_provider=False)
+    tools = native_skill_tool_schemas() if review_skills else []
+    if review_memory:
+        tools.extend(runtime.tool_schemas())
+    review_messages = [{
+        "role": "system",
+        "content": (
+            "You are Hermes' restricted background self-improvement reviewer. "
+            "Only use the supplied memory and skill tools. Do not perform the user's task."
+        ),
+    }]
+    for message in messages[-16:]:
+        role = message.get("role")
+        content = message.get("content")
+        if role in {"user", "assistant"} and isinstance(content, str) and content.strip():
+            review_messages.append({"role": role, "content": content})
+    review_messages.append({"role": "user", "content": prompt})
+
+    try:
+        for _ in range(8):
+            content, tool_calls = await _call_llm_for_tools(model, review_messages, tools, temperature=0.2)
+            if not tool_calls:
+                break
+            review_messages.append({"role": "assistant", "content": content or "", "tool_calls": tool_calls})
+            for call in tool_calls:
+                function = call.get("function", {}) if isinstance(call, dict) else {}
+                name = str(function.get("name") or "")
+                raw_args = function.get("arguments") or "{}"
+                try:
+                    args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+                except (json.JSONDecodeError, TypeError):
+                    args = {}
+                if name == "memory":
+                    result = await asyncio.to_thread(runtime.execute_tool, name, args)
+                elif name in {"skills_list", "skill_view", "skill_manage"}:
+                    result = await asyncio.to_thread(_execute_background_skill, name, args)
+                else:
+                    result = json.dumps({"success": False, "error": "Tool denied in background review"})
+                review_messages.append({
+                    "role": "tool",
+                    "tool_call_id": call.get("id", str(uuid.uuid4())[:8]),
+                    "content": result,
+                })
+    except Exception as exc:
+        logger.warning("Hermes background self-improvement review failed: %s", exc)
+    finally:
+        runtime.close()
+
+
+def _schedule_hermes_background_review(
+    model: str,
+    session_id: str,
+    messages: list[dict],
+    tool_iterations: int,
+) -> None:
+    try:
+        from hermes_cli.config import load_config
+
+        config = load_config()
+        memory_config = config.get("memory") or {}
+        skills_config = config.get("skills") or {}
+        memory_interval = int(memory_config.get("nudge_interval", 10))
+        skill_interval = int(skills_config.get("creation_nudge_interval", 10))
+        turns = _review_turns.get(session_id, 0) + 1
+        review_memory = memory_interval > 0 and turns >= memory_interval
+        review_skills = skill_interval > 0 and tool_iterations >= skill_interval
+        _review_turns[session_id] = 0 if review_memory else turns
+        if not review_memory and not review_skills:
+            return
+        task = asyncio.create_task(_run_hermes_background_review(
+            model,
+            session_id,
+            list(messages),
+            review_memory=review_memory,
+            review_skills=review_skills,
+        ))
+        _review_tasks.add(task)
+        task.add_done_callback(_review_tasks.discard)
+    except Exception as exc:
+        logger.debug("Hermes background review scheduling skipped: %s", exc)
+
+
 # ── SSE Streaming endpoint ─────────────────────────────
 
 @router.post("/api/hermes/chat")
@@ -1679,30 +1863,72 @@ async def hermes_chat(chat_req: HermesChatRequest, user: User | None = Depends(o
         raise HTTPException(422, "messages required")
 
     if not API_KEY and not VOLCENGINE_API_KEY:
-        raise HTTPException(500, "未配置任何LLM API Key，请在 secrets.yaml 中配置 火山引擎 或 config.yaml 中配置 Ollama")
+        raise HTTPException(503, "超级员工服务尚未启用，请联系管理员")
 
     # Extract Authorization header for forwarding to internal API calls
     auth_header = {}
     if req:
         auth_val = req.headers.get("Authorization", "")
         if auth_val:
-            auth_header = {"Authorization": auth_val}
+            auth_header["Authorization"] = auth_val
+        desktop_token = (
+            req.headers.get("X-SZYG-Desktop-Token", "")
+            or req.cookies.get("szyg_desktop_token", "")
+        )
+        if desktop_token:
+            auth_header["X-SZYG-Desktop-Token"] = desktop_token
 
     user_msg = chat_req.messages[-1].get("content", "") if chat_req.messages else ""
     is_admin = user is not None and getattr(user, "role", "") == "admin"
 
     async def stream():
+        from szyg.hermes_runtime import HermesRuntimeSession, maybe_run_native_curator
+
+        session_id = chat_req.session_id or f"szyg-{getattr(user, 'id', 'local')}-{chat_req.agent_id or 'super'}"
+        hermes_runtime = HermesRuntimeSession.create(session_id)
+        runtime_closed = False
+
+        def _finish_runtime(assistant_content: str, messages: list[dict] | None = None) -> None:
+            nonlocal runtime_closed
+            if runtime_closed:
+                return
+            try:
+                if assistant_content:
+                    hermes_runtime.complete_turn(str(user_msg), assistant_content, messages or [])
+                    _schedule_hermes_background_review(
+                        chat_req.model,
+                        session_id,
+                        messages or [],
+                        len(tool_call_history),
+                    )
+                maybe_run_native_curator()
+            finally:
+                hermes_runtime.close()
+                runtime_closed = True
+
         system_prompt, agent_temperature = _build_system_prompt(chat_req.agent_id, chat_req.expert_prompt)
+        memory_context = hermes_runtime.system_context(str(user_msg))
+        if memory_context:
+            system_prompt = f"{system_prompt}\n\n## Hermes 持久记忆\n{memory_context}"
+        try:
+            from szyg.knowledge_service import get_knowledge_service
+            knowledge_context = await get_knowledge_service().context_for_query(str(user_msg), limit=5)
+            if knowledge_context:
+                system_prompt = f"{system_prompt}\n\n{knowledge_context}"
+        except Exception as exc:
+            logger.warning("Hermes knowledge retrieval skipped: %s", exc)
         msgs = [{"role": "system", "content": system_prompt}]
         for m in chat_req.messages[:-1]:
             content = m.get("content","") if isinstance(m, dict) else str(m)
             msgs.append({"role": m.get("role","user") if isinstance(m, dict) else "user", "content": content})
         msgs.append({"role": "user", "content": user_msg})
+        runtime_tools = HERMES_TOOLS + hermes_runtime.tool_schemas()
 
         # 检查模型是否有配置
         api_key, _, actual_model, is_volcengine = _resolve_llm_backend(chat_req.model)
         if is_volcengine and not api_key:
-            yield f"data: {json.dumps({'type': 'error', 'content': f'模型 {chat_req.model} 未配置API Key'})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'content': '超级员工服务暂时不可用，请联系管理员'})}\n\n"
+            _finish_runtime("")
             return
 
         failed_tools = set()       # tools that returned permanent errors — don't retry
@@ -1722,7 +1948,7 @@ async def hermes_chat(chat_req: HermesChatRequest, user: User | None = Depends(o
                 return (tool_name, tool_id, f"工具 {tool_name} 已使用相同参数调用过，跳过重复执行")
             called_signatures.add(sig)
             try:
-                result = await _execute_tool(tool_name, tool_args, auth_header)
+                result = await _execute_tool(tool_name, tool_args, auth_header, hermes_runtime)
             except Exception as e:
                 result = f"工具执行异常: {str(e)[:200]}"
                 failed_tools.add(tool_name)
@@ -1756,7 +1982,7 @@ async def hermes_chat(chat_req: HermesChatRequest, user: User | None = Depends(o
                 yield _sse(type='status', content=f'第{iteration + 1}轮思考…')
 
             try:
-                msg_content, tool_calls = await _call_llm_for_tools(chat_req.model, msgs, HERMES_TOOLS, temperature=agent_temperature)
+                msg_content, tool_calls = await _call_llm_for_tools(chat_req.model, msgs, runtime_tools, temperature=agent_temperature)
 
                 if tool_calls:
                     # ── LLM wants to call tools ──
@@ -1786,7 +2012,7 @@ async def hermes_chat(chat_req: HermesChatRequest, user: User | None = Depends(o
                         # Auth gate
                         if p["tool_name"] in DESTRUCTIVE_TOOLS and not is_admin:
                             yield _sse(type='tool_call', tool=p["tool_name"], args=p["tool_args"], id=p["tool_id"])
-                            yield _sse(type='error', content=f'权限不足: {p["tool_name"]} 需要管理员权限')
+                            yield _sse(type='error', content='当前操作需要管理员权限')
                             msgs.append({"role": "tool", "tool_call_id": p["tool_id"],
                                          "content": f"错误: 权限不足，{p['tool_name']}需要管理员登录"})
                             continue
@@ -1902,23 +2128,37 @@ async def hermes_chat(chat_req: HermesChatRequest, user: User | None = Depends(o
                 else:
                     # ── No tool calls: LLM is done → stream response ──
                     yield _sse(type='status', content='正在生成回复…')
+                    assistant_chunks = []
                     async for content in _stream_llm_response(chat_req.model, msgs, temperature=agent_temperature):
                         if content:
+                            assistant_chunks.append(content)
                             yield _sse(type='text', content=content)
+                    assistant_content = "".join(assistant_chunks)
+                    msgs.append({"role": "assistant", "content": assistant_content})
+                    _finish_runtime(assistant_content, msgs)
                     yield _sse(type='done')
                     break
 
             except Exception as e:
                 logger.error(f"Hermes error iter={iteration}: {e}")
-                yield _sse(type='error', content=f'模型调用失败: {str(e)[:200]}')
+                _finish_runtime("")
+                yield _sse(type='error', content='超级员工暂时无法完成本次请求，请稍后重试')
                 break
         else:
             # for-loop exhausted without break — max iterations reached
             yield _sse(type='status', content='已达到最大轮次，正在总结…')
+            assistant_chunks = []
             async for content in _stream_llm_response(chat_req.model, msgs, temperature=agent_temperature):
                 if content:
+                    assistant_chunks.append(content)
                     yield _sse(type='text', content=content)
+            assistant_content = "".join(assistant_chunks)
+            msgs.append({"role": "assistant", "content": assistant_content})
+            _finish_runtime(assistant_content, msgs)
             yield _sse(type='done')
+
+        if not runtime_closed:
+            _finish_runtime("")
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 

@@ -7,7 +7,6 @@ from szyg.models.common import (
     ErrorResponse,
     IntegrationError,
     MCPError,
-    MemoryError,
     ServerNotFoundError,
     SkillNotFoundError,
     ToolTimeoutError,
@@ -22,7 +21,6 @@ from szyg.models.integration import (
     GenerateResponse,
     TranscriptionResult,
 )
-from szyg.models.memory import MemoryEntry, MemorySearchResult
 from szyg.models.mcp import MCPServerConfig, Tool, ToolResult
 from szyg.models.model import BackendInfo, ChatMessage, ModelResponse, StreamingChunk
 from szyg.models.skill import Skill, SkillParameter, SkillResult
@@ -37,7 +35,6 @@ __all__ = [
     "IntegrationError",
     "ValidationError",
     "ConfigError",
-    "MemoryError",
     "SkillNotFoundError",
     "DuplicateSkillError",
     "AllBackendsFailedError",
@@ -53,9 +50,6 @@ __all__ = [
     "ChatResponse",
     "GenerateResponse",
     "CompletionResponse",
-    # memory
-    "MemoryEntry",
-    "MemorySearchResult",
     # model
     "ChatMessage",
     "ModelResponse",

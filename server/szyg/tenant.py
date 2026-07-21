@@ -75,38 +75,12 @@ def get_tenant_data_file(filename: str) -> Path:
 # ── OEM ID resolver ────────────────────────────────────
 
 def resolve_oem_from_request(request) -> str:
-    """Extract OEM/tenant ID from HTTP request.
+    """Return the local tenant.
 
-    Priority:
-    1. X-OEM-ID header
-    2. ?oem_id query parameter
-    3. JWT token claim (if present)
-    4. Default ("default")
+    Organization identity is established by the cloud control plane. Untrusted
+    renderer headers and query parameters must never select a tenant directory.
     """
-    # Header
-    oem_id = request.headers.get("X-OEM-ID", "").strip()
-    if oem_id:
-        return oem_id
-
-    # Query param
-    oem_id = (request.query_params or {}).get("oem_id", "").strip()
-    if oem_id:
-        return oem_id
-
-    # JWT token
-    try:
-        auth = request.headers.get("Authorization", "")
-        if auth.startswith("Bearer "):
-            import jose.jwt
-            token = auth[7:]
-            # Try to decode without verification just to read claim
-            claims = jose.jwt.get_unverified_claims(token)
-            oem_id = claims.get("oem_id", "") or claims.get("tenant", "")
-            if oem_id:
-                return oem_id
-    except Exception as e:
-        logger.debug("Failed to extract tenant from JWT: %s", e)
-
+    del request
     return DEFAULT_TENANT
 
 
@@ -120,11 +94,7 @@ class TenantMiddleware:
 
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http":
-            # Extract OEM from headers
-            headers = dict(scope.get("headers", []))
-            oem_header = headers.get(b"x-oem-id", b"").decode("utf-8", errors="ignore")
-            tenant = oem_header.strip() if oem_header else DEFAULT_TENANT
-            set_current_tenant(tenant)
+            set_current_tenant(DEFAULT_TENANT)
         await self.app(scope, receive, send)
 
 

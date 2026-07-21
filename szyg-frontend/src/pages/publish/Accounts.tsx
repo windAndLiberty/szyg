@@ -85,7 +85,7 @@ function fallbackPlatform(id: string): PlatformInfo {
 const LOGIN_METHODS = [
   { id: 'qr', label: '扫码登录', icon: QrCode, desc: '打开浏览器窗口，用手机 App 扫描二维码' },
   { id: 'phone', label: '手机号登录', icon: Smartphone, desc: '在浏览器中输入手机号 + 验证码登录' },
-  { id: 'cookie', label: 'Cookie 导入', icon: Cookie, desc: '从浏览器开发者工具导出 Cookie 粘贴导入' },
+  { id: 'cookie', label: '导入登录信息', icon: Cookie, desc: '导入已有的账号登录信息' },
 ] as const
 
 // ── Status helpers ────────────────────────────────────────────
@@ -354,8 +354,8 @@ function AccountCard({
             >
               <div className="pt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <DetailItem icon={Calendar} label="最后登录" value={fmtDateTime(platform.session?.saved_at)} />
-                <DetailItem icon={Clock} label="Cookie 有效期" value={fmtDate(platform.session?.cookie_expiry)} />
-                <DetailItem icon={Cookie} label="Cookie 数量" value={String(platform.session?.cookie_count ?? 0)} />
+                <DetailItem icon={Clock} label="登录有效期" value={fmtDate(platform.session?.cookie_expiry)} />
+                <DetailItem icon={Cookie} label="登录数据" value={platform.session?.cookie_count ? '已保存' : '未保存'} />
                 <DetailItem icon={BarChart3} label="渠道能力" value={capability.state} />
               </div>
               <div className="rounded-lg border border-[#1E293B] bg-[#0D1321] px-3 py-2 text-xs leading-5 text-[#94A3B8]">
@@ -1137,7 +1137,7 @@ export default function Accounts() {
                           {deleteExpandedAccount === account.id && (
                             <div className="absolute right-0 top-11 z-30 w-64 rounded-lg border border-[#334155] bg-[#020617] p-2 shadow-2xl shadow-black/40">
                               <div className="px-2 pb-2 text-xs leading-5 text-[#94A3B8]">
-                                删除本地账号槽位、登录态、Cookie 和已同步资料。
+                                删除此账号、登录信息和已同步资料。
                               </div>
                               <button
                                 type="button"

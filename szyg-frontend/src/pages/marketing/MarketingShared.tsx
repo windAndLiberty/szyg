@@ -7,6 +7,9 @@ export const PLATFORM_LABELS: Record<string, string> = {
   xhs: '小红书',
   kuaishou: '快手',
   bilibili: 'B站',
+  tencent: '视频号',
+  weibo: '微博',
+  youtube: 'YouTube',
   wechat: '微信',
   wechat_mp: '公众号',
 }

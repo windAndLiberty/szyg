@@ -154,13 +154,28 @@ Hermes Tool Search 让你按需加载工具schema，高效调用。
 用自然语言理解用户意图，自动编排工具链完成任务。"""
 
     def get_mcp_servers(self) -> list[dict]:
-        """Return configured MCP servers"""
+        """Return legacy MCP declarations without implying they are running."""
         servers = self.config.get("mcp_servers", {})
-        return [{"name": k, **v} for k, v in servers.items()]
+        return [
+            {
+                "name": name,
+                **config,
+                "configured": True,
+                "running": False,
+                "execution_path": "legacy_stdio_config",
+            }
+            for name, config in servers.items()
+        ]
 
     def get_status(self) -> dict:
         """Brain status for API"""
         cfg = self.config or self._load_config()
+        try:
+            from szyg.hermes_capabilities import get_hermes_capability_registry
+
+            capabilities = get_hermes_capability_registry().list()
+        except Exception:
+            capabilities = []
         return {
             "engine": "hermes-agent",
             "version": "0.15",
@@ -168,6 +183,12 @@ Hermes Tool Search 让你按需加载工具schema，高效调用。
             "provider": cfg.get("model", {}).get("provider", "auto"),
             "mcp_servers": len(cfg.get("mcp_servers", {})),
             "server_list": self.get_mcp_servers(),
+            "mcp_runtime_attached": False,
+            "business_capabilities": {
+                "count": len(capabilities),
+                "domains": sorted({item.get("domain", "") for item in capabilities if item.get("domain")}),
+                "execution_path": "capability_registry",
+            },
         }
 
 

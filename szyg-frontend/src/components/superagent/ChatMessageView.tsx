@@ -16,6 +16,22 @@ type ChatMessageViewProps = {
   statusText?: string
 }
 
+function toolActionLabel(name: string): string {
+  if (/image|video|audio|tts|content|copy|pipeline/i.test(name)) return '内容生成'
+  if (/search|browser|web|intelligence/i.test(name)) return '信息查找'
+  if (/knowledge|memory|document|file/i.test(name)) return '资料整理'
+  if (/workflow|scheduler|task/i.test(name)) return '工作流执行'
+  if (/publish|upload|platform/i.test(name)) return '内容发布'
+  if (/lead|customer|comment|acquisition/i.test(name)) return '客户跟进'
+  return '执行任务'
+}
+
+function toolStatusLabel(status: string): string {
+  if (status === 'success') return '已完成'
+  if (status === 'error') return '需要处理'
+  return '正在执行'
+}
+
 // Lightweight rich-text renderer: **bold**, `code`, and line breaks
 function renderRichText(text: string): React.ReactNode[] {
   const lines = text.split('\n')
@@ -126,8 +142,8 @@ const ChatMessageView: React.FC<ChatMessageViewProps> = ({ message, statusText }
               <Loader2 className="w-3.5 h-3.5 text-[#F59E0B] animate-spin" />
             )}
             <Wrench className="w-3.5 h-3.5 text-[#64748B]" />
-            <span className="text-[12px] font-medium text-[#94A3B8]">{message.toolCall.tool}</span>
-            <span className="text-[12px] text-[#64748B] truncate max-w-[260px]">{message.content}</span>
+            <span className="text-[12px] font-medium text-[#94A3B8]">{toolActionLabel(message.toolCall.tool)}</span>
+            <span className="text-[12px] text-[#64748B]">{toolStatusLabel(message.toolCall.status)}</span>
           </div>
         )}
 

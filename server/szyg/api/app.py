@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -6,6 +6,7 @@ from szyg.api.auth_routes import router as auth_router
 from szyg.api.tools_routes import router as tools_router
 from szyg.api.oem_routes import router as oem_router
 from szyg.version import VERSION
+import hmac
 import os, logging
 
 _CORS_ORIGINS_ENV = os.environ.get("SZYG_CORS_ORIGINS", "")
@@ -26,12 +27,31 @@ def _try_include(app: FastAPI, module_path: str, prefix: str = "") -> bool:
 
 
 def create_app() -> FastAPI:
+    production = os.environ.get("SZYG_PRODUCTION", "").lower() in {"1", "true", "yes"}
     app = FastAPI(
         title="szyg API",
         description="智能矩阵运营系统 - 自托管AI工具平台",
         version=VERSION,
-        docs_url="/docs",
+        docs_url=None if production else "/docs",
+        redoc_url=None if production else "/redoc",
+        openapi_url=None if production else "/openapi.json",
     )
+
+    desktop_token = os.environ.get("SZYG_DESKTOP_TOKEN", "").strip()
+
+    @app.middleware("http")
+    async def protect_desktop_api(request: Request, call_next):
+        """Keep the loopback API private to the Electron session in production."""
+        protected = request.url.path.startswith(("/api/", "/v1/"))
+        exempt = request.url.path == "/api/health" or request.method == "OPTIONS"
+        if desktop_token and protected and not exempt:
+            supplied = request.cookies.get("szyg_desktop_token", "")
+            if not supplied:
+                supplied = request.headers.get("X-SZYG-Desktop-Token", "")
+            if not hmac.compare_digest(supplied, desktop_token):
+                from fastapi.responses import JSONResponse
+                return JSONResponse(status_code=401, content={"detail": "Desktop session required"})
+        return await call_next(request)
 
     # Multi-tenant — OEM isolation
     from szyg.tenant import TenantMiddleware
@@ -51,18 +71,22 @@ def create_app() -> FastAPI:
     )
 
     # Always-available routes
-    app.include_router(auth_router)
+    from szyg.cloud_auth import cloud_auth
+    local_auth_enabled = os.environ.get("SZYG_LOCAL_AUTH_ENABLED", "").lower() in {"1", "true", "yes"}
+    if not cloud_auth.config["enabled"] or local_auth_enabled:
+        app.include_router(auth_router)
     app.include_router(tools_router)
     app.include_router(oem_router)
+    from szyg.api.cloud_routes import router as cloud_router
+    app.include_router(cloud_router)
 
     # Agent marketplace, AI tools hub, announcements
     from szyg.api.agent_routes import router as agent_router
     from szyg.api.hub_routes import router as hub_router
     from szyg.api.announce_routes import router as announce_router
 
-    # Content publisher & smart scheduler
+    # Content publisher. Business automation is exposed by workflow_routes.
     from szyg.api.publisher_routes import router as publisher_router
-    from szyg.api.scheduler_routes import router as scheduler_router
     from szyg.api.platform_routes import router as platform_router
 
     app.include_router(agent_router)
@@ -87,7 +111,6 @@ def create_app() -> FastAPI:
     from szyg.api.client_routes import router as client_router
 
     app.include_router(publisher_router)
-    app.include_router(scheduler_router)
     app.include_router(platform_router)
     app.include_router(brain_router)
     app.include_router(client_router)
@@ -95,6 +118,7 @@ def create_app() -> FastAPI:
     # Optional routes (may need openai, edge_tts, etc.)
     _try_include(app, "szyg.api.routes", prefix="/v1")
     _try_include(app, "szyg.api.frontend_routes")
+    _try_include(app, "szyg.api.workflow_routes")
     _try_include(app, "szyg.api.image_endpoint")
     _try_include(app, "szyg.api.models_endpoint", prefix="/api")
 
@@ -111,6 +135,13 @@ def create_app() -> FastAPI:
         app.include_router(video_router)
     except Exception as e:
         logger.warning(f"Skipped video_endpoint: {e}")
+
+    try:
+        from szyg.api.digital_human_routes import router as digital_human_router
+        app.include_router(digital_human_router)
+        logger.info("Digital human routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped digital_human_routes: {e}")
 
     try:
         from szyg.api.content_copy_routes import router as content_copy_router
@@ -143,6 +174,13 @@ def create_app() -> FastAPI:
     except Exception as e:
         logger.warning(f"Skipped acquisition_routes: {e}")
 
+    try:
+        from szyg.api.intelligence_routes import router as intelligence_router
+        app.include_router(intelligence_router)
+        logger.info("Intelligence routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped intelligence_routes: {e}")
+
     # Skills Market — Hermes Skills Hub bridge
     try:
         from szyg.api.skills_routes import router as skills_router
@@ -158,14 +196,6 @@ def create_app() -> FastAPI:
         logger.info("Infra routes loaded")
     except Exception as e:
         logger.warning(f"Skipped infra_routes: {e}")
-
-    # Memory — Long-term memory CRUD
-    try:
-        from szyg.api.memory_routes import router as memory_router
-        app.include_router(memory_router)
-        logger.info("Memory routes loaded")
-    except Exception as e:
-        logger.warning(f"Skipped memory_routes: {e}")
 
     # Risk Control — Anti-detect configuration
     try:
@@ -279,6 +309,14 @@ def create_app() -> FastAPI:
     except Exception as e:
         logger.warning(f"Skipped dashboard_routes: {e}")
 
+    # Global insights — knowledge, internal operations, and market evidence
+    try:
+        from szyg.api.insights_routes import router as insights_router
+        app.include_router(insights_router)
+        logger.info("Insights routes loaded")
+    except Exception as e:
+        logger.warning(f"Skipped insights_routes: {e}")
+
 
     @app.get("/api/health")
     async def health():
@@ -294,7 +332,9 @@ def create_app() -> FastAPI:
             return {}
 
     # Serve generated assets (images, videos, audio from AIGC pipelines)
-    data_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "data")
+    data_dir = os.environ.get("SZYG_DATA_DIR") or os.path.join(
+        os.path.dirname(__file__), "..", "..", "..", "data"
+    )
     volc_output = os.path.join(data_dir, "volcengine_output")
     if not os.path.isdir(volc_output):
         os.makedirs(volc_output, exist_ok=True)
@@ -308,7 +348,9 @@ def create_app() -> FastAPI:
         )
 
     # Serve built SPA (static files + client-side routing fallback)
-    spa_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "szyg-frontend", "dist")
+    spa_dir = os.environ.get("SZYG_FRONTEND_DIST") or os.path.join(
+        os.path.dirname(__file__), "..", "..", "..", "szyg-frontend", "dist"
+    )
     if os.path.isdir(spa_dir):
         app.mount("/assets", StaticFiles(directory=os.path.join(spa_dir, "assets")), name="assets")
 

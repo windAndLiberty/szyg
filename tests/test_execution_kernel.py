@@ -272,6 +272,42 @@ def _isolate_kernel(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_registered_runner_can_start_pause_and_resume_from_checkpoint(tmp_path, monkeypatch):
+    kernel = _isolate_kernel(tmp_path, monkeypatch)
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def runner(run_id):
+        run = kernel.get_run(run_id)
+        completed = list((run.get("result") or {}).get("completed_step_ids") or [])
+        if "first" not in completed:
+            completed.append("first")
+            kernel.complete_run(run_id, "running", {"completed_step_ids": completed})
+        started.set()
+        await release.wait()
+        return kernel.complete_run(run_id, "success", {"completed_step_ids": completed})
+
+    kernel.register_task_runner("workflow_test", runner)
+    run = kernel.create_run("workflow_test", "", "hermes", {})
+    kernel.start_run(run["id"])
+    await started.wait()
+    kernel.pause_run(run["id"])
+    await asyncio.sleep(0)
+
+    assert kernel.get_run(run["id"])["status"] == "paused"
+    assert kernel.get_run(run["id"])["result"]["completed_step_ids"] == ["first"]
+
+    started.clear()
+    kernel.resume_run(run["id"])
+    await started.wait()
+    release.set()
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    assert kernel.get_run(run["id"])["status"] == "success"
+    assert kernel.get_run(run["id"])["result"]["completed_step_ids"] == ["first"]
+
+
+@pytest.mark.asyncio
 async def test_computer_use_observe_only_completes_with_fake_adapter(tmp_path, monkeypatch):
     import szyg.integrations.computer_use_adapter as adapter_mod
 

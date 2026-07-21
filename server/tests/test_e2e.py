@@ -8,9 +8,8 @@
 """
 
 import asyncio
-import json
 from pathlib import Path
-from typing import Any, AsyncGenerator
+from typing import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -32,7 +31,6 @@ class TestEndToEnd:
         config: MagicMock,
         planner: MagicMock,
         skill_registry: MagicMock,
-        memory_db: Any,
     ):
         """
         验收标准: E2E-001 - 语音指令完整链路。
@@ -73,21 +71,8 @@ class TestEndToEnd:
         # 3. Execute relevant skill
         if "generate" in transcribed_text or "海报" in transcribed_text:
             result = skill_registry.execute("generate_cover", theme="未来城市")
-            # Store result in memory
-            memory_db.execute(
-                "INSERT INTO memories (content, metadata) VALUES (?, ?)",
-                (f"Generated cover for: {transcribed_text}", json.dumps({"type": "image", "theme": "未来城市"})),
-            )
-            memory_db.commit()
 
         # Assert - Verify pipeline results
-        # Check memory storage
-        cursor = memory_db.execute(
-            "SELECT * FROM memories WHERE content LIKE ?", ("%Generated cover%",)
-        )
-        rows = cursor.fetchall()
-        assert len(rows) >= 1, "Pipeline result should be stored in memory"
-
         # Check plan has valid steps
         for step in plan["steps"]:
             assert "id" in step, "Each step should have an id"
@@ -165,7 +150,6 @@ class TestEndToEnd:
         self,
         config: MagicMock,
         model_router: MagicMock,
-        memory_db: Any,
     ):
         """
         验收标准: E2E-003 - 完整聊天API流程。
@@ -304,7 +288,6 @@ class TestEndToEnd:
         self,
         config: MagicMock,
         model_router: MagicMock,
-        memory_db: Any,
     ):
         """
         额外测试 - 多轮对话完整流程。

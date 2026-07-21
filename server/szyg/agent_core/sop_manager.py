@@ -21,11 +21,12 @@ SOP (Standard Operating Procedure) 是用户自定义的工作流模板。
 
 import json
 import logging
+import sqlite3
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
-from szyg.agent_core.memory import Memory
 from szyg.agent_core.skill_registry import SkillRegistry
 
 logger = logging.getLogger(__name__)
@@ -68,12 +69,13 @@ class SOP:
         description: str,
         steps: list[SOPStep],
         sop_id: str = None,
+        created_at: str | None = None,
     ):
         self.id = sop_id or str(uuid.uuid4())[:8]
         self.name = name
         self.description = description
         self.steps = steps
-        self.created_at = datetime.now().isoformat()
+        self.created_at = created_at or datetime.now().isoformat()
 
     def to_dict(self) -> dict:
         return {
@@ -91,6 +93,7 @@ class SOP:
             description=d["description"],
             steps=[SOPStep.from_dict(s) for s in d["steps"]],
             sop_id=d.get("id"),
+            created_at=d.get("created_at"),
         )
 
 
@@ -104,8 +107,38 @@ class SOPManager:
     ):
         self.registry = skill_registry or SkillRegistry()
         self._sops: dict[str, SOP] = {}
-        self._memory = Memory(db_path)
-        self._load_from_memory()
+        self.db_path = Path(db_path)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._ensure_db()
+        self._load()
+
+    def _connect(self) -> sqlite3.Connection:
+        connection = sqlite3.connect(self.db_path)
+        connection.row_factory = sqlite3.Row
+        return connection
+
+    def _ensure_db(self) -> None:
+        with self._connect() as connection:
+            connection.executescript(
+                """
+                DROP TRIGGER IF EXISTS memories_ai;
+                DROP TRIGGER IF EXISTS memories_ad;
+                DROP TRIGGER IF EXISTS memories_au;
+                DROP TABLE IF EXISTS memories_fts;
+                DROP TABLE IF EXISTS memories;
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS sops (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL UNIQUE,
+                    data_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+                """
+            )
 
     # ── 定义 ──────────────────────────────────────────────────────────────
 
@@ -136,23 +169,29 @@ class SOPManager:
         return sop
 
     def _save_sop(self, sop: SOP):
-        """持久化 SOP 到 Memory。"""
-        self._memory.store(
-            content=sop.name,
-            metadata={
-                "type": "sop",
-                "sop_id": sop.id,
-                "sop_data": json.dumps(sop.to_dict(), ensure_ascii=False),
-            },
-        )
+        """Persist SOP in its own domain table."""
+        now = datetime.now().isoformat()
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO sops(id,name,data_json,created_at,updated_at)
+                VALUES (?,?,?,?,?)
+                ON CONFLICT(id) DO UPDATE SET
+                    name=excluded.name,
+                    data_json=excluded.data_json,
+                    updated_at=excluded.updated_at
+                """,
+                (sop.id, sop.name, json.dumps(sop.to_dict(), ensure_ascii=False), sop.created_at, now),
+            )
 
-    def _load_from_memory(self):
-        """从 Memory 恢复已保存的 SOP。"""
+    def _load(self):
+        """Load persisted SOP definitions."""
         try:
-            results = self._memory.search_by_metadata("type", "sop", limit=100)
-            for r in results:
+            with self._connect() as connection:
+                rows = connection.execute("SELECT data_json FROM sops ORDER BY created_at").fetchall()
+            for row in rows:
                 try:
-                    data = json.loads(r.metadata.get("sop_data", "{}"))
+                    data = json.loads(row["data_json"])
                     sop = SOP.from_dict(data)
                     self._sops[sop.name] = sop
                 except (json.JSONDecodeError, KeyError) as e:
@@ -171,27 +210,36 @@ class SOPManager:
         return self._sops.get(name)
 
     def find_sops_for_task(self, task_description: str) -> list[SOP]:
-        """根据任务描述搜索匹配的 SOP（FTS5 搜索）。"""
-        results = self._memory.search(task_description, limit=5)
-        matched = []
-        for r in results:
-            sop_name = r.content
-            if sop_name in self._sops:
-                matched.append(self._sops[sop_name])
-        return matched
+        """Find SOPs by name, description, and step text."""
+        terms = [part.lower() for part in task_description.split() if part.strip()]
+        if not terms:
+            return []
+        scored: list[tuple[int, SOP]] = []
+        for sop in self._sops.values():
+            text = json.dumps(sop.to_dict(), ensure_ascii=False).lower()
+            score = sum(text.count(term) for term in terms)
+            if score:
+                scored.append((score, sop))
+        scored.sort(key=lambda item: item[0], reverse=True)
+        return [sop for _, sop in scored[:5]]
 
     def delete(self, name: str) -> bool:
         """删除 SOP。"""
         if name not in self._sops:
             return False
         sop = self._sops.pop(name)
-        # 从 Memory 中删除
-        results = self._memory.search(name, limit=1)
-        for r in results:
-            if r.metadata.get("sop_id") == sop.id:
-                self._memory.delete(r.id)
-                break
+        with self._connect() as connection:
+            connection.execute("DELETE FROM sops WHERE id=?", (sop.id,))
         return True
+
+    def save(self, sop: SOP) -> SOP:
+        """Persist changes to an existing SOP."""
+        existing_name = next((name for name, item in self._sops.items() if item.id == sop.id), None)
+        if existing_name and existing_name != sop.name:
+            self._sops.pop(existing_name, None)
+        self._sops[sop.name] = sop
+        self._save_sop(sop)
+        return sop
 
     # ── 执行 ──────────────────────────────────────────────────────────────
 
@@ -244,4 +292,4 @@ class SOPManager:
         return results
 
     def close(self):
-        self._memory.close()
+        return None

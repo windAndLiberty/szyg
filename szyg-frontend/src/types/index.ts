@@ -1,17 +1,3 @@
-export interface DigitalHuman {
-  id: string
-  name: string
-  avatar: string
-  status: 'active' | 'training' | 'idle' | 'error'
-  type: 'sales' | 'customer_service' | 'marketing' | 'data_analyst' | 'custom'
-  model: string
-  createdAt: string
-  lastActive: string
-  interactions: number
-  successRate: number
-  description: string
-}
-
 export interface DashboardKPI {
   label: string
   value: string

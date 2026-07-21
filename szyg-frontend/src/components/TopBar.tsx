@@ -13,10 +13,12 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { allNavChildren, pageTitleMap } from '@/lib/navConfig'
 import { useLayout } from '@/lib/layout'
+import { useI18n } from '@/lib/i18n'
 
 export default function TopBar() {
   const location = useLocation()
   const { sidebarWidth } = useLayout()
+  const { t } = useI18n()
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchValue, setSearchValue] = useState('')
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -24,7 +26,7 @@ export default function TopBar() {
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   // 从 navConfig 派生标题（支持全部路由）
-  const pageTitle = pageTitleMap[location.pathname] || 'szyg'
+  const pageTitle = t(pageTitleMap[location.pathname] || 'szyg')
   const pageNavItem = allNavChildren.find((item) => item.path === location.pathname)
   const PageIcon = pageNavItem?.icon
   const isSuperAgent = location.pathname === '/'
@@ -58,13 +60,13 @@ export default function TopBar() {
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
             className="flex items-center gap-2"
           >
-            <h1 className="text-lg font-semibold text-[#F1F5F9]">超级员工</h1>
+            <h1 className="text-lg font-semibold text-[#F1F5F9]">{t('超级员工')}</h1>
             <button
               type="button"
               onClick={toggleSuperAgentHistory}
               className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#1E293B] bg-[#0B0F1A] text-[#94A3B8] transition-colors hover:border-[#6366F1]/50 hover:text-[#F1F5F9]"
-              aria-label={superAgentHistoryCollapsed ? '展开历史对话' : '折叠历史对话'}
-              title={superAgentHistoryCollapsed ? '展开历史对话' : '折叠历史对话'}
+              aria-label={t(superAgentHistoryCollapsed ? '展开' : '折叠')}
+              title={t(superAgentHistoryCollapsed ? '展开' : '折叠')}
             >
               {superAgentHistoryCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </button>
@@ -107,7 +109,7 @@ export default function TopBar() {
                   onBlur={() => {
                     if (!searchValue) setSearchOpen(false)
                   }}
-                  placeholder="搜索..."
+                  placeholder={t('搜索...')}
                   className="w-full h-10 pl-10 pr-4 rounded-lg bg-[#0B0F1A] border border-[#1E293B] text-sm text-[#F1F5F9] placeholder-[#64748B] focus:outline-none focus:border-[#334155] transition-colors"
                 />
               </motion.div>
@@ -121,7 +123,7 @@ export default function TopBar() {
                 className="flex items-center gap-2 h-10 px-3 rounded-lg bg-[#0B0F1A] border border-[#1E293B] text-[#64748B] hover:text-[#94A3B8] hover:border-[#334155] transition-colors"
               >
                 <Search className="w-4 h-4" />
-                <span className="text-sm">搜索...</span>
+                <span className="text-sm">{t('搜索...')}</span>
               </motion.button>
             )}
           </AnimatePresence>
@@ -164,12 +166,12 @@ export default function TopBar() {
                   </div>
                   <button className="flex items-center w-full px-3 py-2 text-sm text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[rgba(255,255,255,0.03)] transition-colors">
                     <User className="w-4 h-4 mr-2 shrink-0" />
-                    个人资料
+                    {t('个人资料')}
                   </button>
                   <div className="border-t border-[#1E293B]" />
                   <button className="flex items-center w-full px-3 py-2 text-sm text-[#EF4444] hover:bg-[rgba(239,68,68,0.05)] transition-colors">
                     <LogOut className="w-4 h-4 mr-2 shrink-0" />
-                    退出登录
+                    {t('退出登录')}
                   </button>
                 </motion.div>
               )}

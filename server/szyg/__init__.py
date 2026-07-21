@@ -11,10 +11,6 @@ def get_planner():
     from szyg.agent_core.planner import Planner
     return Planner
 
-def get_memory():
-    from szyg.agent_core.memory import Memory
-    return Memory
-
 def get_skill_registry():
     from szyg.agent_core.skill_registry import SkillRegistry
     return SkillRegistry

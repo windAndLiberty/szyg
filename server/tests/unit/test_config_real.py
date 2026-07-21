@@ -20,7 +20,6 @@ from szyg.config.settings import (
     IntegrationsConfig,
     MCPConfig,
     MCPServerDefinition,
-    MemoryConfig,
     ModelBackend,
     ModelsConfig,
     WechatyConfig,
@@ -39,9 +38,6 @@ class TestYuLingSettings:
         settings = YuLingSettings()
         assert settings.agent.name == "域灵"
         assert settings.agent.max_plan_steps == 10
-        assert settings.memory.db_path == "./data/memory.db"
-        assert settings.memory.enable_fts is True
-        assert settings.memory.embedding_dim == 768
         assert settings.api.host == "0.0.0.0"
         assert settings.api.port == 8000
         assert settings.debug is False
@@ -59,15 +55,6 @@ class TestYuLingSettings:
         assert settings.log_level == "ERROR"
         assert settings.agent.max_plan_steps == 25
         assert settings.api.port == 9999
-
-    def test_nested_env_override(self, monkeypatch):
-        """双层嵌套环境变量应能覆盖。"""
-        monkeypatch.setenv("YL_MEMORY__DB_PATH", "/custom/path/memory.db")
-        monkeypatch.setenv("YL_MEMORY__SIMILARITY_THRESHOLD", "0.85")
-
-        settings = YuLingSettings()
-        assert settings.memory.db_path == "/custom/path/memory.db"
-        assert settings.memory.similarity_threshold == 0.85
 
     def test_global_singleton(self, monkeypatch):
         """get_settings() 应返回单例。"""
@@ -140,35 +127,6 @@ class TestAgentConfig:
         # 其余保持默认
         assert cfg.planner_model == "qwen2.5:14b"
         assert cfg.max_retries == 3
-
-
-class TestMemoryConfig:
-    """测试 MemoryConfig 验证规则。"""
-
-    def test_default_values(self):
-        cfg = MemoryConfig()
-        assert cfg.db_path == "./data/memory.db"
-        assert cfg.enable_fts is True
-        assert cfg.embedding_dim == 768
-        assert cfg.similarity_threshold == 0.75
-
-    def test_similarity_threshold_bounds(self):
-        """similarity_threshold 必须在 0.0-1.0 之间。"""
-        MemoryConfig(similarity_threshold=0.0)
-        MemoryConfig(similarity_threshold=1.0)
-        with pytest.raises(ValueError):
-            MemoryConfig(similarity_threshold=-0.1)
-        with pytest.raises(ValueError):
-            MemoryConfig(similarity_threshold=1.1)
-
-    def test_embedding_dim_bounds(self):
-        """embedding_dim 必须在 128-4096 之间。"""
-        MemoryConfig(embedding_dim=128)
-        MemoryConfig(embedding_dim=4096)
-        with pytest.raises(ValueError):
-            MemoryConfig(embedding_dim=127)
-        with pytest.raises(ValueError):
-            MemoryConfig(embedding_dim=4097)
 
 
 class TestAPIConfig:
@@ -322,14 +280,3 @@ class TestSerialization:
         cfg2 = AgentConfig.model_validate_json(json_str)
         assert cfg2.name == "test"
         assert cfg2.max_plan_steps == 30
-
-    def test_round_trip_dict(self):
-        """model_dump / model_validate 应往返正确。"""
-        cfg = MemoryConfig(db_path="/tmp/test.db", enable_fts=False)
-        d = cfg.model_dump()
-        assert d["db_path"] == "/tmp/test.db"
-        assert d["enable_fts"] is False
-
-        cfg2 = MemoryConfig.model_validate(d)
-        assert cfg2.db_path == "/tmp/test.db"
-        assert cfg2.enable_fts is False
