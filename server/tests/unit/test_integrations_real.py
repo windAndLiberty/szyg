@@ -7,7 +7,6 @@
 import pytest
 
 from szyg.integrations.whisper_client import WhisperClient
-from szyg.integrations.comfyui_client import ComfyUIClient
 from szyg.integrations.ffmpeg_client import FFmpegClient
 from szyg.integrations.ollama_client import OllamaClient
 from szyg.integrations.litellm_client import LiteLLMClient
@@ -57,30 +56,6 @@ class TestWhisperClientInit:
         assert client.default_model == "large"
         assert client.default_language == "en"
         assert client.timeout == 120
-
-
-class TestComfyUIClientInit:
-    """测试 ComfyUIClient 初始化。"""
-
-    def test_default_init(self):
-        client = ComfyUIClient()
-        assert client.api_url == "http://localhost:8188"
-        assert str(client.output_dir).replace("\\", "/") == "data/comfyui_output"
-        assert client.checkpoint == "sd21.safetensors"
-        assert client.timeout == 300
-
-    def test_custom_init(self, tmp_path):
-        output_dir = str(tmp_path / "comfy_output")
-        client = ComfyUIClient(
-            api_url="http://gpu:8188",
-            output_dir=output_dir,
-            checkpoint="sd_xl.safetensors",
-            timeout=600,
-        )
-        assert client.api_url == "http://gpu:8188"
-        assert str(client.output_dir) == output_dir
-        assert client.checkpoint == "sd_xl.safetensors"
-        assert client.timeout == 600
 
 
 class TestFFmpegClientInit:

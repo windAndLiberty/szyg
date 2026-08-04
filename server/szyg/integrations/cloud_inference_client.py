@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 import time
 import uuid
 from pathlib import Path
@@ -12,6 +13,9 @@ import httpx
 
 from szyg.cloud_auth import CloudAuthError, cloud_auth
 from szyg.models.common import IntegrationError
+
+
+logger = logging.getLogger(__name__)
 
 
 class CloudInferenceClient:
@@ -25,16 +29,25 @@ class CloudInferenceClient:
 
     async def _request(self, method: str, path: str, payload: dict | None = None) -> dict:
         cfg = cloud_auth.config
-        try:
-            token = cloud_auth.access_token()
+
+        async def send(token: str) -> httpx.Response:
             async with httpx.AsyncClient(timeout=self.timeout, trust_env=False) as client:
-                response = await client.request(
+                return await client.request(
                     method,
                     cfg["control_url"] + path,
                     headers={"Authorization": f"Bearer {token}"},
                     json=payload,
                 )
-        except (CloudAuthError, httpx.HTTPError) as exc:
+
+        try:
+            token = cloud_auth.access_token()
+            response = await send(token)
+            if response.status_code == 401:
+                token = cloud_auth.access_token(force_refresh=True)
+                response = await send(token)
+        except CloudAuthError as exc:
+            raise IntegrationError("登录状态已过期，请重新登录") from exc
+        except httpx.HTTPError as exc:
             raise IntegrationError("智能服务暂时不可用") from exc
         if response.is_error:
             try:
@@ -42,6 +55,12 @@ class CloudInferenceClient:
                 request_id = detail.get("request_id", "") if isinstance(detail, dict) else ""
             except Exception:
                 request_id = ""
+            logger.warning(
+                "Cloud inference request failed: status=%s path=%s request_id=%s",
+                response.status_code,
+                path,
+                request_id or "-",
+            )
             suffix = f"（请求编号：{request_id}）" if request_id else ""
             raise IntegrationError(f"智能服务暂时不可用{suffix}")
         return response.json()

@@ -7,6 +7,7 @@ import {
   Loader2,
   Film,
   Download,
+  UserRound,
 } from 'lucide-react'
 import type { ChatMessage } from '@/types'
 import { cn } from '@/lib/utils'
@@ -14,6 +15,7 @@ import { cn } from '@/lib/utils'
 type ChatMessageViewProps = {
   message: ChatMessage
   statusText?: string
+  userName?: string
 }
 
 function toolActionLabel(name: string): string {
@@ -76,25 +78,31 @@ function renderRichText(text: string): React.ReactNode[] {
   })
 }
 
-const Avatar: React.FC<{ role: string }> = ({ role }) => {
+function userInitial(name?: string): string | null {
+  const character = Array.from((name || '').trim()).find((value) => /[A-Za-z0-9\u3400-\u9FFF]/.test(value))
+  return character ? character.toUpperCase() : null
+}
+
+const Avatar: React.FC<{ role: string; userName?: string }> = ({ role, userName }) => {
   // system 角色（工具调用卡片）不显示头像，但保留占位以对齐
   if (role === 'system') return <div className="w-8 h-8 shrink-0" />
   if (role === 'user') {
+    const initial = userInitial(userName)
     return (
       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#334155] to-[#1E293B] flex items-center justify-center text-[12px] font-semibold text-[#F1F5F9] shrink-0">
-        U
+        {initial || <UserRound className="h-4 w-4 text-[#94A3B8]" aria-hidden="true" />}
       </div>
     )
   }
   return (
     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#6366F1] to-[#8B5CF6] flex items-center justify-center shrink-0 shadow-glow overflow-hidden">
-      <img src="/logo1.jpg" alt="AI" className="w-full h-full object-cover" />
+      <img src="/logo1.png" alt="超级员工" className="w-full h-full object-cover" />
     </div>
   )
 }
 
 // === ChatMessageView component body ===
-const ChatMessageView: React.FC<ChatMessageViewProps> = ({ message, statusText }) => {
+const ChatMessageView: React.FC<ChatMessageViewProps> = ({ message, statusText, userName }) => {
   const isUser = message.role === 'user'
 
   return (
@@ -104,7 +112,7 @@ const ChatMessageView: React.FC<ChatMessageViewProps> = ({ message, statusText }
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
     >
-      <Avatar role={message.role} />
+      <Avatar role={message.role} userName={userName} />
 
       <div className="flex-1 min-w-0 pt-0.5">
         {/* Text message */}

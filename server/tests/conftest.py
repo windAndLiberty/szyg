@@ -4,7 +4,7 @@
 本文件提供所有测试模块共享的fixtures，包括：
 - 异步事件循环
 - 临时目录和内存数据库
-- Mock HTTP服务（Ollama/ComfyUI/LiteLLM）
+- Mock HTTP服务（Ollama/LiteLLM）
 - 各Client实例
 - FastAPI TestClient
 - Agent Core组件实例
@@ -79,9 +79,6 @@ def config(temp_dir: Path) -> MagicMock:
     mock_config.whisper = MagicMock()
     mock_config.whisper.host = "http://localhost:9000"
 
-    mock_config.comfyui = MagicMock()
-    mock_config.comfyui.host = "http://localhost:8188"
-
     mock_config.ffmpeg = MagicMock()
     mock_config.ffmpeg.binary = "ffmpeg"
 
@@ -139,40 +136,6 @@ def mock_ollama_server() -> Generator[respx.MockRouter, None, None]:
             )
         )
         route_tags._name = "ollama_tags"
-
-        yield router
-
-
-@pytest.fixture
-def mock_comfyui_server() -> Generator[respx.MockRouter, None, None]:
-    """提供mock ComfyUI HTTP服务。"""
-    with respx.mock(assert_all_mocked=False, assert_all_called=False) as router:
-        # Prompt/queue endpoint
-        route_prompt = router.post("http://localhost:8188/prompt").mock(
-            return_value=Response(200, json={"prompt_id": "test-prompt-123"})
-        )
-        route_prompt._name = "comfyui_prompt"
-
-        # History endpoint
-        route_history = router.get("http://localhost:8188/history/test-prompt-123").mock(
-            return_value=Response(
-                200,
-                json={
-                    "test-prompt-123": {
-                        "outputs": {
-                            "9": {"images": [{"filename": "test.png", "subfolder": ""}]}
-                        }
-                    }
-                },
-            )
-        )
-        route_history._name = "comfyui_history"
-
-        # View image endpoint
-        route_view = router.get("http://localhost:8188/view").mock(
-            return_value=Response(200, content=b"\x89PNG\r\n\x1a\nfake_image_data")
-        )
-        route_view._name = "comfyui_view"
 
         yield router
 
@@ -247,19 +210,6 @@ def client_whisper(config: MagicMock) -> AsyncMock:
     """提供WhisperClient实例（mock）。"""
     mock_client = AsyncMock()
     mock_client.transcribe = AsyncMock(return_value=" transcribed text from audio ")
-    mock_client.close = AsyncMock()
-    return mock_client
-
-
-@pytest.fixture
-def client_comfyui(config: MagicMock) -> AsyncMock:
-    """提供ComfyUIClient实例（mock）。"""
-    mock_client = AsyncMock()
-    mock_client.generate_cover = AsyncMock(return_value=b"\x89PNG\r\n\x1a\ngenerated_image")
-    mock_client.queue_workflow = AsyncMock(return_value="test-prompt-123")
-    mock_client.get_result = AsyncMock(
-        return_value={"outputs": {"9": {"images": [{"filename": "test.png"}]}}}
-    )
     mock_client.close = AsyncMock()
     return mock_client
 
@@ -597,12 +547,3 @@ def sample_video_file(temp_dir: Path) -> Path:
     video_path = temp_dir / "sample.mp4"
     video_path.write_bytes(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 100)
     return video_path
-
-
-@pytest.fixture
-def sample_workflow() -> dict:
-    """提供示例ComfyUI工作流。"""
-    return {
-        "1": {"inputs": {"text": "a beautiful landscape"}, "class_type": "CLIPTextEncode"},
-        "3": {"inputs": {"seed": 42, "steps": 20}, "class_type": "KSampler"},
-    }

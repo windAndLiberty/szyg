@@ -136,10 +136,9 @@ function sourceLabel(value?: string) {
 }
 
 function providerLabel(value?: string) {
-  if (value === 'terminator') return '桌面结构'
-  if (value === 'playwright') return '浏览器网页'
-  if (value === 'vision') return '视觉兜底'
-  return '基础观察'
+  if (value === 'desktop') return '桌面观察'
+  if (value === 'vision') return '视觉理解'
+  return '桌面观察'
 }
 
 export default function ComputerUse() {
@@ -168,8 +167,6 @@ export default function ComputerUse() {
   const [error, setError] = useState('')
   const observedElements = useMemo(() => (observation?.elements || []).slice(0, 8), [observation])
   const sourceCounts = observation?.source_counts || {}
-  const providers = observation?.providers || status?.providers || status?.health?.providers || {}
-  const omni = providers.omniparser
 
   async function load(selected = selectedRunId) {
     setError('')
@@ -334,33 +331,27 @@ export default function ComputerUse() {
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-[#94A3B8]">视觉兜底</span>
-                <Badge variant={omni?.available ? 'success' : omni?.source_available ? 'warning' : 'muted'}>
-                  {omni?.available ? '已就绪' : omni?.source_available ? '未就绪' : '未配置'}
+                <span className="text-sm text-[#94A3B8]">视觉理解</span>
+                <Badge variant={status?.health?.available ? 'success' : 'warning'}>
+                  {status?.health?.available ? '可用' : '检查中'}
                 </Badge>
               </div>
               <div className="grid grid-cols-3 gap-2 text-center text-xs">
                 <div className="rounded-md border border-[#1E293B] bg-[#0B1120] px-2 py-2">
-                  <div className="text-[#64748B]">源码</div>
-                  <div className={omni?.source_available ? 'mt-1 text-[#86EFAC]' : 'mt-1 text-[#64748B]'}>
-                    {omni?.source_available ? '存在' : '缺失'}
-                  </div>
+                  <div className="text-[#64748B]">观察</div>
+                  <div className="mt-1 text-[#86EFAC]">实时</div>
                 </div>
                 <div className="rounded-md border border-[#1E293B] bg-[#0B1120] px-2 py-2">
-                  <div className="text-[#64748B]">权重</div>
-                  <div className={omni?.weights_ready ? 'mt-1 text-[#86EFAC]' : 'mt-1 text-[#FBBF24]'}>
-                    {omni?.weights_ready ? '就绪' : '待配置'}
-                  </div>
+                  <div className="text-[#64748B]">操作</div>
+                  <div className="mt-1 text-[#86EFAC]">受控</div>
                 </div>
                 <div className="rounded-md border border-[#1E293B] bg-[#0B1120] px-2 py-2">
-                  <div className="text-[#64748B]">服务</div>
-                  <div className={omni?.service_ready ? 'mt-1 text-[#86EFAC]' : 'mt-1 text-[#64748B]'}>
-                    {omni?.service_ready ? '运行' : '未运行'}
-                  </div>
+                  <div className="text-[#64748B]">确认</div>
+                  <div className="mt-1 text-[#86EFAC]">开启</div>
                 </div>
               </div>
               <p className="rounded-md bg-[#0F172A] px-3 py-2 text-xs leading-6 text-[#94A3B8]">
-                {omni?.message || status?.health?.message || '正在检查本机能力'}
+                {status?.health?.message || '正在检查本机能力'}
               </p>
             </div>
           </section>

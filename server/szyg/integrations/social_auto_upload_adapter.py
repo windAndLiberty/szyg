@@ -1,7 +1,7 @@
 """
 SocialAutoUpload Adapter — 统一封装 social-auto-upload 的多平台发布能力。
 
-直接 import sau 的 uploader 类（不调 CLI 子进程），复用 szyg 的 session 管理。
+通过 SZYG 内置的发布 provider 复用平台会话。
 支持平台: 抖音、小红书、快手、视频号(腾讯)、B站、YouTube、TikTok、百家号。
 """
 from __future__ import annotations
@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from szyg.channel_accounts import get_account, get_default_account_for_platform
+from szyg.data_path import DATA_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -27,33 +28,22 @@ try:
 except Exception:
     _SAU_CONFIG = None
 
-_CONFIGURED_SAU_DIR = Path(getattr(_SAU_CONFIG, "project_dir", "") or "")
-if _CONFIGURED_SAU_DIR and not _CONFIGURED_SAU_DIR.is_absolute():
-    _CONFIGURED_SAU_DIR = (_REPO_ROOT / _CONFIGURED_SAU_DIR).resolve()
-_BUNDLED_SAU_DIR = Path(__file__).parent / "social_auto_upload"
-_DEFAULT_EXTERNAL_SAU_DIR = _REPO_ROOT / "external" / "social-auto-upload-main"
-_SAU_DIR = (
-    _CONFIGURED_SAU_DIR
-    if _CONFIGURED_SAU_DIR and _CONFIGURED_SAU_DIR.exists()
-    else _DEFAULT_EXTERNAL_SAU_DIR
-    if _DEFAULT_EXTERNAL_SAU_DIR.exists()
-    else _BUNDLED_SAU_DIR
-)
-if str(_SAU_DIR) not in sys.path:
-    sys.path.insert(0, str(_SAU_DIR))
+_SERVER_ROOT = _REPO_ROOT / "server"
+_PROVIDER_PACKAGE = "szyg.integrations.social_auto_upload"
 
 # ── Session 映射 ──────────────────────────────────────────
 # szyg: data/sessions/storage_state_{platform}.json
 # sau:  cookies/{platform}_uploader/account.json
 # 格式相同（Playwright storage_state），只需路径转换
-_DATA_DIR = _REPO_ROOT / "data"
+_DATA_DIR = DATA_DIR
 _SESSIONS_DIR = _DATA_DIR / "sessions"
-_SAU_COOKIES_DIR = _SAU_DIR / "cookies"
+_SAU_RUNTIME_DIR = _DATA_DIR / "social_auto_upload"
+_SAU_COOKIES_DIR = _SAU_RUNTIME_DIR / "cookies"
 
 # 平台名映射: szyg Platform enum → sau uploader 模块
 _PLATFORM_MAP = {
     "douyin": {
-        "module": "uploader.douyin_uploader.main",
+        "module": f"{_PROVIDER_PACKAGE}.uploader.douyin_uploader.main",
         "video_class": "DouYinVideo",
         "note_class": "DouYinNote",
         "upload_method_video": "douyin_upload_video",
@@ -63,7 +53,7 @@ _PLATFORM_MAP = {
         "scheduled_strategy": "DOUYIN_PUBLISH_STRATEGY_SCHEDULED",
     },
     "xhs": {
-        "module": "uploader.xiaohongshu_uploader.main",
+        "module": f"{_PROVIDER_PACKAGE}.uploader.xiaohongshu_uploader.main",
         "video_class": "XiaoHongShuVideo",
         "note_class": "XiaoHongShuNote",
         "upload_method_video": "xiaohongshu_upload_video",
@@ -73,7 +63,7 @@ _PLATFORM_MAP = {
         "scheduled_strategy": "XIAOHONGSHU_PUBLISH_STRATEGY_SCHEDULED",
     },
     "kuaishou": {
-        "module": "uploader.ks_uploader.main",
+        "module": f"{_PROVIDER_PACKAGE}.uploader.ks_uploader.main",
         "video_class": "KSVideo",
         "note_class": "KSNote",
         "upload_method_video": "main",
@@ -93,7 +83,7 @@ _PLATFORM_MAP = {
         "scheduled_strategy": None,
     },
     "tencent": {
-        "module": "uploader.tencent_uploader.main",
+        "module": f"{_PROVIDER_PACKAGE}.uploader.tencent_uploader.main",
         "video_class": "TencentVideo",
         "note_class": "TencentNote",
         "upload_method_video": "tencent_upload_video",
@@ -103,7 +93,7 @@ _PLATFORM_MAP = {
         "scheduled_strategy": "TENCENT_PUBLISH_STRATEGY_SCHEDULED",
     },
     "youtube": {
-        "module": "uploader.youtube_uploader.main",
+        "module": f"{_PROVIDER_PACKAGE}.uploader.youtube_uploader.main",
         "video_class": "YouTubeVideo",
         "note_class": None,
         "upload_method_video": "youtube_upload_video",
@@ -183,23 +173,23 @@ class SocialAutoUploadAdapter:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
 
-    async def _run_external_sau(self, args: list[str], timeout_seconds: int = 900) -> dict:
-        sau_cli = _SAU_DIR / "sau_cli.py"
-        if not sau_cli.exists():
-            return {
-                "success": False,
-                "message": f"social-auto-upload CLI not found: {sau_cli}",
-                "stdout": "",
-                "stderr": "",
-            }
+    async def _run_provider_cli(self, args: list[str], timeout_seconds: int = 900) -> dict:
+        frozen_cli = Path(sys.executable).with_name("sau-cli.exe")
+        frozen_cli_available = bool(getattr(sys, "frozen", False) and frozen_cli.is_file())
 
         env = os.environ.copy()
         env.setdefault("PYTHONIOENCODING", "utf-8")
+        env["SZYG_SAU_RUNTIME_HOME"] = str(_SAU_RUNTIME_DIR)
+        if frozen_cli_available:
+            command = [str(frozen_cli), *args]
+            cwd = _SAU_RUNTIME_DIR
+        else:
+            command = [sys.executable, "-m", f"{_PROVIDER_PACKAGE}.cli", *args]
+            cwd = _SERVER_ROOT
+        cwd.mkdir(parents=True, exist_ok=True)
         process = await asyncio.create_subprocess_exec(
-            sys.executable,
-            str(sau_cli),
-            *args,
-            cwd=str(_SAU_DIR),
+            *command,
+            cwd=str(cwd),
             env=env,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -474,7 +464,7 @@ class SocialAutoUploadAdapter:
         if schedule:
             args.extend(["--schedule", schedule.strftime("%Y-%m-%d %H:%M")])
 
-        result = await self._run_external_sau(args, timeout_seconds=self._publish_timeout_seconds())
+        result = await self._run_provider_cli(args, timeout_seconds=self._publish_timeout_seconds())
         self._sync_external_sau_to_douyin_session(account_id=account_id, account_file=account_file, account_name=account_name)
         result.update({
             "platform": "douyin",
@@ -521,7 +511,7 @@ class SocialAutoUploadAdapter:
         if schedule:
             args.extend(["--schedule", schedule.strftime("%Y-%m-%d %H:%M")])
 
-        result = await self._run_external_sau(args, timeout_seconds=self._publish_timeout_seconds())
+        result = await self._run_provider_cli(args, timeout_seconds=self._publish_timeout_seconds())
         self._sync_external_sau_to_douyin_session(account_id=account_id, account_file=account_file, account_name=account_name)
         result.update({
             "platform": "douyin",
@@ -578,7 +568,7 @@ class SocialAutoUploadAdapter:
         if schedule:
             args.extend(["--schedule", schedule.strftime("%Y-%m-%d %H:%M")])
 
-        result = await self._run_external_sau(args, timeout_seconds=self._publish_timeout_seconds())
+        result = await self._run_provider_cli(args, timeout_seconds=self._publish_timeout_seconds())
         result.update({
             "platform": "bilibili",
             "title": title,
@@ -865,7 +855,7 @@ class SocialAutoUploadAdapter:
         if platform == "douyin":
             account_name = self._account_name("douyin", account_id=account_id, account_name=account_name)
             account_file_path = self._sync_douyin_session_to_external_sau(account_id=account_id, account_file=account_file, account_name=account_name)
-            result = await self._run_external_sau([
+            result = await self._run_provider_cli([
                 "douyin",
                 "login",
                 "--account",
@@ -988,7 +978,7 @@ class SocialAutoUploadAdapter:
         if platform == "douyin":
             account_name = self._account_name("douyin", account_id=account_id, account_name=account_name)
             account_file_path = self._sync_douyin_session_to_external_sau(account_id=account_id, account_file=account_file, account_name=account_name)
-            result = await self._run_external_sau([
+            result = await self._run_provider_cli([
                 "douyin",
                 "check",
                 "--account",
@@ -1014,7 +1004,7 @@ class SocialAutoUploadAdapter:
                     "message": "B站登录态不存在",
                     "engine": "bilibili-uploader",
                 }
-            result = await self._run_external_sau([
+            result = await self._run_provider_cli([
                 "bilibili",
                 "check",
                 "--account",

@@ -6,9 +6,9 @@ def get_data_dir() -> Path:
     # Priority: env var > project-relative > D:\szyg > C:\szyg (legacy)
     env_dir = (os.environ.get("SZYG_DATA_DIR", "") or "").strip()
     if env_dir:
-        p = Path(env_dir)
-        if (p / "tools.json").exists():
-            return p
+        p = Path(env_dir).expanduser()
+        p.mkdir(parents=True, exist_ok=True)
+        return p
     # Project-relative (works from server/szyg/data_path.py → ../../data)
     proj = Path(__file__).parent.parent.parent / "data"
     if (proj / "tools.json").exists():

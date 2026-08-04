@@ -45,6 +45,28 @@ def invite_and_activate(client: TestClient, admin_token: str, email: str = "user
     return activated.json()
 
 
+def test_admin_can_create_a_ready_to_login_account():
+    with TestClient(app) as client:
+        admin = login_admin(client)
+        created = client.post("/api/v1/admin/users", headers=auth(admin["access_token"]), json={
+            "email": "direct-user@example.com",
+            "display_name": "直接开通用户",
+            "password": "direct-user-password-123",
+            "organization_name": "直接开通企业",
+            "entitlement_days": 45,
+            "device_limit": 2,
+        })
+        assert created.status_code == 200, created.text
+
+        logged_in = client.post("/api/v1/auth/login", json={
+            "email": "direct-user@example.com",
+            "password": "direct-user-password-123",
+            "device": device("direct-user-device-0001"),
+        })
+        assert logged_in.status_code == 200, logged_in.text
+        assert logged_in.json()["user"]["display_name"] == "直接开通用户"
+
+
 def test_invitation_activation_device_limit_and_session_rotation():
     with TestClient(app) as client:
         license_key = client.get("/api/v1/auth/license-key")
@@ -74,6 +96,111 @@ def test_invitation_activation_device_limit_and_session_rotation():
         assert rotated.status_code == 200
         replay = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
         assert replay.status_code == 401
+
+
+def test_device_is_blacklisted_after_ten_failed_logins_and_admin_can_unblock():
+    with TestClient(app) as client:
+        admin = login_admin(client)
+        user = invite_and_activate(client, admin["access_token"], "locked-device@example.com")
+        locked_device = {
+            "installation_id": "locked-device-0001",
+            "name": "待锁定电脑",
+            "fingerprint": "stable-locked-device-fingerprint",
+            "app_version": "1.0.2-test",
+        }
+
+        for attempt in range(1, 10):
+            failed = client.post("/api/v1/auth/login", json={
+                "email": "locked-device@example.com",
+                "password": "wrong-password-value",
+                "device": locked_device,
+            })
+            assert failed.status_code == 401
+            assert f"还可尝试 {10 - attempt} 次" in failed.text
+
+        locked = client.post("/api/v1/auth/login", json={
+            "email": "locked-device@example.com",
+            "password": "wrong-password-value",
+            "device": locked_device,
+        })
+        assert locked.status_code == 423
+        assert "设备已锁定" in locked.text
+
+        correct_password_cannot_bypass = client.post("/api/v1/auth/login", json={
+            "email": "locked-device@example.com",
+            "password": "user-password-123",
+            "device": locked_device,
+        })
+        assert correct_password_cannot_bypass.status_code == 423
+
+        blocks = client.get("/api/v1/admin/login-blocks", headers=auth(admin["access_token"]))
+        assert blocks.status_code == 200
+        block = next(item for item in blocks.json()["items"] if item["attempted_account"] == "locked-device@example.com")
+        assert block["failed_attempts"] == 10
+        assert block["device_name"] == "待锁定电脑"
+
+        removed = client.delete(
+            f"/api/v1/admin/login-blocks/{block['id']}",
+            headers=auth(admin["access_token"]),
+        )
+        assert removed.status_code == 200
+
+        login_after_unblock = client.post("/api/v1/auth/login", json={
+            "email": "locked-device@example.com",
+            "password": "user-password-123",
+            "device": locked_device,
+        })
+        assert login_after_unblock.status_code == 200
+        assert login_after_unblock.json()["user"]["id"] == user["user"]["id"]
+
+
+def test_blacklisting_an_existing_device_revokes_its_sessions():
+    with TestClient(app) as client:
+        admin = login_admin(client)
+        user = invite_and_activate(client, admin["access_token"], "session-lock@example.com")
+        existing_device = device("user-device-0001")
+
+        for _ in range(10):
+            client.post("/api/v1/auth/login", json={
+                "email": "session-lock@example.com",
+                "password": "wrong-password-value",
+                "device": existing_device,
+            })
+
+        assert client.get("/api/v1/auth/me", headers=auth(user["access_token"])).status_code == 403
+        assert client.post("/api/v1/auth/refresh", json={"refresh_token": user["refresh_token"]}).status_code in {401, 403}
+
+
+def test_user_can_change_password_only_once_per_beijing_day():
+    with TestClient(app) as client:
+        admin = login_admin(client)
+        user = invite_and_activate(client, admin["access_token"], "password-change@example.com")
+        changed = client.put("/api/v1/auth/password", headers=auth(user["access_token"]), json={
+            "current_password": "user-password-123",
+            "new_password": "new-user-password-456",
+        })
+        assert changed.status_code == 200, changed.text
+        assert changed.json()["next_change_at"]
+
+        second_change = client.put("/api/v1/auth/password", headers=auth(user["access_token"]), json={
+            "current_password": "new-user-password-456",
+            "new_password": "another-password-789",
+        })
+        assert second_change.status_code == 429
+        assert "明天再试" in second_change.text
+
+        old_password = client.post("/api/v1/auth/login", json={
+            "email": "password-change@example.com",
+            "password": "user-password-123",
+            "device": device("password-change-device-0002"),
+        })
+        assert old_password.status_code == 401
+        new_password = client.post("/api/v1/auth/login", json={
+            "email": "password-change@example.com",
+            "password": "new-user-password-456",
+            "device": device("password-change-device-0002"),
+        })
+        assert new_password.status_code == 200
 
 
 def test_user_isolation_suspend_and_header_spoofing():

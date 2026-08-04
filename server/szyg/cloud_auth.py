@@ -153,10 +153,10 @@ class CloudAuthManager:
         except (OSError, ValueError, JWTError, KeyError):
             return None
 
-    def login(self, email: str, password: str, totp_code: str = "") -> dict:
+    def login(self, email: str, password: str) -> dict:
         with self._lock:
             data = self._request("POST", "/api/v1/auth/login", json_body={
-                "email": email, "password": password, "totp_code": totp_code, "device": self.device(),
+                "email": email, "password": password, "device": self.device(),
             })
             return self._accept_session(data)
 
@@ -170,10 +170,12 @@ class CloudAuthManager:
             })
             return self._accept_session(data)
 
-    def access_token(self) -> str:
+    def access_token(self, *, force_refresh: bool = False) -> str:
         with self._lock:
-            if self._access_token:
+            if self._access_token and not force_refresh:
                 return self._access_token
+            if force_refresh:
+                self._access_token = ""
             refresh_token = self._load_refresh()
             if not refresh_token:
                 raise CloudAuthError("请先登录")
@@ -194,6 +196,8 @@ class CloudAuthManager:
             offline = self._offline_session()
             if offline:
                 return offline
+            if str(exc) == "请先登录":
+                return {"configured": True, "authenticated": False}
             return {"configured": True, "authenticated": False, "message": str(exc)}
 
     def proxy(self, method: str, path: str, body: dict | None = None) -> dict:

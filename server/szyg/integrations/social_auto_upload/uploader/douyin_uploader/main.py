@@ -10,15 +10,15 @@ from patchright.async_api import Page
 from patchright.async_api import Playwright
 from patchright.async_api import async_playwright
 
-from conf import DEBUG_MODE, LOCAL_CHROME_HEADLESS, LOCAL_CHROME_PATH
-from uploader.base_video import BaseVideoUploader
-from utils.base_social_media import set_init_script
-from utils.login_qrcode import build_login_qrcode_path
-from utils.login_qrcode import decode_qrcode_from_path
-from utils.login_qrcode import print_terminal_qrcode
-from utils.login_qrcode import remove_qrcode_file
-from utils.login_qrcode import save_data_url_image
-from utils.log import douyin_logger
+from ...conf import DEBUG_MODE, LOCAL_CHROME_HEADLESS, LOCAL_CHROME_PATH, RUNTIME_HOME
+from ..base_video import BaseVideoUploader
+from ...utils.base_social_media import set_init_script
+from ...utils.login_qrcode import build_login_qrcode_path
+from ...utils.login_qrcode import decode_qrcode_from_path
+from ...utils.login_qrcode import print_terminal_qrcode
+from ...utils.login_qrcode import remove_qrcode_file
+from ...utils.login_qrcode import save_data_url_image
+from ...utils.log import douyin_logger
 
 DOUYIN_PUBLISH_STRATEGY_IMMEDIATE = "immediate"
 DOUYIN_PUBLISH_STRATEGY_SCHEDULED = "scheduled"
@@ -332,7 +332,7 @@ class DouYinBaseUploader(BaseVideoUploader):
             except Exception:
                 continue
         if not title_filled:
-            debug_dir = Path("logs/douyin_debug")
+            debug_dir = RUNTIME_HOME / "logs" / "douyin_debug"
             debug_dir.mkdir(parents=True, exist_ok=True)
             await page.screenshot(path=str(debug_dir / "title_input_not_found.png"), full_page=True)
             raise RuntimeError("未找到抖音标题输入框，已保存调试截图 logs/douyin_debug/title_input_not_found.png")

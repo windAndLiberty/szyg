@@ -1,20 +1,20 @@
 from pathlib import Path
 
-from conf import BASE_DIR
+from ...conf import COOKIES_DIR
 
-Path(BASE_DIR / "cookies" / "tencent_uploader").mkdir(exist_ok=True)
+Path(COOKIES_DIR / "tencent_uploader").mkdir(parents=True, exist_ok=True)
 
-from uploader.tencent_uploader.main import TENCENT_PUBLISH_STRATEGY_IMMEDIATE
-from uploader.tencent_uploader.main import TENCENT_PUBLISH_STRATEGY_SCHEDULED
-from uploader.tencent_uploader.main import TencentBaseUploader
-from uploader.tencent_uploader.main import TencentNote
-from uploader.tencent_uploader.main import TencentVideo
-from uploader.tencent_uploader.main import cookie_auth
-from uploader.tencent_uploader.main import format_str_for_short_title
-from uploader.tencent_uploader.main import get_tencent_cookie
-from uploader.tencent_uploader.main import tencent_cookie_gen
-from uploader.tencent_uploader.main import tencent_setup
-from uploader.tencent_uploader.main import weixin_setup
+from .main import TENCENT_PUBLISH_STRATEGY_IMMEDIATE
+from .main import TENCENT_PUBLISH_STRATEGY_SCHEDULED
+from .main import TencentBaseUploader
+from .main import TencentNote
+from .main import TencentVideo
+from .main import cookie_auth
+from .main import format_str_for_short_title
+from .main import get_tencent_cookie
+from .main import tencent_cookie_gen
+from .main import tencent_setup
+from .main import weixin_setup
 
 __all__ = [
     "TENCENT_PUBLISH_STRATEGY_IMMEDIATE",

@@ -42,11 +42,10 @@ def _clean_result(result: dict) -> dict:
 
 
 def _debug_screenshot_path(started: datetime) -> str:
-    path = DATA_DIR.parent / "external" / "social-auto-upload-main" / "logs" / "douyin_debug" / "publish_retry.png"
-    if not path.exists():
-        return ""
-    modified = datetime.fromtimestamp(path.stat().st_mtime)
-    return str(path) if modified >= started else ""
+    debug_root = DATA_DIR / "social_auto_upload" / "logs"
+    candidates = list(debug_root.rglob("*.png")) if debug_root.exists() else []
+    recent = [path for path in candidates if datetime.fromtimestamp(path.stat().st_mtime) >= started]
+    return str(max(recent, key=lambda path: path.stat().st_mtime)) if recent else ""
 
 
 class SAUPublishTaskManager:

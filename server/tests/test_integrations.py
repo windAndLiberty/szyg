@@ -3,7 +3,6 @@
 
 测试范围:
 - WhisperClient: 转录、文件不存在、重试
-- ComfyUIClient: 生成封面、队列和获取
 - FFmpegClient: 批处理、提取音频
 - OllamaClient: chat、generate
 - LiteLLMClient: completion、acompletion
@@ -110,85 +109,6 @@ class TestWhisperClient:
                 assert result is not None, "Should succeed after retries"
                 assert result["text"] == "Success after retries"
                 assert attempt_count == 3
-
-
-# =============================================================================
-# ComfyUIClient 测试
-# =============================================================================
-
-@pytest.mark.asyncio
-class TestComfyUIClient:
-    """ComfyUIClient测试类。"""
-
-    async def test_comfyui_generate_cover(self, mock_comfyui_server: respx.MockRouter):
-        """
-        验收标准: CMF-001 - 应能提交工作流到ComfyUI队列。
-
-        Arrange: mock ComfyUI服务
-        Act: 提交prompt
-        Assert: 返回prompt_id
-        """
-        # Arrange & Act
-        async with AsyncClient() as client:
-            response = await client.post(
-                "http://localhost:8188/prompt",
-                json={"prompt": {"1": {"inputs": {"text": "test"}}}},
-            )
-
-            # Assert
-            assert response.status_code == 200
-            result = response.json()
-            assert "prompt_id" in result
-            assert result["prompt_id"] == "test-prompt-123"
-
-    async def test_comfyui_queue_and_get(self, mock_comfyui_server: respx.MockRouter):
-        """
-        验收标准: CMF-002 - 应能查询队列状态和获取生成结果。
-
-        Arrange: mock ComfyUI历史记录端点
-        Act: 查询结果
-        Assert: 返回图像数据
-        """
-        # Act
-        async with AsyncClient() as client:
-            # Get history
-            history_response = await client.get(
-                "http://localhost:8188/history/test-prompt-123"
-            )
-
-            # Assert
-            assert history_response.status_code == 200
-            history = history_response.json()
-            assert "test-prompt-123" in history
-            outputs = history["test-prompt-123"]["outputs"]
-            assert "9" in outputs
-            assert len(outputs["9"]["images"]) > 0
-
-    async def test_comfyui_invalid_workflow(self):
-        """
-        验收标准: CMF-003 - 无效工作流应返回错误信息。
-
-        Arrange: mock返回错误
-        Act: 提交无效工作流
-        Assert: 返回错误
-        """
-        # Arrange - Use isolated respx mock context
-        with respx.mock:
-            respx.post("http://localhost:8188/prompt").mock(
-                return_value=Response(400, json={"error": "Invalid workflow", "details": "Missing required node"})
-            )
-
-            # Act
-            async with AsyncClient() as client:
-                response = await client.post(
-                    "http://localhost:8188/prompt",
-                    json={"prompt": {}},
-                )
-
-                # Assert
-                assert response.status_code == 400
-                result = response.json()
-                assert "error" in result
 
 
 # =============================================================================

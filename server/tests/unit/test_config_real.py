@@ -15,7 +15,6 @@ import yaml
 from szyg.config.settings import (
     AgentConfig,
     APIConfig,
-    ComfyUIConfig,
     FFmpegConfig,
     IntegrationsConfig,
     MCPConfig,

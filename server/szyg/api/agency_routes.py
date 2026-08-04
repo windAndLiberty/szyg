@@ -1,8 +1,8 @@
 """Agency Agents 市场 API — 集成 Agency 232 专家，保留 155 个领域专家.
 
-数据源: D:/szyg/external/agency-agents-main (msitarzewski/agency-agents)
+数据源: SZYG 内置的 agency-agents 精选资源
 保留 11 个 Division (排除 engineering/game-development/security/spatial-computing/testing)
-激活专家后注入 brain_hermes 的 system prompt。
+激活专家后作为 Agent Profile 注入当前智能员工会话。
 """
 import json
 import logging
@@ -17,13 +17,18 @@ import uuid
 from datetime import datetime, timezone
 
 from szyg import agency_state
+from szyg.agency_manifest import EXCLUDED_DIVISIONS, RESOURCE_DIRNAME, RETAINED_DIVISIONS
 from szyg.data_path import DATA_DIR
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/agency", tags=["agency"])
 
-# Agency 数据根目录
-AGENCY_ROOT = Path(__file__).parent.parent.parent.parent / "external" / "agency-agents-main"
+def _resolve_agency_root() -> Path:
+    """Return the single internal expert-resource root."""
+    return Path(__file__).resolve().parent.parent / "resources" / RESOURCE_DIRNAME
+
+
+AGENCY_ROOT = _resolve_agency_root()
 
 # —— Marketplace 专属对话存储 ——
 _AGENCY_CONV_DIR = DATA_DIR / "agency_conversations"
@@ -195,24 +200,6 @@ def _cache_active_expert() -> dict | None:
                                            div_meta.get("label", expert.get("division", ""))),
         "prompt": expert.get("prompt", ""),
     }
-
-# 保留的 11 个 Division（按业务优先级排序：营销获客 > 运营管理 > 支撑职能）
-RETAINED_DIVISIONS = [
-    "marketing",        # 营销增长 — 核心获客
-    "paid-media",       # 付费投放 — 核心获客
-    "sales",            # 销售策略 — 核心获客
-    "specialized",      # 专项领域 — 数字员工/AI自动化
-    "product",          # 产品管理 — 运营管理
-    "project-management",  # 项目管理 — 运营管理
-    "support",          # 客户支持 — 运营管理
-    "academic",         # 学术研究 — 支撑职能
-    "design",           # 创意设计 — 支撑职能
-    "finance",          # 金融财务 — 支撑职能
-    "gis",              # 地理信息 — 支撑职能
-]
-# 排除的 5 个技术 division
-EXCLUDED_DIVISIONS = ["engineering", "game-development", "security", "spatial-computing", "testing"]
-
 
 # ── Pydantic 模型 ────────────────────────────────────────────────────
 class Division(BaseModel):

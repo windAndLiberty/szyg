@@ -38,6 +38,10 @@ $backendExe = Join-Path $distPath "szyg-backend\szyg-backend.exe"
 if (-not (Test-Path $backendExe)) {
     throw "Backend executable was not produced"
 }
+$sauExe = Join-Path $distPath "szyg-backend\sau-cli.exe"
+if (-not (Test-Path $sauExe)) {
+    throw "Publishing CLI executable was not produced"
+}
 
 Remove-Item -LiteralPath $workPath -Recurse -Force -ErrorAction SilentlyContinue
 Write-Host "Backend runtime ready: $backendExe"

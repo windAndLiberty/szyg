@@ -11,10 +11,10 @@ from patchright.async_api import Page
 from patchright.async_api import Playwright
 from patchright.async_api import async_playwright
 
-from conf import BASE_DIR, DEBUG_MODE, LOCAL_CHROME_HEADLESS, LOCAL_CHROME_PATH
-from uploader.base_video import BaseVideoUploader
-from utils.base_social_media import set_init_script
-from utils.log import tencent_logger
+from ...conf import COOKIES_DIR, DEBUG_MODE, LOCAL_CHROME_HEADLESS, LOCAL_CHROME_PATH, RUNTIME_HOME
+from ..base_video import BaseVideoUploader
+from ...utils.base_social_media import set_init_script
+from ...utils.log import tencent_logger
 
 TENCENT_LOGIN_URL = "https://channels.weixin.qq.com"
 TENCENT_UPLOAD_URL = "https://channels.weixin.qq.com/platform/post/create"
@@ -33,7 +33,7 @@ def _resolve_account_file(account_file: str | Path) -> str:
         return str(path)
 
     if len(path.parts) == 1:
-        return str((Path(BASE_DIR) / "cookies" / "tencent_uploader" / path).resolve())
+        return str((COOKIES_DIR / "tencent_uploader" / path).resolve())
 
     return str(path.resolve())
 
@@ -128,11 +128,11 @@ async def _open_tencent_login_page(page: Page) -> None:
 
 
 def _get_qrcode_utils():
-    from utils.login_qrcode import build_login_qrcode_path
-    from utils.login_qrcode import decode_qrcode_from_path
-    from utils.login_qrcode import print_terminal_qrcode
-    from utils.login_qrcode import remove_qrcode_file
-    from utils.login_qrcode import save_data_url_image
+    from ...utils.login_qrcode import build_login_qrcode_path
+    from ...utils.login_qrcode import decode_qrcode_from_path
+    from ...utils.login_qrcode import print_terminal_qrcode
+    from ...utils.login_qrcode import remove_qrcode_file
+    from ...utils.login_qrcode import save_data_url_image
 
     return {
         "build_login_qrcode_path": build_login_qrcode_path,
@@ -706,7 +706,7 @@ class TencentBaseUploader(BaseVideoUploader):
 
         if not original_set:
             try:
-                diagnostic_path = Path(BASE_DIR) / "debug_tencent_original_missing.png"
+                diagnostic_path = RUNTIME_HOME / "debug_tencent_original_missing.png"
                 await page.screenshot(path=str(diagnostic_path), full_page=True)
                 visible_text = (await page.locator("body").first.inner_text())[-4000:]
                 tencent_logger.warning(_msg("😵", f"未确认声明原创，诊断截图: {diagnostic_path}"))

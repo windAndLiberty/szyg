@@ -1,4 +1,5 @@
 import configparser
+from importlib.resources import files
 import json
 import pathlib
 from time import sleep
@@ -6,17 +7,17 @@ from time import sleep
 import requests
 from playwright.sync_api import sync_playwright
 
-from conf import BASE_DIR, XHS_SERVER, LOCAL_CHROME_HEADLESS
+from ...conf import RUNTIME_HOME, XHS_SERVER, LOCAL_CHROME_HEADLESS
 
 config = configparser.RawConfigParser()
-config.read('accounts.ini')
+config.read(RUNTIME_HOME / 'accounts.ini')
 
 
 def sign_local(uri, data=None, a1="", web_session=""):
     for _ in range(10):
         try:
             with sync_playwright() as playwright:
-                stealth_js_path = pathlib.Path(BASE_DIR / "utils/stealth.min.js")
+                stealth_js_path = files("szyg.resources").joinpath("social_auto_upload", "stealth.min.js")
                 chromium = playwright.chromium
 
                 # 如果一直失败可尝试设置成 False 让其打开浏览器，适当添加 sleep 可查看浏览器状态

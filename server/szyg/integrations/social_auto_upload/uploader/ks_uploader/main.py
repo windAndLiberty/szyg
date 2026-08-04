@@ -11,16 +11,16 @@ from patchright.async_api import Page
 from patchright.async_api import Playwright
 from patchright.async_api import async_playwright
 
-from conf import DEBUG_MODE, LOCAL_CHROME_HEADLESS, LOCAL_CHROME_PATH
-from uploader.base_video import BaseVideoUploader
-from utils.base_social_media import set_init_script
-from utils.files_times import get_absolute_path
-from utils.login_qrcode import build_login_qrcode_path
-from utils.login_qrcode import decode_qrcode_from_path
-from utils.login_qrcode import print_terminal_qrcode
-from utils.login_qrcode import remove_qrcode_file
-from utils.login_qrcode import save_data_url_image
-from utils.log import kuaishou_logger
+from ...conf import DEBUG_MODE, LOCAL_CHROME_HEADLESS, LOCAL_CHROME_PATH
+from ..base_video import BaseVideoUploader
+from ...utils.base_social_media import set_init_script
+from ...utils.files_times import get_absolute_path
+from ...utils.login_qrcode import build_login_qrcode_path
+from ...utils.login_qrcode import decode_qrcode_from_path
+from ...utils.login_qrcode import print_terminal_qrcode
+from ...utils.login_qrcode import remove_qrcode_file
+from ...utils.login_qrcode import save_data_url_image
+from ...utils.log import kuaishou_logger
 
 KUAISHOU_UPLOAD_URL = "https://cp.kuaishou.com/article/publish/video"
 KUAISHOU_MANAGE_URL = "https://cp.kuaishou.com/article/manage/video?status=2&from=publish"

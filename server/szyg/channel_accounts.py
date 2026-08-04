@@ -16,9 +16,7 @@ ACCOUNTS_FILE = DATA_DIR / "channel_accounts.json"
 PROFILES_FILE = DATA_DIR / "publishing_profiles.json"
 SESSIONS_DIR = DATA_DIR / "sessions"
 ACCOUNT_SESSIONS_DIR = SESSIONS_DIR / "accounts"
-REPO_ROOT = DATA_DIR.parent
-EXTERNAL_SAU_COOKIES_DIR = REPO_ROOT / "external" / "social-auto-upload-main" / "cookies"
-BUNDLED_SAU_COOKIES_DIR = REPO_ROOT / "server" / "szyg" / "integrations" / "social_auto_upload" / "cookies"
+SAU_COOKIES_DIR = DATA_DIR / "social_auto_upload" / "cookies"
 
 MAX_ACCOUNTS_PER_PLATFORM = 10
 MAX_TOTAL_ACCOUNTS = 50
@@ -84,7 +82,7 @@ def _session_info(path: str) -> dict:
 
 def _sau_account_file(platform: str, account: dict) -> Path:
     sau_name = account.get("sau_account_name") or safe_token(account.get("id", ""))
-    return EXTERNAL_SAU_COOKIES_DIR / f"{normalize_platform(platform)}_{sau_name}.json"
+    return SAU_COOKIES_DIR / f"{normalize_platform(platform)}_{sau_name}.json"
 
 
 def _effective_session_info(account: dict) -> dict:
@@ -318,19 +316,18 @@ def _remove_account_files(account: dict) -> None:
 
     platform = normalize_platform(account.get("platform", ""))
     sau_name = account.get("sau_account_name") or safe_token(account.get("id", ""))
-    for cookies_dir in (EXTERNAL_SAU_COOKIES_DIR, BUNDLED_SAU_COOKIES_DIR):
-        _remove_path(cookies_dir / f"{platform}_{sau_name}.json")
-        if account.get("is_default"):
-            cfg_dir = {
-                "douyin": "douyin_uploader",
-                "xhs": "xiaohongshu_uploader",
-                "kuaishou": "ks_uploader",
-                "tencent": "tencent_uploader",
-                "youtube": "youtube_uploader",
-                "bilibili": "bilibili_uploader",
-            }.get(platform)
-            if cfg_dir:
-                _remove_path(cookies_dir / cfg_dir / "account.json")
+    _remove_path(SAU_COOKIES_DIR / f"{platform}_{sau_name}.json")
+    if account.get("is_default"):
+        cfg_dir = {
+            "douyin": "douyin_uploader",
+            "xhs": "xiaohongshu_uploader",
+            "kuaishou": "ks_uploader",
+            "tencent": "tencent_uploader",
+            "youtube": "youtube_uploader",
+            "bilibili": "bilibili_uploader",
+        }.get(platform)
+        if cfg_dir:
+            _remove_path(SAU_COOKIES_DIR / cfg_dir / "account.json")
 
 
 def _remove_account_from_profiles(account_id: str) -> None:

@@ -1192,22 +1192,8 @@ def _detect_sensitive_computer_action(payload: dict) -> bool:
 
 def _has_required_computer_provider(health: dict, payload: dict, plan: dict | None = None) -> bool:
     providers = health.get("providers", {})
-    actions = list((plan or {}).get("actions") or [])
-    needs_browser = bool(payload.get("url")) or payload.get("target_app") in {"browser", "chrome"} or any(
-        item.get("provider") == "playwright" or item.get("action") == "open_url"
-        for item in actions
-    )
-    needs_desktop = any(
-        item.get("provider") in {"terminator", "desktop"} or item.get("action") == "launch_app"
-        for item in actions
-    ) or (not needs_browser and payload.get("target_app") not in {"windows", "browser", "chrome"})
-    browser_ok = bool((providers.get("playwright") or {}).get("available"))
-    desktop_ok = bool((providers.get("terminator") or {}).get("available") or health.get("available"))
-    if needs_browser and not browser_ok:
-        return False
-    if needs_desktop and not desktop_ok:
-        return False
-    return True
+    del payload, plan
+    return bool((providers.get("desktop") or {}).get("available") or health.get("available"))
 
 
 def _extract_safe_text_to_type(instruction: str) -> str:
@@ -1258,12 +1244,8 @@ async def _execute_safe_computer_actions(adapter: Any, payload: dict) -> dict:
 
 
 def _debug_screenshot_path(started: datetime) -> str:
-    candidates = [
-        DATA_DIR.parent / "external" / "social-auto-upload-main" / "logs" / "douyin_debug" / "publish_retry.png",
-        DATA_DIR.parent / "external" / "social-auto-upload-main" / "logs" / "xiaohongshu_debug" / "note_upload_timeout.png",
-        DATA_DIR.parent / "external" / "social-auto-upload-main" / "logs" / "xiaohongshu_debug" / "note_publish_timeout.png",
-        DATA_DIR.parent / "external" / "social-auto-upload-main" / "logs" / "xiaohongshu_debug" / "note_publish_retry.png",
-    ]
+    debug_root = DATA_DIR / "social_auto_upload" / "logs"
+    candidates = list(debug_root.rglob("*.png")) if debug_root.exists() else []
     latest = ""
     latest_time = started
     for path in candidates:

@@ -46,6 +46,7 @@ class User(Base):
     totp_secret: Mapped[str] = mapped_column(String(128), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     organization: Mapped[Organization] = relationship()
 
 
@@ -78,6 +79,22 @@ class Device(Base):
     status: Mapped[str] = mapped_column(String(24), default="active", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class LoginDeviceBlock(Base):
+    __tablename__ = "login_device_blocks"
+    id: Mapped[str] = mapped_column(String(48), primary_key=True, default=lambda: new_id("ldb"))
+    identity_key: Mapped[str] = mapped_column(String(160), unique=True, index=True)
+    installation_id: Mapped[str] = mapped_column(String(160), default="", index=True)
+    fingerprint_hash: Mapped[str] = mapped_column(String(128), default="", index=True)
+    device_name: Mapped[str] = mapped_column(String(160), default="Windows PC")
+    app_version: Mapped[str] = mapped_column(String(40), default="")
+    attempted_account: Mapped[str] = mapped_column(String(320), default="")
+    failed_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(24), default="watching", index=True)
+    first_failure_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_failure_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    blocked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class RefreshSession(Base):

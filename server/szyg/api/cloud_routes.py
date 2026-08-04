@@ -12,7 +12,6 @@ router = APIRouter(prefix="/api/cloud", tags=["cloud-account"])
 class LoginBody(BaseModel):
     email: str = Field(min_length=3, max_length=320)
     password: str
-    totp_code: str = ""
 
 
 class ActivateBody(BaseModel):
@@ -25,6 +24,11 @@ class FeedbackBody(BaseModel):
     category: str = "general"
     message: str
     request_id: str = ""
+
+
+class ChangePasswordBody(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=10, max_length=200)
 
 
 def call(fn, *args, **kwargs):
@@ -47,7 +51,7 @@ def session():
 
 @router.post("/login")
 def login(body: LoginBody):
-    return call(cloud_auth.login, body.email, body.password, body.totp_code)
+    return call(cloud_auth.login, body.email, body.password)
 
 
 @router.post("/activate")
@@ -59,6 +63,11 @@ def activate(body: ActivateBody):
 def logout():
     cloud_auth.logout()
     return {"ok": True}
+
+
+@router.put("/password")
+def change_password(body: ChangePasswordBody):
+    return call(cloud_auth.proxy, "PUT", "/api/v1/auth/password", body.model_dump())
 
 
 @router.get("/devices")

@@ -1,7 +1,5 @@
-from pathlib import Path
+from importlib.resources import files
 from typing import List
-
-from conf import BASE_DIR
 
 SOCIAL_MEDIA_DOUYIN = "douyin"
 SOCIAL_MEDIA_TENCENT = "tencent"
@@ -19,6 +17,6 @@ def get_cli_action() -> List[str]:
 
 
 async def set_init_script(context):
-    stealth_js_path = Path(BASE_DIR / "utils/stealth.min.js")
-    await context.add_init_script(path=stealth_js_path)
+    stealth_js_path = files("szyg.resources").joinpath("social_auto_upload", "stealth.min.js")
+    await context.add_init_script(path=str(stealth_js_path))
     return context

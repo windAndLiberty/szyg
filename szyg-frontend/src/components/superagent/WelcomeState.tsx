@@ -49,6 +49,11 @@ const skillShortcuts = [
 ]
 
 const formatLikes = (n: number) => (n >= 10000 ? `${(n / 10000).toFixed(1)}w` : `${n}`)
+const sourceLabel: Record<string, string> = {
+  bilibili: 'B站',
+  douyin: '抖音',
+  kuaishou: '快手',
+}
 
 const WelcomeState: React.FC<WelcomeStateProps> = ({
   inputText,
@@ -88,7 +93,7 @@ const WelcomeState: React.FC<WelcomeStateProps> = ({
             style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.6) 0%, transparent 70%)' }}
           />
           <div className="relative w-32 h-32 rounded-2xl overflow-hidden shadow-glow-strong">
-            <img src="/logo1.jpg" alt="超级员工" className="w-full h-full object-cover" />
+            <img src="/logo1.png" alt="超级员工" className="w-full h-full object-cover" />
           </div>
         </div>
         <div className="text-center">
@@ -182,63 +187,66 @@ const WelcomeState: React.FC<WelcomeStateProps> = ({
           <span className="text-heading-sm text-[#F1F5F9]">智能员工 · 精选案例</span>
         </div>
 
-        {caseCardsLoading ? (
-          <div className="flex items-center justify-center py-10 text-[#64748B] gap-2">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="text-[13px]">正在搜索真实推荐案例…</span>
-          </div>
-        ) : caseCards.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 text-[#64748B] gap-1">
-            <span className="text-[13px]">暂无推荐案例</span>
-            <span className="text-[11px]">发送一条消息即可开始对话</span>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
-            {caseCards.map((card, i) => (
-              <motion.button
-                key={`${card.video_url}-${i}`}
-                onClick={() => onCaseClick(card)}
-                disabled={streaming}
-                className="group text-left rounded-card overflow-hidden border border-[#1E293B] hover:border-[#6366F1]/30 hover:shadow-card-hover transition-all disabled:opacity-50"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 + i * 0.06, duration: 0.4 }}
-                whileHover={{ y: -4 }}
-              >
-                <div className="relative aspect-video overflow-hidden bg-[#0D1321]">
-                  {card.cover_url ? (
-                    <img
-                      src={card.cover_url}
-                      alt={card.title}
-                      loading="lazy"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Film className="w-6 h-6 text-[#334155]" />
+        <div className="h-[132px] overflow-x-auto overflow-y-hidden">
+          {caseCardsLoading ? (
+            <div className="flex h-full items-center justify-center text-[#64748B] gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-[13px]">正在搜索真实推荐案例…</span>
+            </div>
+          ) : caseCards.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center text-[#64748B] gap-1">
+              <span className="text-[13px]">暂无推荐案例</span>
+              <span className="text-[11px]">发送一条消息即可开始对话</span>
+            </div>
+          ) : (
+            <div className="grid h-full min-w-[720px] grid-cols-3 gap-4">
+              {caseCards.slice(0, 3).map((card, i) => (
+                <motion.div
+                  key={`${card.video_url}-${i}`}
+                  className="group relative h-full min-w-0 overflow-hidden rounded-card border border-[#1E293B] bg-[#111827] transition-all hover:border-[#6366F1]/30 hover:shadow-card-hover"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 + i * 0.06, duration: 0.4 }}
+                  whileHover={{ y: -3 }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => onCaseClick(card)}
+                    disabled={streaming}
+                    className="flex h-full w-full min-w-0 flex-col p-4 text-left disabled:opacity-50"
+                  >
+                    <div className="flex w-full items-center justify-between gap-2 text-[11px]">
+                      <span className="inline-flex items-center gap-1.5 font-medium text-[#818CF8]">
+                        <Film className="h-3.5 w-3.5" />
+                        {sourceLabel[card.source] || '视频案例'}
+                      </span>
+                      <span className="shrink-0 text-[#64748B]">♥ {formatLikes(card.likes)}</span>
                     </div>
+                    <p className="mt-2 line-clamp-2 text-body-sm font-medium leading-6 text-[#F1F5F9] transition-colors group-hover:text-[#A5B4FC]">
+                      {card.title}
+                    </p>
+                    <p className="mt-auto max-w-[calc(100%-28px)] truncate text-[11px] text-[#64748B]">
+                      {card.author || '平台作者'}
+                    </p>
+                  </button>
+                  {card.video_url && (
+                    <a
+                      href={card.video_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(event) => event.stopPropagation()}
+                      className="absolute bottom-3 right-3 inline-flex h-7 w-7 items-center justify-center rounded-md text-[#64748B] transition-colors hover:bg-[#1E293B] hover:text-[#C7D2FE] focus:outline-none focus:ring-1 focus:ring-[#6366F1]/50"
+                      aria-label={`打开${card.title}`}
+                      title="打开原视频"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
                   )}
-                  <div className="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-black/40 backdrop-blur-sm border border-white/10">
-                    <Film className="w-3 h-3 text-[#06B6D4]" />
-                    <span className="text-[9px] font-medium text-white uppercase">视频</span>
-                  </div>
-                  <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded-md bg-black/40 backdrop-blur-sm border border-white/10">
-                    <span className="text-[9px] font-medium text-white/90">♥ {formatLikes(card.likes)}</span>
-                  </div>
-                </div>
-                <div className="p-3 bg-[#111827]">
-                  <p className="text-body-sm text-[#F1F5F9] font-medium line-clamp-2 group-hover:text-[#6366F1] transition-colors">
-                    {card.title}
-                  </p>
-                  <p className="mt-1 text-[11px] text-[#64748B] flex items-center gap-1">
-                    <span className="truncate">{card.author}</span>
-                    <ExternalLink className="w-3 h-3 shrink-0" />
-                  </p>
-                </div>
-              </motion.button>
-            ))}
-          </div>
-        )}
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
       </motion.div>
     </motion.div>
   )

@@ -64,7 +64,7 @@ export default function Sidebar() {
                 className="flex flex-col min-w-0"
               >
                 <span className="font-display text-xl font-bold text-[#F1F5F9] whitespace-nowrap">
-                  szyg
+                  {t('领鹿员工')}
                 </span>
                 <span className="text-[10px] text-[#64748B] whitespace-nowrap -mt-0.5">
                   {t('超级数字员工')}

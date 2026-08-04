@@ -16,15 +16,15 @@ from pathlib import Path
 
 from patchright.async_api import Page, Playwright, async_playwright
 
-from conf import DEBUG_MODE
-from uploader.base_video import BaseVideoUploader
-from utils.base_social_media import set_init_script
-from utils.log import youtube_logger
+from ...conf import DEBUG_MODE
+from ..base_video import BaseVideoUploader
+from ...utils.base_social_media import set_init_script
+from ...utils.log import youtube_logger
 
 try:
     # 国内直连 youtube.com 会超时，且 patchright 启的 chromium 不吃系统代理。
     # 在 conf.py 设 YT_PROXY = "http://127.0.0.1:7890"（本地代理端口）即可；不设则不走代理。
-    from conf import YT_PROXY
+    from ...conf import YT_PROXY
 except Exception:
     YT_PROXY = None
 

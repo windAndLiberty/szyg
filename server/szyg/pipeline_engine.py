@@ -516,22 +516,16 @@ class PipelineExecutor:
         return result
 
     async def _execute_skill(self, node: PipelineNode, params: dict, ctx: PipelineContext) -> dict:
-        """技能节点 — 调用系统现有工具。"""
+        """技能节点通过统一业务能力目录执行。"""
         skill_name = params.get("skill", node.id)
+        from szyg.hermes_capabilities import get_hermes_capability_registry
 
-        # 调用 _execute_tool 或 _call_direct
-        from szyg.api.hermes_chat import _execute_tool, _call_direct
-        tool_args = json.dumps({k: v for k, v in params.items() if k != "skill"})
-
-        try:
-            result = await _execute_tool(skill_name, tool_args)
-            if result.startswith("错误:") or result.startswith("工具"):
-                # 尝试直接调用
-                result = _call_direct(skill_name, params)
-            return {"result": result}
-        except Exception:
-            result = _call_direct(skill_name, params)
-            return {"result": result}
+        registry = get_hermes_capability_registry()
+        names = {item["name"] for item in registry.list()}
+        if skill_name not in names:
+            raise RuntimeError(f"未找到可执行能力：{skill_name}")
+        arguments = {key: value for key, value in params.items() if key != "skill"}
+        return {"result": await registry.execute(skill_name, arguments)}
 
 
 # ── Pipeline Registry ───────────────────────────────────────────────────

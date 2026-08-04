@@ -57,13 +57,15 @@ export interface Conversation {
   title: string
   updated_at: string
   pinned: boolean
+  archived?: boolean
 }
 
-// 欢迎页精选案例 — 来自后端 /api/hermes/case-cards (真实抖音短视频)
+// 欢迎页精选案例 — 来自后端 /api/hermes/case-cards
 export interface CaseCard {
   title: string
   cover_url: string
   video_url: string
   author: string
   likes: number
+  source: string
 }

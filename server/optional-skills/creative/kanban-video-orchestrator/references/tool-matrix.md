@@ -15,7 +15,6 @@ called from the terminal toolset; they don't appear in `always_load`.
 | `ascii-art` | Static ASCII art generation | Concept artist for ASCII style frames; secondary tool for ASCII renderer |
 | `manim-video` | Manim CE animations — math, algorithms, 3Blue1Brown-style explainers | Renderer for math, algorithm walkthroughs, technical concept explainers |
 | `p5js` | p5.js sketches — generative art, shaders, interactive, 3D | Renderer for generative art, particle systems, organic motion, web-canvas content |
-| `comfyui` | Generate images, video, audio with ComfyUI workflows (image-to-image, image-to-video, etc.) | image-generator, image-to-video-generator, or general renderer for AI-generated content |
 | `touchdesigner-mcp` | Control a running TouchDesigner instance — real-time visuals, audio-reactive installation art, VJ | Renderer for real-time/audio-reactive content; installation art; live performance |
 | `blender-mcp` *(optional)* | Control Blender 4.3+ via MCP — 3D modeling, animation, rendering | Renderer for 3D scenes, photoreal environments, character animation |
 | `pixel-art` | Pixel art with era palettes (NES, Game Boy, PICO-8) | Renderer for retro game aesthetic; concept artist for pixel-style frames |
@@ -74,7 +73,7 @@ them directly.
 | `ffmpeg` | Video / audio encode, splice, mux | renderer, editor, audio-mixer, masterer |
 | `ffprobe` | Inspect media | All media-touching profiles |
 | Whisper (CLI or API) | Speech-to-text for captions | captioner |
-| Text-to-image API (FAL / Replicate / OpenAI / Midjourney) | Stills generation | image-generator (alternative to local `comfyui`) |
+| Text-to-image API | Stills generation | image-generator |
 | Image-to-video API (Runway / Kling / Luma / Pika) | Animate stills | image-to-video-generator |
 | Text-to-speech API (ElevenLabs / OpenAI TTS / etc.) | Voiceover generation | voice-talent |
 | Suno API or web | Track composition (paired with `songwriting-and-ai-music`) | music-supervisor |
@@ -174,7 +173,6 @@ skills:
     # - ascii-video            (ASCII projects)
     # - manim-video            (math/explainer)
     # - p5js                   (generative)
-    # - comfyui                (AI-generated visuals)
     # - blender-mcp            (3D)
     # - touchdesigner-mcp      (real-time/installation)
 ```
@@ -193,7 +191,6 @@ skills:
     # - ascii-video               (renderer-ascii)
     # - manim-video               (renderer-manim)
     # - p5js                      (renderer-p5js)
-    # - comfyui                   (renderer-comfyui — img/video AI gen)
     # - touchdesigner-mcp         (renderer-touchdesigner)
     # - blender-mcp               (renderer-3d)
     # - pixel-art                 (renderer-pixel)
@@ -220,18 +217,12 @@ toolsets:
 skills:
   always_load:
     - kanban-worker
-    # for image-generator that drives ComfyUI locally:
-    # - comfyui
 env_required:
   # populate based on the chosen API:
   - FAL_KEY                 # or REPLICATE_API_TOKEN, OPENAI_API_KEY for image-gen
   - RUNWAY_API_KEY          # or KLING_API_KEY, LUMA_API_KEY for image-to-video
   - ELEVENLABS_API_KEY      # or OPENAI_API_KEY for TTS
 ```
-
-If the user's setup has ComfyUI installed locally, the `comfyui` skill can
-replace the external image-gen API entirely (cheaper, more control, supports
-custom workflows for image-to-video too).
 
 ### music-supervisor
 

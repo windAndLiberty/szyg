@@ -14,10 +14,8 @@ city. Voiceover narration. AI-generated visuals.
 - `director` — vision, decomposition, approval
 - `writer` — script + voiceover copy (loads `humanizer` for natural voice)
 - `storyboarder` — beat-by-beat shot list (loads `excalidraw`)
-- `image-generator` — generates each shot's still via local ComfyUI workflows
-  (loads `comfyui`)
-- `image-to-video-generator` — animates each still (Runway/Kling, OR
-  ComfyUI's AnimateDiff/WAN workflows via `comfyui`)
+- `image-generator` — generates each shot's still via the configured image API
+- `image-to-video-generator` — animates each still via the configured video API
 - `voice-talent` — narration via ElevenLabs
 - `audio-mixer` — VO + ambient pad
 - `editor` — assembly + transitions
@@ -37,8 +35,7 @@ T8  reviewer         final QA                                 (parent: T7)
 ```
 
 **Key choices:**
-- Local ComfyUI via `comfyui` skill is preferred over external API for
-  cost/control — but external APIs are fine if ComfyUI isn't installed
+- Image and video generation use the configured provider APIs
 - `editor` profile is ffmpeg-only, no Hermes skill required beyond
   `kanban-worker`
 - Storyboarder produces `storyboard.excalidraw` alongside the markdown
@@ -218,8 +215,8 @@ When the user describes a video, look for these signals to map to an example:
 - **Retro game / pixel-art aesthetic** → use `renderer-pixel` (`pixel-art` skill)
 - **3D scene, photoreal environment** → use `renderer-3d` (`blender-mcp`)
 - **Generative art, particle system, shader** → use `renderer-p5js` (`p5js`)
-- **AI-generated photoreal stills + animation** → use `renderer-comfyui`
-  (`comfyui`) for both stills and image-to-video
+- **AI-generated photoreal stills + animation** → use API-driven image and
+  image-to-video renderer profiles
 - **"video about how the system works", recursive demo** → composable from
   any of the above; the recursion is a rendering technique, not a style
 

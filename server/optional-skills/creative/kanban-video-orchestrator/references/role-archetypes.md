@@ -114,7 +114,7 @@ instead of overloading one. Each loads a different creative skill.
 | `renderer-ascii` | `ascii-video` | Terminal aesthetic, retro pixel, audio-reactive grid, video-to-ASCII conversion |
 | `renderer-manim` | `manim-video` | Math, algorithms, 3Blue1Brown-style explainers, equation derivations |
 | `renderer-p5js` | `p5js` | Generative art, particles, shaders, organic motion, web-canvas content |
-| `renderer-comfyui` | `comfyui` | AI-generated stills + video using local ComfyUI workflows (img-to-img, img-to-video, etc.) |
+| `renderer-cloud` | (provider API) | AI-generated stills and video |
 | `renderer-touchdesigner` | `touchdesigner-mcp` | Real-time, audio-reactive, installation art, VJ-style content |
 | `renderer-3d` | `blender-mcp` *(optional)* | 3D modeling, animation, photoreal environments, character animation |
 | `renderer-pixel` | `pixel-art` | Retro game aesthetic with era-correct palettes |
@@ -133,22 +133,18 @@ Specifically for text-to-image generation. Often produces stills that go to
 `renderer-video` for animation.
 
 - **Toolsets:** kanban, terminal, file
-- **Skills:** `kanban-worker`, optionally `comfyui` (drives a local
-  ComfyUI install for image generation)
-- **External APIs (alternative to local ComfyUI):** FAL, Replicate, OpenAI
-  Images, Midjourney
+- **Skills:** `kanban-worker`
+- **External APIs:** configured image generation provider
 - **Outputs:** `scenes/scene-NN/stills/*.png`
 
 ### image-to-video-generator
 
-Takes still images and animates them via Runway/Kling/Luma APIs, or via
-ComfyUI's image-to-video workflows locally. Almost always follows
+Takes still images and animates them via the configured video API. Almost always follows
 `image-generator` in narrative film pipelines.
 
 - **Toolsets:** kanban, terminal, file
-- **Skills:** `kanban-worker`, optionally `comfyui` (for local image-to-video
-  workflows like AnimateDiff or WAN)
-- **External APIs:** Runway, Kling, Luma, Pika
+- **Skills:** `kanban-worker`
+- **External APIs:** configured video generation provider
 - **Outputs:** `scenes/scene-NN/clip.mp4`
 
 ### music-supervisor

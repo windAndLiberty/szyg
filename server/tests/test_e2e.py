@@ -84,7 +84,6 @@ class TestEndToEnd:
         config: MagicMock,
         mcp_manager: MagicMock,
         client_ffmpeg: MagicMock,
-        client_comfyui: AsyncMock,
     ):
         """
         验收标准: E2E-002 - Agent→MCP→Integration调用链。

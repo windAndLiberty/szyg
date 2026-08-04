@@ -24,6 +24,7 @@ from .database import (
     Entitlement,
     Feedback,
     Invitation,
+    LoginDeviceBlock,
     ModelRoute,
     Organization,
     ProviderBillingDaily,
@@ -40,6 +41,7 @@ from .dependencies import Principal, current_admin, current_principal, get_db
 from .provider import ProviderError, ProviderGateway
 from .schemas import (
     ActivateRequest,
+    AdminUserCreateRequest,
     ChangePasswordRequest,
     EntitlementUpdate,
     FeedbackRequest,
@@ -125,6 +127,7 @@ def _user_json(user: User) -> dict:
         "must_change_password": user.must_change_password,
         "created_at": user.created_at,
         "last_login_at": user.last_login_at,
+        "password_changed_at": user.password_changed_at,
     }
 
 
@@ -138,6 +141,80 @@ def _device_json(device: Device) -> dict:
         "created_at": device.created_at,
         "last_seen_at": device.last_seen_at,
     }
+
+
+def _login_identity(device_input) -> tuple[str, str]:
+    fingerprint_hash = _fingerprint(device_input.fingerprint)
+    if fingerprint_hash:
+        return f"fingerprint:{fingerprint_hash}", fingerprint_hash
+    installation_hash = hashlib.sha256(device_input.installation_id.encode("utf-8")).hexdigest()
+    return f"installation:{installation_hash}", ""
+
+
+def _login_guard(db: Session, device_input) -> LoginDeviceBlock | None:
+    identity_key, _ = _login_identity(device_input)
+    return db.scalar(select(LoginDeviceBlock).where(LoginDeviceBlock.identity_key == identity_key).with_for_update())
+
+
+def _block_matching_devices(db: Session, guard: LoginDeviceBlock) -> None:
+    rows = db.scalars(select(Device).where(Device.installation_id == guard.installation_id)).all()
+    if guard.fingerprint_hash:
+        fingerprint_rows = db.scalars(select(Device).where(Device.fingerprint_hash == guard.fingerprint_hash)).all()
+        rows = list({item.id: item for item in [*rows, *fingerprint_rows]}.values())
+    now = utcnow()
+    for device in rows:
+        if device.status != "revoked":
+            device.status = "blocked"
+        for session in db.scalars(select(RefreshSession).where(
+            RefreshSession.device_id == device.id,
+            RefreshSession.revoked_at.is_(None),
+        )):
+            session.revoked_at = now
+
+
+def _record_login_failure(db: Session, req: LoginRequest) -> LoginDeviceBlock:
+    identity_key, fingerprint_hash = _login_identity(req.device)
+    guard = _login_guard(db, req.device)
+    now = utcnow()
+    if guard is None:
+        candidate = LoginDeviceBlock(
+            identity_key=identity_key,
+            installation_id=req.device.installation_id,
+            fingerprint_hash=fingerprint_hash,
+            device_name=req.device.name,
+            app_version=req.device.app_version,
+            attempted_account=req.email.lower().strip(),
+            failed_attempts=0,
+            first_failure_at=now,
+            last_failure_at=now,
+        )
+        try:
+            with db.begin_nested():
+                db.add(candidate)
+                db.flush()
+            guard = candidate
+        except IntegrityError:
+            guard = _login_guard(db, req.device)
+            if guard is None:
+                raise
+    guard.installation_id = req.device.installation_id
+    guard.device_name = req.device.name
+    guard.app_version = req.device.app_version
+    guard.attempted_account = req.email.lower().strip()
+    guard.failed_attempts += 1
+    guard.last_failure_at = now
+    if guard.failed_attempts >= 10:
+        guard.status = "blocked"
+        guard.blocked_at = guard.blocked_at or now
+        _block_matching_devices(db, guard)
+    db.commit()
+    return guard
+
+
+def _clear_login_failures(db: Session, device_input) -> None:
+    guard = _login_guard(db, device_input)
+    if guard and guard.status != "blocked":
+        db.delete(guard)
 
 
 def _audit(db: Session, admin_id: str, action: str, target_type: str = "", target_id: str = "", detail: dict | None = None) -> None:
@@ -156,6 +233,8 @@ def _ensure_device(db: Session, user: User, device_input, entitlement: Entitleme
         Device.installation_id == device_input.installation_id,
     ))
     if device:
+        if device.status == "blocked":
+            raise HTTPException(423, "当前设备已锁定，请联系管理员")
         if device.status != "active":
             raise HTTPException(403, "当前设备已被移除，请联系管理员")
         device.name = device_input.name
@@ -400,17 +479,29 @@ def license_key():
 
 @app.post("/api/v1/auth/login")
 def login(req: LoginRequest, db: Session = Depends(get_db)):
+    guard = _login_guard(db, req.device)
+    if guard and guard.status == "blocked":
+        raise HTTPException(423, "当前设备已锁定，请联系管理员解除")
     user = db.scalar(select(User).where(User.email == req.email.lower().strip()))
     if not user or not verify_password(req.password, user.password_hash):
-        raise HTTPException(401, "邮箱或密码错误")
+        guard = _record_login_failure(db, req)
+        if guard.status == "blocked":
+            raise HTTPException(423, "密码错误次数已达上限，当前设备已锁定")
+        remaining = 10 - guard.failed_attempts
+        raise HTTPException(401, f"账号或密码错误，还可尝试 {remaining} 次")
     if user.status != "active":
         raise HTTPException(403, "账户暂不可用")
     if not verify_totp(user.totp_secret, req.totp_code):
-        raise HTTPException(401, "动态验证码错误")
+        guard = _record_login_failure(db, req)
+        if guard.status == "blocked":
+            raise HTTPException(423, "验证失败次数已达上限，当前设备已锁定")
+        remaining = 10 - guard.failed_attempts
+        raise HTTPException(401, f"验证未通过，还可尝试 {remaining} 次")
     entitlement = db.scalar(select(Entitlement).where(Entitlement.user_id == user.id))
     if not entitlement or as_utc(entitlement.valid_until) <= utcnow():
         raise HTTPException(403, "服务授权已到期")
     device = _ensure_device(db, user, req.device, entitlement)
+    _clear_login_failures(db, req.device)
     user.last_login_at = utcnow()
     result = _issue_session(db, user, device)
     result["license"] = _license_payload(user, device, entitlement)
@@ -448,19 +539,26 @@ def logout(req: LogoutRequest, db: Session = Depends(get_db)):
 
 @app.put("/api/v1/auth/password")
 def change_password(req: ChangePasswordRequest, principal: Principal = Depends(current_principal), db: Session = Depends(get_db)):
-    if not verify_password(req.current_password, principal.user.password_hash):
+    user = db.scalar(select(User).where(User.id == principal.user.id).with_for_update())
+    if not user or not verify_password(req.current_password, user.password_hash):
         raise HTTPException(400, "当前密码不正确")
-    principal.user.password_hash = hash_password(req.new_password)
-    principal.user.must_change_password = False
+    if verify_password(req.new_password, user.password_hash):
+        raise HTTPException(400, "新密码不能与当前密码相同")
+    day_start, day_end = _day_window()
+    if user.password_changed_at and day_start <= as_utc(user.password_changed_at) < day_end:
+        raise HTTPException(429, "今天已经修改过密码，请明天再试")
+    user.password_hash = hash_password(req.new_password)
+    user.must_change_password = False
     now = utcnow()
+    user.password_changed_at = now
     for session in db.scalars(select(RefreshSession).where(
-        RefreshSession.user_id == principal.user.id,
+        RefreshSession.user_id == user.id,
         RefreshSession.device_id != principal.device.id,
         RefreshSession.revoked_at.is_(None),
     )):
         session.revoked_at = now
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "password_changed_at": now, "next_change_at": day_end}
 
 
 @app.get("/api/v1/auth/me")
@@ -822,6 +920,86 @@ def admin_users(admin: Principal = Depends(current_admin), db: Session = Depends
             "spent": _credits(spent_micros),
         }})
     return {"items": result}
+
+
+@app.post("/api/v1/admin/users")
+def admin_create_user(req: AdminUserCreateRequest, admin: Principal = Depends(current_admin), db: Session = Depends(get_db)):
+    email = req.email.lower().strip()
+    if db.scalar(select(User).where(User.email == email)):
+        raise HTTPException(409, "该账号已开通")
+    organization = Organization(name=req.organization_name.strip() or req.display_name.strip())
+    db.add(organization)
+    db.flush()
+    user = User(
+        organization_id=organization.id,
+        email=email,
+        display_name=req.display_name.strip(),
+        password_hash=hash_password(req.password),
+        role="user",
+        status="active",
+    )
+    db.add(user)
+    db.flush()
+    entitlement = Entitlement(
+        user_id=user.id,
+        valid_until=utcnow() + timedelta(days=req.entitlement_days),
+        device_limit=req.device_limit,
+        features={"cloud_models": True},
+        quotas={**DEFAULT_QUOTAS, **req.quotas},
+    )
+    db.add(entitlement)
+    _audit(db, admin.user.id, "create_user", "user", user.id, {
+        "email": email,
+        "device_limit": req.device_limit,
+        "entitlement_days": req.entitlement_days,
+    })
+    db.commit()
+    return {
+        "user": _user_json(user),
+        "entitlement": {
+            "valid_until": entitlement.valid_until,
+            "device_limit": entitlement.device_limit,
+        },
+    }
+
+
+@app.get("/api/v1/admin/login-blocks")
+def admin_login_blocks(admin: Principal = Depends(current_admin), db: Session = Depends(get_db)):
+    del admin
+    rows = db.scalars(select(LoginDeviceBlock).where(
+        LoginDeviceBlock.status == "blocked",
+    ).order_by(LoginDeviceBlock.blocked_at.desc())).all()
+    return {"items": [{
+        "id": item.id,
+        "device_name": item.device_name,
+        "installation_id": item.installation_id,
+        "attempted_account": item.attempted_account,
+        "failed_attempts": item.failed_attempts,
+        "app_version": item.app_version,
+        "blocked_at": item.blocked_at,
+        "last_failure_at": item.last_failure_at,
+    } for item in rows]}
+
+
+@app.delete("/api/v1/admin/login-blocks/{block_id}")
+def admin_remove_login_block(block_id: str, admin: Principal = Depends(current_admin), db: Session = Depends(get_db)):
+    guard = db.get(LoginDeviceBlock, block_id)
+    if not guard or guard.status != "blocked":
+        raise HTTPException(404, "黑名单设备不存在")
+    matching_devices = db.scalars(select(Device).where(Device.installation_id == guard.installation_id)).all()
+    if guard.fingerprint_hash:
+        fingerprint_devices = db.scalars(select(Device).where(Device.fingerprint_hash == guard.fingerprint_hash)).all()
+        matching_devices = list({item.id: item for item in [*matching_devices, *fingerprint_devices]}.values())
+    for device in matching_devices:
+        if device.status == "blocked":
+            device.status = "active"
+    _audit(db, admin.user.id, "remove_login_block", "login_device_block", guard.id, {
+        "attempted_account": guard.attempted_account,
+        "installation_id": guard.installation_id,
+    })
+    db.delete(guard)
+    db.commit()
+    return {"ok": True}
 
 
 @app.post("/api/v1/admin/invitations")

@@ -20,7 +20,7 @@ class ActivateRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str = Field(min_length=3, max_length=320)
     password: str
     device: DeviceInput
     totp_code: str = ""
@@ -49,6 +49,16 @@ class InviteRequest(BaseModel):
     email: EmailStr
     organization_name: str = Field(default="", max_length=120)
     role: str = Field(default="user", pattern="^(user|admin)$")
+    entitlement_days: int = Field(default=30, ge=1, le=3650)
+    device_limit: int = Field(default=2, ge=1, le=10)
+    quotas: dict[str, int] = Field(default_factory=dict)
+
+
+class AdminUserCreateRequest(BaseModel):
+    email: EmailStr
+    display_name: str = Field(min_length=1, max_length=120)
+    password: str = Field(min_length=10, max_length=200)
+    organization_name: str = Field(default="", max_length=120)
     entitlement_days: int = Field(default=30, ge=1, le=3650)
     device_limit: int = Field(default=2, ge=1, le=10)
     quotas: dict[str, int] = Field(default_factory=dict)

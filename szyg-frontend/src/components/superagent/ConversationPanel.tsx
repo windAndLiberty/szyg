@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, MessageSquare, Pin, Trash2, Pencil, X } from 'lucide-react'
+import { Archive, Plus, MessageSquare, Pin, Trash2, Pencil, X } from 'lucide-react'
 import type { Conversation } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -10,6 +10,7 @@ type ConversationPanelProps = {
   onSelect: (id: string) => void
   onNew: () => void
   onPin: (conv: Conversation) => void
+  onArchive: (conv: Conversation) => void
   onDelete: (conv: Conversation) => void
   onRename: (conv: Conversation, title: string) => void
 }
@@ -34,6 +35,7 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({
   onSelect,
   onNew,
   onPin,
+  onArchive,
   onDelete,
   onRename,
 }) => {
@@ -102,12 +104,11 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({
               onClick={() => onSelect(conv.id)}
               onContextMenu={(e) => openCtx(e, conv)}
               className={cn(
-                'px-3 py-2.5 rounded-lg cursor-pointer mb-1 transition-colors',
+                'group relative px-3 py-2.5 rounded-lg cursor-pointer mb-1 transition-colors',
                 conv.id === activeConvId ? 'bg-[rgba(99,102,241,0.1)]' : 'hover:bg-[rgba(255,255,255,0.03)]',
               )}
             >
-              <div className="flex items-center gap-1.5">
-                {conv.pinned && <Pin className="w-3 h-3 text-[#6366F1] shrink-0" />}
+              <div className="flex items-center gap-1.5 pr-14">
                 <span
                   className={cn(
                     'text-[13px] truncate flex-1',
@@ -118,6 +119,35 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({
                 </span>
               </div>
               <div className="text-[11px] text-[#64748B] mt-1">{formatTime(conv.updated_at)}</div>
+              <div className="absolute right-2 top-2 flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onPin(conv)
+                  }}
+                  className={cn(
+                    'inline-flex h-6 w-6 items-center justify-center rounded-md transition-all group-hover:opacity-100 hover:bg-[#1E293B] hover:text-[#C7D2FE] focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-[#6366F1]/50',
+                    conv.pinned ? 'text-[#818CF8] opacity-100' : 'text-[#64748B] opacity-0',
+                  )}
+                  aria-label={conv.pinned ? '取消置顶' : '置顶'}
+                  title={conv.pinned ? '取消置顶' : '置顶'}
+                >
+                  <Pin className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onArchive(conv)
+                  }}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[#64748B] opacity-0 transition-all hover:bg-[#1E293B] hover:text-[#F1F5F9] focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-[#6366F1]/50 group-hover:opacity-100 group-focus-within:opacity-100"
+                  aria-label="归档对话"
+                  title="归档"
+                >
+                  <Archive className="h-3.5 w-3.5" />
+                </button>
+              </div>
             </div>
           ))
         )}
@@ -150,6 +180,15 @@ const ConversationPanel: React.FC<ConversationPanelProps> = ({
               className="flex items-center gap-2 w-full px-3 py-2 text-[13px] text-[#94A3B8] hover:bg-[rgba(255,255,255,0.05)] hover:text-[#F1F5F9] transition-colors"
             >
               <Pencil className="w-3.5 h-3.5" /> 重命名
+            </button>
+            <button
+              onClick={() => {
+                if (ctx.conv) onArchive(ctx.conv)
+                closeCtx()
+              }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-[13px] text-[#94A3B8] hover:bg-[rgba(255,255,255,0.05)] hover:text-[#F1F5F9] transition-colors"
+            >
+              <Archive className="w-3.5 h-3.5" /> 归档
             </button>
             <div className="h-px bg-[#1E293B] my-1" />
             <button

@@ -37,6 +37,7 @@ class ConversationUpdate(BaseModel):
     title: Optional[str] = None
     messages: Optional[list[ConversationMessage]] = None
     pinned: Optional[bool] = None
+    archived: Optional[bool] = None
 
 
 def _conv_path(conv_id: str) -> Path:
@@ -72,6 +73,7 @@ def _list_convs() -> list[dict]:
                 "created_at": data.get("created_at", ""),
                 "updated_at": data.get("updated_at", ""),
                 "pinned": data.get("pinned", False),
+                "archived": data.get("archived", False),
             })
         except (json.JSONDecodeError, OSError) as e:
             logger.warning("Skipping corrupt conversation file %s: %s", f.name, e)
@@ -99,10 +101,15 @@ def _prune_conversations(max_count: int = MAX_CONVERSATIONS):
 
 
 @router.get("")
-async def list_conversations(limit: int = Query(default=MAX_CONVERSATIONS, ge=1, le=MAX_CONVERSATIONS)):
+async def list_conversations(
+    limit: int = Query(default=MAX_CONVERSATIONS, ge=1, le=MAX_CONVERSATIONS),
+    include_archived: bool = Query(default=False),
+):
     """列出所有会话（置顶在前，其余按更新时间倒序）"""
     _prune_conversations()
     convs = _sort_convs(_list_convs())
+    if not include_archived:
+        convs = [conv for conv in convs if not conv.get("archived", False)]
     return {"conversations": convs[:limit]}
 
 
@@ -127,6 +134,7 @@ async def create_conversation(body: ConversationCreate):
         "agent_id": body.agent_id,
         "model": body.model,
         "pinned": False,
+        "archived": False,
         "created_at": now,
         "updated_at": now,
     }
@@ -148,6 +156,8 @@ async def update_conversation(conv_id: str, body: ConversationUpdate):
         conv["messages"] = [m.model_dump() for m in body.messages]
     if body.pinned is not None:
         conv["pinned"] = body.pinned
+    if body.archived is not None:
+        conv["archived"] = body.archived
 
     conv["updated_at"] = datetime.now(timezone.utc).isoformat()
     _save_conv(conv_id, conv)

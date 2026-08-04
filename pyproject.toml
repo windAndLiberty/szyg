@@ -69,7 +69,7 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 markers = [
-    "real_service: tests that require real external services (Ollama, ComfyUI, etc.)",
+    "real_service: tests that require real external services (Ollama, media providers, etc.)",
 ]
 
 [tool.coverage.run]

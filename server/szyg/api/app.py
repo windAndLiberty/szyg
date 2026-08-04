@@ -44,6 +44,15 @@ def create_app() -> FastAPI:
         """Keep the loopback API private to the Electron session in production."""
         protected = request.url.path.startswith(("/api/", "/v1/"))
         exempt = request.url.path == "/api/health" or request.method == "OPTIONS"
+        if request.url.path.startswith("/api/internal/hermes/"):
+            from szyg.hermes_process_manager import hermes_process_manager
+            internal_token = request.headers.get("X-SZYG-Hermes-Token", "")
+            bearer = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+            supplied_internal = internal_token or bearer
+            if supplied_internal and hermes_process_manager.token and hmac.compare_digest(
+                supplied_internal, hermes_process_manager.token
+            ):
+                exempt = True
         if desktop_token and protected and not exempt:
             supplied = request.cookies.get("szyg_desktop_token", "")
             if not supplied:
@@ -103,8 +112,8 @@ def create_app() -> FastAPI:
     from szyg.api.chat import router as chat_api_router
     app.include_router(chat_api_router)
 
-    # Hermes Chat — 超级AI员工 (Ollama + szyg MCP tools)
-    from szyg.api.hermes_chat import router as hermes_chat_router
+    # Hermes Chat — isolated upstream agent loop + guarded SZYG capabilities
+    from szyg.api.hermes_native_routes import router as hermes_chat_router
     app.include_router(hermes_chat_router)
 
     # Client-side local AI & runtime
@@ -362,12 +371,12 @@ def create_app() -> FastAPI:
                 return FileResponse(favicon_path, media_type="image/svg+xml")
             return FileResponse(os.path.join(spa_dir, "index.html"))
 
-        @app.get("/logo1.jpg")
+        @app.get("/logo1.png")
         async def serve_logo1():
             """Serve logo1 branding image."""
-            logo_path = os.path.join(spa_dir, "logo1.jpg")
+            logo_path = os.path.join(spa_dir, "logo1.png")
             if os.path.isfile(logo_path):
-                return FileResponse(logo_path, media_type="image/jpeg")
+                return FileResponse(logo_path, media_type="image/png")
             return FileResponse(os.path.join(spa_dir, "index.html"))
 
         # szyg-frontend (React Router) 路由

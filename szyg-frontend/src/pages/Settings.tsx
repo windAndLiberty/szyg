@@ -34,6 +34,8 @@ import {
   apiDel,
   getCurrentUser,
   fetchCloudSession,
+  changeCloudPassword,
+  getErrorMessage,
   logoutCloud,
   type CloudSession,
 } from '@/lib/api'
@@ -112,6 +114,12 @@ export default function SettingsPage() {
   const [profileEmail] = useState(`${currentUser?.username ?? 'admin'}@szyg.local`)
   const [profileRole, setProfileRole] = useState('系统管理员')
   const { data: cloudSession, reload: reloadCloudSession } = useAsync<CloudSession>(fetchCloudSession)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordSaving, setPasswordSaving] = useState(false)
+  const [passwordMessage, setPasswordMessage] = useState('')
+  const [passwordError, setPasswordError] = useState('')
   useEffect(() => {
     if (cloudSession?.user) {
       setProfileName(cloudSession.user.display_name)
@@ -148,6 +156,32 @@ export default function SettingsPage() {
 
   const handleReset = () => {
     setUnsaved(false)
+  }
+
+  const handlePasswordChange = async () => {
+    setPasswordError('')
+    setPasswordMessage('')
+    if (newPassword.length < 10) {
+      setPasswordError('新密码至少需要 10 个字符')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('两次输入的新密码不一致')
+      return
+    }
+    setPasswordSaving(true)
+    try {
+      await changeCloudPassword(currentPassword, newPassword)
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setPasswordMessage('密码已更新')
+      await reloadCloudSession()
+    } catch (error) {
+      setPasswordError(getErrorMessage(error, '密码修改失败'))
+    } finally {
+      setPasswordSaving(false)
+    }
   }
 
   /* -- animation variants -- */
@@ -557,6 +591,39 @@ export default function SettingsPage() {
                 </div>
               </div>
             </motion.div>
+
+            {cloudSession?.configured && cloudSession.authenticated && (
+              <motion.div variants={cardVariant}>
+                <h2 className="mb-1 text-heading-sm text-[#F1F5F9]">账户安全</h2>
+                <p className="mb-4 text-body-sm text-[#64748B]">修改登录密码，每个账号每天最多修改一次。</p>
+                <form
+                  className="glass-card space-y-4 rounded-[16px] border border-[#1E293B] p-5"
+                  onSubmit={(event) => { event.preventDefault(); void handlePasswordChange() }}
+                >
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div>
+                      <Label className="mb-1.5 block text-body-sm text-[#94A3B8]">当前密码</Label>
+                      <Input value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} type="password" autoComplete="current-password" className="border-[#1E293B] bg-[#0D1321] text-[#F1F5F9]" />
+                    </div>
+                    <div>
+                      <Label className="mb-1.5 block text-body-sm text-[#94A3B8]">新密码</Label>
+                      <Input value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" autoComplete="new-password" className="border-[#1E293B] bg-[#0D1321] text-[#F1F5F9]" />
+                    </div>
+                    <div>
+                      <Label className="mb-1.5 block text-body-sm text-[#94A3B8]">确认新密码</Label>
+                      <Input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} type="password" autoComplete="new-password" className="border-[#1E293B] bg-[#0D1321] text-[#F1F5F9]" />
+                    </div>
+                  </div>
+                  {passwordError && <p className="text-sm text-[#FCA5A5]">{passwordError}</p>}
+                  {passwordMessage && <p className="text-sm text-[#6EE7B7]">{passwordMessage}</p>}
+                  <div className="flex justify-end">
+                    <Button type="submit" disabled={passwordSaving || !currentPassword || !newPassword || !confirmPassword} className="bg-[#6366F1] text-white hover:bg-[#818CF8]">
+                      {passwordSaving ? '正在保存' : '修改密码'}
+                    </Button>
+                  </div>
+                </form>
+              </motion.div>
+            )}
 
             {/* Team */}
             <motion.div variants={cardVariant}>

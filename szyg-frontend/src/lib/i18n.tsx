@@ -11,6 +11,7 @@ interface I18nContextValue {
 const LOCALE_STORAGE_KEY = 'szyg-locale'
 
 const enUS: Record<string, string> = {
+  '领鹿员工': 'Linglu Staff',
   'AI员工': 'AI Staff',
   '超级员工': 'Super Agent',
   'AI人才市场': 'AI Talent',
@@ -52,7 +53,7 @@ const enUS: Record<string, string> = {
   '个人资料': 'Profile',
   '退出登录': 'Sign out',
   '超级数字员工': 'Super Digital Workforce',
-  '© 2026 szyg - 超级数字员工系统. All rights reserved.': '© 2026 szyg - Super Digital Workforce. All rights reserved.',
+  '© 2026 领鹿员工. All rights reserved.': '© 2026 Linglu Staff. All rights reserved.',
 
   '通用设置': 'General',
   'AI 模型': 'AI Models',

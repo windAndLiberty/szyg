@@ -29,19 +29,6 @@ async def ollama_chat(prompt: str, model: str = "qwen3", system: str = ""):
     return {"response": result}
 
 
-@router.post("/comfyui/generate")
-async def comfyui_generate(prompt: str, negative: str = "", steps: int = 15,
-                            width: int = 768, height: int = 768):
-    """Generate image via local ComfyUI SD 2.1"""
-    if not LocalAI.is_comfyui_running():
-        return {"error": "ComfyUI not running"}
-    try:
-        image_url = await LocalAI.comfyui_generate(prompt, negative, steps, width, height)
-        return {"ok": True, "image_url": image_url}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
-
-
 @router.get("/runtime")
 async def runtime_list():
     """List running local processes"""

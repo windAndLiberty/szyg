@@ -2,19 +2,14 @@
 
 from __future__ import annotations
 
-import importlib
 import logging
 import subprocess
-import sys
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
+from szyg.integrations import wxauto_vendor
+
 logger = logging.getLogger(__name__)
-
-REPO_ROOT = Path(__file__).resolve().parents[3]
-LOCAL_WXAUTO_ROOT = REPO_ROOT / "external" / "wxauto-main"
-
 
 @dataclass
 class WxautoProbeResult:
@@ -49,25 +44,7 @@ class WxautoBridge:
             )
             return None
 
-        try:
-            module = importlib.import_module("wxauto")
-        except Exception as first_error:
-            if LOCAL_WXAUTO_ROOT.exists():
-                root = str(LOCAL_WXAUTO_ROOT)
-                if root not in sys.path:
-                    sys.path.insert(0, root)
-                try:
-                    module = importlib.import_module("wxauto")
-                except Exception as second_error:
-                    self._load_error = str(second_error)
-                    logger.debug("wxauto import failed from local source: %s", second_error)
-                    return None
-            else:
-                self._load_error = str(first_error)
-                logger.debug("wxauto import failed: %s", first_error)
-                return None
-
-        self._wechat_class = getattr(module, "WeChat", None)
+        self._wechat_class = getattr(wxauto_vendor, "WeChat", None)
         if self._wechat_class is None:
             self._load_error = "wxauto.WeChat is unavailable"
         return self._wechat_class

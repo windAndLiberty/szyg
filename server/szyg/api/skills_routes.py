@@ -7,7 +7,6 @@ import json
 import logging
 import os
 import re
-import sys
 import asyncio
 import time
 from pathlib import Path
@@ -19,72 +18,29 @@ from pydantic import BaseModel
 
 from szyg.api.auth_routes import require_admin
 from szyg.auth import User
+from szyg.hermes_process_manager import hermes_process_manager
 
 logger = logging.getLogger(__name__)
-
-# hermes CLI root → tools/, agent/, etc.
-_HERMES_ROOT = Path(__file__).resolve().parent.parent.parent
-if str(_HERMES_ROOT) not in sys.path:
-    sys.path.insert(0, str(_HERMES_ROOT))
 
 router = APIRouter(prefix="/api/skills", tags=["skills-market"])
 
 # ── Lazy imports (heavy modules only loaded when endpoints are hit) ──
 
-_source_router = None
-_hub_lock = None
 _market_cache: dict[tuple[str, str], tuple[float, list[dict]]] = {}
 _MARKET_CACHE_TTL_SECONDS = 15 * 60
 
 
-def _get_source_router():
-    global _source_router
-    if _source_router is None:
-        from tools.skills_hub import create_source_router
-        _source_router = create_source_router()
-    return _source_router
-
-
-def _get_lock():
-    global _hub_lock
-    if _hub_lock is None:
-        from tools.skills_hub import HubLockFile
-        _hub_lock = HubLockFile()
-    return _hub_lock
-
-
-def _resolve_install_bundle(identifier: str):
-    """Resolve metadata and a downloadable bundle from the same source.
-
-    Search-only aggregators may expose ClawHub metadata without implementing
-    package downloads, so a metadata hit alone is not enough for installation.
-    """
-    for source in _get_source_router():
-        try:
-            meta = source.inspect(identifier)
-            if meta is None:
-                continue
-            bundle = source.fetch(identifier)
-            if bundle is not None:
-                return meta, bundle
-        except Exception as exc:
-            logger.debug("Skill source %s failed for %s: %s", type(source).__name__, identifier, exc)
-    return None, None
-
-
-def _skill_meta_to_dict(sm) -> dict:
-    """Convert SkillMeta dataclass to JSON-safe dict."""
-    return {
-        "name": sm.name,
-        "description": sm.description,
-        "source": sm.source,
-        "identifier": sm.identifier,
-        "trust_level": sm.trust_level,
-        "repo": sm.repo,
-        "path": sm.path,
-        "tags": sm.tags,
-        "extra": sm.extra,
-    }
+async def _runtime_native(operation: str, payload: dict | None = None) -> dict:
+    await asyncio.to_thread(hermes_process_manager.ensure_started)
+    async with httpx.AsyncClient(timeout=180, trust_env=False) as client:
+        response = await client.post(
+            hermes_process_manager.base_url + "/v1/native",
+            headers=hermes_process_manager.headers,
+            json={"operation": operation, "payload": payload or {}},
+        )
+    if response.status_code >= 400:
+        raise HTTPException(503, "智能员工能力暂时不可用")
+    return response.json()
 
 
 _MARKET_CATEGORIES = {
@@ -504,35 +460,17 @@ class CuratorPauseRequest(BaseModel):
 
 @router.get("/runtime")
 async def hermes_runtime_status():
-    from szyg.hermes_runtime import runtime_status
-
-    return await asyncio.to_thread(runtime_status)
+    return await _runtime_native("status")
 
 
 @router.get("/native")
 async def list_native_skills():
-    from tools.skill_usage import usage_report
-    from tools.skills_tool import skills_list
-
-    data = json.loads(await asyncio.to_thread(skills_list))
-    usage = {row.get("name"): row for row in await asyncio.to_thread(usage_report)}
-    items = []
-    for skill in data.get("skills", []):
-        item = dict(skill)
-        item["usage"] = usage.get(item.get("name"), {})
-        items.append(item)
-    return {
-        "items": items,
-        "total": len(items),
-        "categories": data.get("categories", []),
-    }
+    return await _runtime_native("skills_list")
 
 
 @router.get("/native/{skill_name}")
 async def native_skill_detail(skill_name: str):
-    from tools.skills_tool import skill_view
-
-    result = json.loads(await asyncio.to_thread(skill_view, skill_name))
+    result = await _runtime_native("skill_view", {"name": skill_name})
     if not result.get("success"):
         raise HTTPException(404, result.get("error") or f"技能不存在: {skill_name}")
     return result
@@ -543,11 +481,7 @@ async def manage_native_skill(
     body: NativeSkillManageRequest,
     admin: User = Depends(require_admin),
 ):
-    from szyg.hermes_runtime import execute_native_skill_tool
-
-    result = json.loads(
-        await asyncio.to_thread(execute_native_skill_tool, "skill_manage", body.model_dump())
-    )
+    result = await _runtime_native("skill_manage", body.model_dump())
     if not result.get("success"):
         raise HTTPException(400, result.get("error") or "技能操作失败")
     return result
@@ -555,10 +489,7 @@ async def manage_native_skill(
 
 @router.post("/curator/run")
 async def run_native_curator(admin: User = Depends(require_admin)):
-    from agent.curator import run_curator_review
-
-    result = await asyncio.to_thread(run_curator_review, None, False, False)
-    return {"ok": True, "result": result}
+    return await _runtime_native("curator_run")
 
 
 @router.put("/curator/paused")
@@ -566,10 +497,7 @@ async def pause_native_curator(
     body: CuratorPauseRequest,
     admin: User = Depends(require_admin),
 ):
-    from agent.curator import set_paused
-
-    await asyncio.to_thread(set_paused, body.paused)
-    return {"ok": True, "paused": body.paused}
+    return await _runtime_native("curator_pause", {"paused": body.paused})
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -649,30 +577,10 @@ async def market_list(
 @router.get("/market/{identifier:path}")
 async def market_detail(identifier: str):
     """获取单个技能的元数据 + SKILL.md 预览。"""
-    sources = _get_source_router()
-    for src in sources:
-        try:
-            meta = src.inspect(identifier)
-            if meta is not None:
-                result = _skill_meta_to_dict(meta)
-                # Try to get the bundle for a SKILL.md preview
-                try:
-                    bundle = src.fetch(identifier)
-                    if bundle and "SKILL.md" in bundle.files:
-                        skill_md = bundle.files["SKILL.md"]
-                        if isinstance(skill_md, bytes):
-                            skill_md = skill_md.decode("utf-8", errors="replace")
-                        # First 80 lines as preview
-                        lines = skill_md.split("\n")[:80]
-                        result["skill_md_preview"] = "\n".join(lines)
-                        result["skill_md_full_lines"] = len(skill_md.split("\n"))
-                except Exception as e:
-                    logger.debug("Failed to fetch SKILL.md for %s: %s", identifier, e)
-                return result
-        except Exception as e:
-            logger.debug("Source %s failed for %s: %s", type(src).__name__, identifier, e)
-            continue
-    raise HTTPException(404, f"技能不存在: {identifier}")
+    result = await _runtime_native("market_detail", {"identifier": identifier})
+    if result.get("ok") is False:
+        raise HTTPException(404, result.get("error") or f"技能不存在: {identifier}")
+    return result
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -692,55 +600,20 @@ async def install_skill(body: dict):
     if not identifier:
         raise HTTPException(422, "identifier 必填")
 
-    from tools.skills_hub import quarantine_bundle, install_from_quarantine
-    from tools.skills_guard import scan_skill, should_allow_install
-    from agent.prompt_builder import clear_skills_system_prompt_cache
-
-    # 1. Locate a source that can both identify and download the package.
-    meta, bundle = await asyncio.to_thread(_resolve_install_bundle, identifier)
-    if meta is None:
-        raise HTTPException(404, f"技能不存在或无法访问: {identifier}")
-    if bundle is None:
-        raise HTTPException(500, f"无法下载技能包: {identifier}")
-
-    ready, readiness_reason = _validate_install_ready_bundle(identifier, bundle)
-    if not ready:
-        raise HTTPException(422, readiness_reason)
-
-    # 3. Quarantine → Scan → Install
-    try:
-        quarantine_path = quarantine_bundle(bundle)
-        scan_result = scan_skill(quarantine_path, source=meta.source or "community")
-        allowed, reason = should_allow_install(scan_result, force=force)
-        if not allowed:
-            # Clean up quarantine on rejection
-            import shutil
-            shutil.rmtree(quarantine_path, ignore_errors=True)
-            raise HTTPException(403, f"安装被安全策略拒绝: {reason}")
-
-        install_path = install_from_quarantine(
-            quarantine_path, bundle.name, category, bundle, scan_result
-        )
-        clear_skills_system_prompt_cache(clear_snapshot=True)
-
-        return {
-            "ok": True,
-            "skill_name": bundle.name,
-            "install_path": str(install_path),
-            "trust_level": meta.trust_level,
-            "scan_warnings": scan_result.warnings if hasattr(scan_result, 'warnings') else [],
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(500, f"安装失败: {str(e)[:300]}")
+    result = await _runtime_native("market_install", {
+        "identifier": identifier,
+        "category": category,
+        "force": force,
+    })
+    if not result.get("ok"):
+        raise HTTPException(422, result.get("error") or "安装失败")
+    return result
 
 
 @router.get("/installed")
 async def list_installed():
     """只列出用户从外部能力市场添加的技能，不暴露 SZYG 内部技能。"""
-    lock = _get_lock()
-    data = lock.load()
+    data = await _runtime_native("installed_list")
     installed = data.get("installed", {})
     items = []
     for name, entry in installed.items():
@@ -760,9 +633,7 @@ async def list_installed():
 @router.delete("/installed/{skill_name}")
 async def remove_skill(skill_name: str):
     """卸载已安装的技能。"""
-    from tools.skills_hub import uninstall_skill
-
-    ok, message = uninstall_skill(skill_name)
-    if not ok:
-        raise HTTPException(400, message)
-    return {"ok": True, "message": message}
+    result = await _runtime_native("skill_uninstall", {"name": skill_name})
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("message") or "移除失败")
+    return result

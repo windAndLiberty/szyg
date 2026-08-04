@@ -51,7 +51,6 @@ class TestConfigModule:
         assert config.api is not None, "API config should exist"
         assert config.api.port == 8000, "Default API port should be 8000"
         assert config.whisper is not None, "Whisper config should exist"
-        assert config.comfyui is not None, "ComfyUI config should exist"
         assert config.ffmpeg is not None, "FFmpeg config should exist"
         assert config.wechaty is not None, "Wechaty config should exist"
 

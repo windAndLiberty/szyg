@@ -78,15 +78,6 @@ class WhisperConfig(BaseModel):
     timeout: int = Field(default=300, ge=10)
 
 
-class ComfyUIConfig(BaseModel):
-    """ComfyUI 图像生成配置。"""
-
-    api_url: str = Field(default="http://localhost:8188")
-    output_dir: str = Field(default="./data/comfyui_output")
-    default_workflow: str = Field(default="default")
-    timeout: int = Field(default=300, ge=10)
-
-
 class FFmpegConfig(BaseModel):
     """FFmpeg 视频处理配置。"""
 
@@ -100,10 +91,9 @@ class FFmpegConfig(BaseModel):
 
 
 class SocialAutoUploadConfig(BaseModel):
-    """social-auto-upload integration config."""
+    """Built-in social publishing provider config."""
 
     enabled: bool = Field(default=True)
-    project_dir: str = Field(default="./external/social-auto-upload-main")
     default_headless: bool = Field(default=True)
     publish_timeout_seconds: int = Field(default=900, ge=60)
     accounts: dict[str, str] = Field(default_factory=lambda: {"douyin": "szyg"})
@@ -113,7 +103,6 @@ class IntegrationsConfig(BaseModel):
     """集成配置聚合。"""
 
     whisper: WhisperConfig = Field(default_factory=WhisperConfig)
-    comfyui: ComfyUIConfig = Field(default_factory=ComfyUIConfig)
     ffmpeg: FFmpegConfig = Field(default_factory=FFmpegConfig)
     social_auto_upload: SocialAutoUploadConfig = Field(default_factory=SocialAutoUploadConfig)
 

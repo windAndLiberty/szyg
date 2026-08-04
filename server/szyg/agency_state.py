@@ -1,6 +1,6 @@
 """Agency 专家激活状态管理 — 独立模块避免循环依赖.
 
-被 agency_routes.py（设置/清除激活）与 hermes_chat.py（读取激活构建Prompt）共用。
+被 agency_routes.py（设置/清除激活）与原生智能员工路由（读取激活构建提示）共用。
 激活状态持久化到 data/agency_active.json，重启后自动恢复。
 """
 import json
@@ -9,6 +9,7 @@ import threading
 from pathlib import Path
 from typing import Optional
 
+from szyg.agency_manifest import RESOURCE_DIRNAME
 from szyg.data_path import DATA_DIR
 
 logger = logging.getLogger(__name__)
@@ -51,8 +52,7 @@ def _persist(data: dict | None) -> None:
 
 def _agency_root() -> Path:
     """Agency 专家数据根目录。"""
-    # D:\szyg\external\agency-agents-main
-    return Path(__file__).parent.parent.parent.parent / "external" / "agency-agents-main"
+    return Path(__file__).resolve().parent / "resources" / RESOURCE_DIRNAME
 
 
 def get_active_expert() -> Optional[dict]:

@@ -7,6 +7,7 @@ import json
 import re
 import urllib.request
 from datetime import datetime, timedelta
+from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
@@ -14,13 +15,14 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
 
 from szyg.channel_accounts import get_account, patch_account, safe_token
+from szyg.data_path import DATA_DIR
 from szyg.integrations.desktop_browser_session import get_desktop_browser_session
 from szyg.platforms.weibo_desktop import WEIBO_HOME_URL, weibo_profile_key
 
 
 PROFILE_SYNC_TTL_HOURS = 24
-SAU_STEALTH_SCRIPT = Path(__file__).resolve().parents[2] / "external" / "social-auto-upload-main" / "utils" / "stealth.min.js"
-SAU_COOKIES_DIR = Path(__file__).resolve().parents[2] / "external" / "social-auto-upload-main" / "cookies"
+SAU_STEALTH_SCRIPT = Path(str(files("szyg.resources").joinpath("social_auto_upload", "stealth.min.js")))
+SAU_COOKIES_DIR = DATA_DIR / "social_auto_upload" / "cookies"
 
 
 def _now_iso() -> str:

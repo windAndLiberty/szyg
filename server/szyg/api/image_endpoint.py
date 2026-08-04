@@ -1,11 +1,10 @@
-"""图像生成 API 端点。支持火山引擎方舟、ComfyUI 多后端。"""
+"""图像生成 API 端点。"""
 
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from szyg.agent_core.image_router import ImageRouter
-from szyg.config.loader import load_config
 from szyg.media_storage import get_media_output_dir, media_url_for_path
 
 router = APIRouter(prefix="/api/image", tags=["image"])
@@ -105,7 +104,7 @@ async def generate_image(req: GenerateRequest):
         print("[image_endpoint] VolcEngine failed, falling back to local:")
         traceback.print_exc()
 
-    # ── Fallback: ImageRouter (ComfyUI / VolcEngine Seedream) ──
+    # Retry with prompt enhancement when the direct provider request failed.
     router = ImageRouter()
     try:
         results = []

@@ -57,10 +57,14 @@ node_modules/
 # Electron
 electron/node_modules/
 electron/out/
+electron/.build/
+electron/runtime/
+electron/data/
 
 # Hermes runtime
 .hermes/
 .claude/
+server/.hermes-venv/
 
 # Build output
 build/dist/

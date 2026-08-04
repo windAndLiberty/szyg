@@ -574,7 +574,7 @@ function PublishSelectedDrawer({
   const [autoTitleDone, setAutoTitleDone] = useState(false)
   const [titleNotice, setTitleNotice] = useState('')
   const [body, setBody] = useState('')
-  const [tags, setTags] = useState('SZYG AI生成')
+  const [tags, setTags] = useState('领鹿员工生成')
   const [publishImageAnchors, setPublishImageAnchors] = useState<NonNullable<GraphicDraft['image_anchors']>>([])
   const [headless, setHeadless] = useState(true)
   const [tencentPublishMode, setTencentPublishMode] = useState<'auto' | 'manual'>('auto')
@@ -1196,7 +1196,7 @@ function PublishSelectedDrawer({
                 </div>
                 {tencentPublishMode === 'manual' && (
                   <div className="mt-3 rounded-lg border border-[#6366F1]/25 bg-[#6366F1]/10 px-3 py-2 text-body-xs leading-5 text-[#C4B5FD]">
-                    发布看板会显示“需处理”，表示 SZYG 已完成必要信息填写，正在等待你在视频号页面确认。
+                    发布看板会显示“需处理”，表示领鹿员工已完成必要信息填写，正在等待你在视频号页面确认。
                   </div>
                 )}
               </section>

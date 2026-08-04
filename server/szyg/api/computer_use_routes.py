@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field
 
 from szyg.execution_kernel import get_execution_kernel
 from szyg.integrations.computer_use_adapter import get_computer_use_adapter
-from szyg.integrations.omniparser_adapter import get_omniparser_provider
 
 router = APIRouter(prefix="/api/computer-use", tags=["computer-use"])
 
@@ -33,8 +32,6 @@ class ComputerUseObserveRequest(BaseModel):
     title: str = ""
     include_ocr: bool = True
     include_browser_dom: bool = True
-    include_omniparser: bool = False
-    include_gemini_vision: bool = False
 
 
 class ComputerUseClickIndexRequest(BaseModel):
@@ -75,8 +72,8 @@ async def status():
         "active_window": active,
         "windows": windows,
         "providers": health.get("providers", {}),
-        "backend_version": health.get("backend", "terminator"),
-        "vision_fallback_enabled": health.get("vision_fallback", {}).get("enabled", False),
+        "backend_version": health.get("backend", "desktop"),
+        "vision_fallback_enabled": health.get("available", False),
     }
 
 
@@ -104,8 +101,6 @@ async def clustered_tree(body: ComputerUseObserveRequest):
     payload = body.model_dump() if hasattr(body, "model_dump") else body.dict()
     return await adapter.clustered_tree(
         process=payload.get("process", ""),
-        include_omniparser=payload.get("include_omniparser", False),
-        include_gemini_vision=payload.get("include_gemini_vision", False),
     )
 
 
@@ -136,21 +131,22 @@ async def verify(body: ComputerUseVerifyRequest):
 
 @router.post("/vision/start")
 async def start_vision():
-    provider = get_omniparser_provider()
-    return await provider.start_service()
+    health = await get_computer_use_adapter().health()
+    return {"ok": bool(health.get("available")), "message": health.get("message", "")}
 
 
 @router.post("/vision/parse")
 async def parse_vision(body: ComputerUseVisionParseRequest):
     adapter = get_computer_use_adapter()
-    provider = get_omniparser_provider()
-    screenshot_path = body.screenshot_path
-    if body.current_screen or not screenshot_path:
-        screenshot = await adapter.screenshot()
-        if not screenshot.get("ok"):
-            return {"ok": False, "error": screenshot.get("message", "截图失败"), "elements": []}
-        screenshot_path = screenshot.get("path", "")
-    return await provider.parse_image_file(screenshot_path, auto_start=True)
+    if body.screenshot_path and not body.current_screen:
+        return {"ok": False, "error": "请直接观察当前桌面", "elements": []}
+    observation = await adapter.observe()
+    return {
+        "ok": observation.get("ok", False),
+        "elements": observation.get("elements", []),
+        "screenshot": observation.get("screenshot", {}),
+        "summary": observation.get("summary", ""),
+    }
 
 
 @router.post("/tasks")

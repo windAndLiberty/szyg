@@ -300,12 +300,12 @@ markers = [
     "read_only: marks tests that only read data, no side effects",
     "aigc: marks tests requiring VolcEngine API keys",
 ]
-# pytest-timeout: per-test 30s hard cap with signal method.
+# pytest-timeout: per-test 30s hard cap with the cross-platform thread method.
 # This is the fallback inside each per-file pytest subprocess (see
 # scripts/run_tests_parallel.py). Per-file isolation gives every test
 # file a fresh Python interpreter; pytest-timeout catches Python-level
 # hangs within a file.
-addopts = "-m 'not integration' --timeout=30 --timeout-method=signal"
+addopts = "-m 'not integration' --timeout=30 --timeout-method=thread"
 
 [tool.ty.environment]
 python-version = "3.13"

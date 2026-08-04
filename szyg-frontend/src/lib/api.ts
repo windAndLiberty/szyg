@@ -42,6 +42,12 @@ export function toUserFacingMessage(value: unknown, fallback = '操作未完成�
     return '当前参考素材组合暂不受支持，请调整素材后重试'
   }
   if (/method not allowed/i.test(raw)) return '当前操作暂不可用'
+  if (/\b401\b|unauthorized|token (?:expired|revoked)|登录状态已失效/i.test(raw)) {
+    return '登录状态已过期，请重新登录'
+  }
+  if (/api call failed after \d+ retries|http 5\d\d|internal server error/i.test(raw)) {
+    return '当前智能服务暂时不可用，请稍后重试'
+  }
 
   const hasTechnicalDetail = /seedance|seedream|doubao|qwen|volcengine|火山方舟|火山引擎|\bprovider\b|\bendpoint\b|ep-(?:m-)?[\w-]+|invalidendpointormodel|model id|推理服务|接入点/i.test(raw)
   if (hasTechnicalDetail && /failed|error|not found|does not exist|not configured|invalid|不可用|未配置|失败|无权限|拒绝/i.test(raw)) {
@@ -118,7 +124,7 @@ export interface CloudSession {
   configured: boolean
   authenticated: boolean
   message?: string
-  user?: { id: string; email: string; display_name: string; role: string; organization_id: string }
+  user?: { id: string; email: string; display_name: string; role: string; organization_id: string; password_changed_at?: string | null }
   device?: { id: string; name: string; status: string; last_seen_at?: string }
 }
 
@@ -172,11 +178,13 @@ export interface CloudBilling {
 }
 
 export const fetchCloudSession = () => apiGet<CloudSession>('/api/cloud/session')
-export const loginCloud = (email: string, password: string, totp_code = '') =>
-  apiPost<CloudSession>('/api/cloud/login', { email, password, totp_code })
+export const loginCloud = (account: string, password: string) =>
+  apiPost<CloudSession>('/api/cloud/login', { email: account, password })
 export const activateCloud = (invitation_code: string, display_name: string, password: string) =>
   apiPost<CloudSession>('/api/cloud/activate', { invitation_code, display_name, password })
 export const logoutCloud = () => apiPost<{ ok: boolean }>('/api/cloud/logout')
+export const changeCloudPassword = (current_password: string, new_password: string) =>
+  apiPut<{ ok: boolean; password_changed_at: string; next_change_at: string }>('/api/cloud/password', { current_password, new_password })
 export const fetchCloudDevices = () => apiGet<{ items: Array<Record<string, unknown>> }>('/api/cloud/devices')
 export const fetchCloudEntitlements = () => apiGet<Record<string, unknown>>('/api/cloud/entitlements')
 export const fetchCloudUsage = () => apiGet<CloudUsage>('/api/cloud/usage')
@@ -1862,17 +1870,6 @@ export interface ComputerUseHealth {
   available: boolean
   windows_only: boolean
   platform: string
-  terminator: {
-    available: boolean
-    command: boolean
-    npx: boolean
-    node: boolean
-    python_package: boolean
-  }
-  vision_fallback: {
-    enabled: boolean
-    backend: string
-  }
   providers?: ComputerUseProviders
   message: string
 }
@@ -1892,9 +1889,7 @@ export interface ComputerUseProviderStatus {
 }
 
 export interface ComputerUseProviders {
-  terminator?: ComputerUseProviderStatus
-  playwright?: ComputerUseProviderStatus
-  omniparser?: ComputerUseProviderStatus
+  desktop?: ComputerUseProviderStatus
   [key: string]: ComputerUseProviderStatus | undefined
 }
 
@@ -1993,7 +1988,6 @@ export async function fetchComputerUseTree(payload: {
   title?: string
   include_ocr?: boolean
   include_browser_dom?: boolean
-  include_omniparser?: boolean
   include_gemini_vision?: boolean
 } = {}): Promise<ComputerUseObservation> {
   return apiPost<ComputerUseObservation>('/api/computer-use/tree', payload)

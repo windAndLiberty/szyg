@@ -20,14 +20,13 @@ class TestGetDataDir:
             result = get_data_dir()
             assert result == tmp_path
 
-    def test_env_var_without_tools_json_skipped(self, tmp_path: Path):
-        # Dir exists but no tools.json
+    def test_env_var_without_tools_json_is_initialized(self, tmp_path: Path):
+        # A clean desktop install starts with an empty private data directory.
         env_dir = tmp_path / "no_tools"
-        env_dir.mkdir()
         with patch.dict(os.environ, {"SZYG_DATA_DIR": str(env_dir)}):
             result = get_data_dir()
-            # Should fall through to other options
-            assert result != env_dir
+            assert result == env_dir
+            assert env_dir.is_dir()
 
     def test_empty_env_var_skipped(self):
         with patch.dict(os.environ, {"SZYG_DATA_DIR": ""}):

@@ -12,14 +12,17 @@ app.disableHardwareAcceleration()
 
 const isDev = process.env.NODE_ENV === 'development'
 const enableDevTools = isDev || process.env.SZYG_DEBUG === '1'
-const PORT = 8000
+
+// Keep local user data compatible with earlier SZYG builds after the product rename.
+app.setPath('userData', path.join(app.getPath('appData'), 'szyg'))
+
+let PORT = 8000
 const FRONTEND_PORT = 5173
 const PRODUCTION_CONTROL_URL = 'https://szyg.qdtracing.com'
 
 let mainWindow = null
 let tray = null
 let backendProcess = null
-let comfyuiProcess = null
 let isQuitting = false
 const desktopToken = crypto.randomBytes(32).toString('hex')
 
@@ -89,13 +92,49 @@ function isPortInUse(port) {
   })
 }
 
+function sha256File(file) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha256')
+    const stream = fs.createReadStream(file)
+    stream.on('error', reject)
+    stream.on('data', (chunk) => hash.update(chunk))
+    stream.on('end', () => resolve(hash.digest('hex')))
+  })
+}
+
+async function verifyRuntimeIntegrity() {
+  if (isDev) return
+  const manifestPath = path.join(process.resourcesPath, 'runtime-integrity.json')
+  if (!fs.existsSync(manifestPath)) throw new Error('Runtime integrity manifest is missing')
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+  for (const entry of manifest.entries || []) {
+    const target = path.resolve(process.resourcesPath, entry.path)
+    if (!target.startsWith(path.resolve(process.resourcesPath) + path.sep)) {
+      throw new Error('Runtime integrity manifest contains an invalid path')
+    }
+    if (!fs.existsSync(target)) throw new Error(`Required runtime file is missing: ${entry.path}`)
+    if (fs.statSync(target).size !== entry.size || await sha256File(target) !== entry.sha256) {
+      throw new Error(`Runtime integrity verification failed: ${entry.path}`)
+    }
+  }
+}
+
 async function startBackend() {
+  await verifyRuntimeIntegrity()
   if (await isPortInUse(PORT)) {
     if (isDev) {
       console.log(`Backend already running on port ${PORT}, skipping spawn`)
       return
     }
-    throw new Error(`Local service port ${PORT} is already in use`)
+    let availablePort = null
+    for (let candidate = 8001; candidate <= 8010; candidate += 1) {
+      if (!await isPortInUse(candidate)) {
+        availablePort = candidate
+        break
+      }
+    }
+    if (!availablePort) throw new Error('No local service port is available')
+    PORT = availablePort
   }
 
   const projectRoot = getProjectRoot()
@@ -106,11 +145,14 @@ async function startBackend() {
     ...process.env,
     PYTHONPATH: serverDir,
     SZYG_DATA_DIR: runtimeDataDir,
+    SZYG_AUTH_DB: path.join(runtimeDataDir, 'auth.db'),
+    SZYG_SAU_RUNTIME_HOME: path.join(runtimeDataDir, 'social_auto_upload'),
     SZYG_CLOUD_ENABLED: isDev ? (process.env.SZYG_CLOUD_ENABLED || 'false') : 'true',
     SZYG_CONTROL_URL: isDev ? (process.env.SZYG_CONTROL_URL || '') : PRODUCTION_CONTROL_URL,
     SZYG_LOCAL_AUTH_ENABLED: isDev ? (process.env.SZYG_LOCAL_AUTH_ENABLED || 'false') : 'false',
     SZYG_PRODUCTION: isDev ? 'false' : 'true',
     SZYG_DESKTOP_TOKEN: desktopToken,
+    SZYG_BACKEND_PORT: String(PORT),
     SZYG_SECRET_KEY: isDev ? (process.env.SZYG_SECRET_KEY || '') : crypto.randomBytes(48).toString('base64url'),
     SZYG_CONFIG_PATH: path.join(projectRoot, 'config.yaml'),
     SZYG_FRONTEND_DIST: isDev
@@ -123,9 +165,16 @@ async function startBackend() {
     SZYG_CHROMIUM_DIR: isDev
       ? path.join(projectRoot, 'server', 'szyg', 'storage', 'chromium')
       : path.join(process.resourcesPath, 'runtime', 'chromium'),
+    SZYG_NODE_EXECUTABLE: isDev ? (process.env.SZYG_NODE_EXECUTABLE || '') : process.execPath,
+    SZYG_HERMES_RUNTIME_EXECUTABLE: isDev
+      ? (process.env.SZYG_HERMES_RUNTIME_EXECUTABLE || '')
+      : path.join(process.resourcesPath, 'runtime', 'hermes', 'hermes-runtime.exe'),
+    SZYG_CUA_DRIVER_PATH: isDev
+      ? path.join(projectRoot, 'electron', 'providers', 'cua', 'cua-driver.exe')
+      : path.join(process.resourcesPath, 'runtime', 'cua', 'cua-driver.exe'),
     SZYG_CORS_ORIGINS: isDev
       ? 'http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:8000'
-      : 'http://127.0.0.1:8000',
+      : `http://127.0.0.1:${PORT}`,
   }
 
   let command
@@ -191,87 +240,15 @@ function waitForBackend(retries = 30) {
   })
 }
 
-// ── ComfyUI management ──
-const COMFYUI_PORT = 8188
-const COMFYUI_DIR = process.env.SZYG_COMFYUI_DIR || ''
-const COMFYUI_PYTHON = COMFYUI_DIR ? path.join(COMFYUI_DIR, '.venv', 'Scripts', 'python.exe') : ''
-
-function startComfyUI() {
-  const fs = require('fs')
-  if (!COMFYUI_DIR) {
-    console.log('ComfyUI is not configured - skipping')
-    return
-  }
-  if (!fs.existsSync(COMFYUI_PYTHON)) {
-    console.log(`ComfyUI Python not found: ${COMFYUI_PYTHON} — skipping`)
-    return
-  }
-  if (!fs.existsSync(path.join(COMFYUI_DIR, 'main.py'))) {
-    console.log(`ComfyUI main.py not found in ${COMFYUI_DIR} — skipping`)
-    return
-  }
-  // Validate the venv Python actually runs (handles broken relocated venvs)
-  const probe = require('child_process').spawnSync(COMFYUI_PYTHON, ['--version'], { encoding: 'utf8' })
-  if (probe.status !== 0) {
-    console.log(`ComfyUI Python validation failed — skipping`)
-    console.log(probe.stderr || probe.error?.message || '')
-    return
-  }
-
-  console.log(`Starting ComfyUI: ${COMFYUI_PYTHON} ${COMFYUI_DIR}`)
-  comfyuiProcess = spawn(COMFYUI_PYTHON, ['main.py', '--listen', '127.0.0.1', '--port', String(COMFYUI_PORT)], {
-    cwd: COMFYUI_DIR,
-    env: { ...process.env },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-
-  comfyuiProcess.stdout.on('data', (d) => console.log(`[comfyui] ${d}`))
-  comfyuiProcess.stderr.on('data', (d) => console.error(`[comfyui] ${d}`))
-  comfyuiProcess.on('exit', (code) => {
-    console.log(`ComfyUI exited: ${code}`)
-    if (!isQuitting) {
-      console.log('Restarting ComfyUI in 3s...')
-      setTimeout(startComfyUI, 3000)
-    }
-  })
-}
-
-function stopComfyUI() {
-  if (comfyuiProcess) {
-    comfyuiProcess.kill()
-    comfyuiProcess = null
-  }
-}
-
-function waitForComfyUI(retries = 40) {
-  return new Promise((resolve, reject) => {
-    function check(i) {
-      const req = http.get(`http://127.0.0.1:${COMFYUI_PORT}/system_stats`, (res) => {
-        if (res.statusCode === 200) return resolve()
-        if (i > 0) setTimeout(() => check(i - 1), 1000)
-        else reject(new Error('ComfyUI not ready'))
-      })
-      req.on('error', () => {
-        if (i > 0) setTimeout(() => check(i - 1), 1000)
-        else reject(new Error('ComfyUI timeout'))
-      })
-      req.setTimeout(3000, () => { req.destroy(); if (i > 0) setTimeout(() => check(i - 1), 1000) })
-    }
-    check(retries)
-  })
-}
-
 // ── Window ──
 async function createWindow() {
-  if (!isDev) {
-    await session.defaultSession.cookies.set({
-      url: `http://127.0.0.1:${PORT}`,
-      name: 'szyg_desktop_token',
-      value: desktopToken,
-      httpOnly: true,
-      sameSite: 'strict',
-    })
-  }
+  await session.defaultSession.cookies.set({
+    url: isDev ? `http://localhost:${FRONTEND_PORT}` : `http://127.0.0.1:${PORT}`,
+    name: 'szyg_desktop_token',
+    value: desktopToken,
+    httpOnly: true,
+    sameSite: 'strict',
+  })
 
   mainWindow = new BrowserWindow({
     width: 1300,
@@ -366,12 +343,12 @@ function createTray() {
     )
   )
   tray = new Tray(icon.resize({ width: 16, height: 16 }))
-  tray.setToolTip('szyg - Double-click to show')
+  tray.setToolTip('领鹿员工 - 双击打开')
   const menu = Menu.buildFromTemplate([
     { label: '打开主窗口', click: () => { mainWindow?.show(); mainWindow?.focus() } },
     { label: '重新加载', click: () => { mainWindow?.reload() } },
     { type: 'separator' },
-    { label: '退出 szyg', click: () => { isQuitting = true; app.quit() } },
+    { label: '退出领鹿员工', click: () => { isQuitting = true; app.quit() } },
   ])
   tray.setContextMenu(menu)
   tray.on('double-click', () => { mainWindow?.show(); mainWindow?.focus() })
@@ -391,19 +368,12 @@ ipcMain.handle('get-version', () => app.getVersion())
 // ── App lifecycle ──
 app.whenReady().then(async () => {
   createTray()
-  startBackend()
-  startComfyUI()
   try {
+    await startBackend()
     await waitForBackend(40)
     console.log('Backend ready')
   } catch (e) {
     console.error('Backend failed to start:', e.message)
-  }
-  try {
-    await waitForComfyUI(40)
-    console.log('ComfyUI ready')
-  } catch (e) {
-    console.error('ComfyUI failed to start:', e.message)
   }
   await createWindow()
 })
@@ -411,7 +381,6 @@ app.whenReady().then(async () => {
 app.on('before-quit', () => {
   isQuitting = true
   stopBackend()
-  stopComfyUI()
 })
 
 app.on('window-all-closed', () => {

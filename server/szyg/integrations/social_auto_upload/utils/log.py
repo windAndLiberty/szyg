@@ -2,7 +2,8 @@ import sys
 from pathlib import Path
 from loguru import logger
 
-from conf import BASE_DIR
+from ..conf import RUNTIME_HOME
+
 
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -39,15 +40,17 @@ def create_logger(log_name: str, file_path: str):
     def filter_record(record):
         return record["extra"].get("business_name") == log_name
 
-    Path(BASE_DIR / file_path).parent.mkdir(exist_ok=True)
-    logger.add(Path(BASE_DIR / file_path), filter=filter_record, level="INFO", rotation="10 MB", retention="10 days", backtrace=True, diagnose=True)
+    log_path = RUNTIME_HOME / file_path
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    logger.add(log_path, filter=filter_record, level="INFO", rotation="10 MB", retention="10 days", backtrace=True, diagnose=True)
     return logger.bind(business_name=log_name)
 
 
 # Remove all existing handlers
 logger.remove()
 # Add a standard console handler
-logger.add(sys.stdout, colorize=True, format=log_formatter)
+if sys.stdout is not None:
+    logger.add(sys.stdout, colorize=True, format=log_formatter)
 
 douyin_logger = create_logger('douyin', 'logs/douyin.log')
 tencent_logger = create_logger('tencent', 'logs/tencent.log')

@@ -1,11 +1,11 @@
 """
-智能图像生成路由 — LLM意图识别 + Prompt增强 + 多后端调度。
+智能图像生成路由 — LLM意图识别 + Prompt增强 + 云端图像生成。
 
 流程:
   用户输入 ("画一只赛博朋克风格的猫咪")
     → LLM 意图识别: 提取主体/风格
     → Prompt 增强: 中文→英文 + 构图/光照/画质
-    → 后端路由: ComfyUI(SD 2.1本地) > VolcEngine(Seedream云端) > 降级
+    → 云端图像生成服务
 """
 
 import logging
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class ImageRouter:
-    """智能图像生成路由器。ComfyUI 主 + VolcEngine Seedream 降级。"""
+    """智能图像生成路由器。"""
 
     STYLE_TAGS = {
         "写实": "photorealistic, 8k, highly detailed",
@@ -32,15 +32,7 @@ class ImageRouter:
     def __init__(self, config: dict | None = None):
         self.config = config or {}
         self.llm = OllamaClient()
-        self._comfyui = None
         self._volcengine = None
-
-    @property
-    def comfyui(self):
-        if self._comfyui is None:
-            from szyg.integrations.comfyui_client import ComfyUIClient
-            self._comfyui = ComfyUIClient()
-        return self._comfyui
 
     @property
     def volcengine(self):
@@ -53,55 +45,12 @@ class ImageRouter:
         self, user_input: str, style: str | None = None,
         size: str = "768*768", backend: str | None = None,
     ) -> dict:
-        """智能图像生成。LLM增强prompt + ComfyUI优先 + VolcEngine Seedream降级。"""
+        """增强提示词并调用云端图像生成服务。"""
         intent = await self._analyze_intent(user_input, style)
-        chosen = backend or self._select_backend()
-
-        if chosen == "comfyui":
-            try:
-                path = await self.comfyui.generate(
-                    prompt=intent["enhanced_prompt"],
-                    negative=intent.get("negative", ""),
-                )
-                paths = [path]
-            except Exception:
-                try:
-                    paths = [await self.volcengine.generate_image(intent["enhanced_prompt"])]
-                except Exception:
-                    # Both backends failed — return the enhanced prompt so caller can retry
-                    return {
-                        "backend": "none",
-                        "enhanced_prompt": intent["enhanced_prompt"],
-                        "intent": {
-                            "subject": intent.get("subject", user_input),
-                            "style": intent.get("style", ""),
-                            "negative": intent.get("negative", ""),
-                        },
-                        "paths": [],
-                        "error": "All image backends failed (ComfyUI + VolcEngine)",
-                    }
-
-        elif chosen == "volcengine":
-            paths = [await self.volcengine.generate_image(intent["enhanced_prompt"])]
-        else:
-            # Default: try VolcEngine as final fallback
-            try:
-                paths = [await self.volcengine.generate_image(intent["enhanced_prompt"])]
-            except Exception:
-                return {
-                    "backend": "none",
-                    "enhanced_prompt": intent["enhanced_prompt"],
-                    "intent": {
-                        "subject": intent.get("subject", user_input),
-                        "style": intent.get("style", ""),
-                        "negative": intent.get("negative", ""),
-                    },
-                    "paths": [],
-                    "error": "No image backend available",
-                }
+        paths = [await self.volcengine.generate_image(intent["enhanced_prompt"])]
 
         return {
-            "backend": chosen,
+            "backend": "volcengine",
             "enhanced_prompt": intent["enhanced_prompt"],
             "intent": {
                 "subject": intent.get("subject", user_input),
@@ -152,17 +101,6 @@ class ImageRouter:
         except Exception as e:
             logger.debug("LLM prompt enhancement unavailable, using raw prompt: %s", e)
             return direct_result
-
-    def _select_backend(self) -> str:
-        """Select best available image backend: ComfyUI > VolcEngine."""
-        try:
-            import httpx
-            r = httpx.get("http://localhost:8188/object_info", timeout=3, trust_env=False)
-            if r.status_code == 200:
-                return "comfyui"
-        except Exception as e:
-            logger.debug("ComfyUI not reachable, using volcengine: %s", e)
-        return "volcengine"
 
     async def list_styles(self) -> list[str]:
         return list(self.STYLE_TAGS.keys())

@@ -26,7 +26,7 @@ export default function TopBar() {
   const userMenuRef = useRef<HTMLDivElement>(null)
 
   // 从 navConfig 派生标题（支持全部路由）
-  const pageTitle = t(pageTitleMap[location.pathname] || 'szyg')
+  const pageTitle = t(pageTitleMap[location.pathname] || '领鹿员工')
   const pageNavItem = allNavChildren.find((item) => item.path === location.pathname)
   const PageIcon = pageNavItem?.icon
   const isSuperAgent = location.pathname === '/'

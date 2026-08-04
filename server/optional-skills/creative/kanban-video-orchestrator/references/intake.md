@@ -85,7 +85,7 @@ texture inside the final scene.
 - **Diagram density?** — Heavy math / formulas / code / abstract concepts
 - **Voiceover?** — TTS / recorded / on-screen text only
 - **Tool preference?** — `manim-video` (math), `p5js` (generative),
-  Remotion (UI motion graphics), `comfyui` (AI-generated visuals),
+  Remotion (UI motion graphics), provider APIs (AI-generated visuals),
   `ascii-video` (technical/retro), hybrid
 - **Pacing?** — Fast and dense (3Blue1Brown) or slow and contemplative
 
@@ -130,7 +130,7 @@ texture inside the final scene.
 - **Reactivity tightness?** — Mood-level (loose) vs. tight beat-sync vs. live
   parameter control
 - **Tool preference?** — `touchdesigner-mcp` for full TD operator graphs;
-  `p5js` for web-canvas; `comfyui` for generative-AI fed by audio features
+  `p5js` for web-canvas; provider APIs for generative AI
 
 ## Tier 2 — Always ask near the end
 

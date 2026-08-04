@@ -3,12 +3,12 @@ from datetime import timedelta
 from datetime import datetime
 from pathlib import Path
 
-from conf import BASE_DIR
+from ..conf import RUNTIME_HOME
 
 
 def get_absolute_path(relative_path: str, base_dir: str = None) -> str:
     # Convert the relative path to an absolute path
-    absolute_path = Path(BASE_DIR) / base_dir / relative_path
+    absolute_path = Path(RUNTIME_HOME) / base_dir / relative_path
     return str(absolute_path)
 
 
