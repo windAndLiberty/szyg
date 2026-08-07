@@ -5,6 +5,7 @@ import json
 import secrets
 import time
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -41,6 +42,7 @@ from .dependencies import Principal, current_admin, current_principal, get_db
 from .provider import ProviderError, ProviderGateway
 from .schemas import (
     ActivateRequest,
+    AdminCreditRechargeRequest,
     AdminUserCreateRequest,
     ChangePasswordRequest,
     EntitlementUpdate,
@@ -63,7 +65,7 @@ from .security import (
     verify_password,
     verify_totp,
 )
-from .usage_accounting import settle_usage
+from .usage_accounting import estimate_credits_micros, settle_usage
 
 settings = get_settings()
 app = FastAPI(title="SZYG Control", version="1.0.0", docs_url=None if settings.environment == "production" else "/docs")
@@ -95,6 +97,18 @@ CAPABILITY_UNITS = {
 
 def _credits(value: int | None) -> float:
     return round(int(value or 0) / 1_000_000, 6)
+
+
+def _credit_balance(db: Session, user_id: str) -> int:
+    """统一计费余额（micros）：总充值 − 已成功消费。"""
+    credited = db.scalar(select(func.coalesce(func.sum(CreditTransaction.credits_micros), 0)).where(
+        CreditTransaction.user_id == user_id,
+    )) or 0
+    spent = db.scalar(select(func.coalesce(func.sum(UsageEvent.credits_charged_micros), 0)).where(
+        UsageEvent.user_id == user_id,
+        UsageEvent.status == "succeeded",
+    )) or 0
+    return int(credited) - int(spent)
 
 
 def _month_start() -> datetime:
@@ -326,15 +340,27 @@ def _reserve_usage(db: Session, principal: Principal, req: InferenceRequest) -> 
     if not unit_type:
         raise HTTPException(400, "未知的智能能力")
     estimate = _estimate_units(req.capability, req.payload)
-    used = db.scalar(select(func.coalesce(func.sum(UsageEvent.units), 0)).where(
-        UsageEvent.user_id == principal.user.id,
-        UsageEvent.unit_type == unit_type,
-        UsageEvent.status.in_(["reserved", "succeeded"]),
-        UsageEvent.created_at >= _month_start(),
+    credited = db.scalar(select(func.coalesce(func.sum(CreditTransaction.credits_micros), 0)).where(
+        CreditTransaction.user_id == principal.user.id,
     )) or 0
-    limit = int((entitlement.quotas or {}).get(unit_type, 0))
-    if limit > 0 and used + estimate > limit:
-        raise HTTPException(429, f"本月{unit_type}额度已用完")
+    if int(credited) > 0:
+        # 统一计费（方案B）：credits 为唯一拦截额度，text/图片/视频统一从一个池子扣
+        balance = _credit_balance(db, principal.user.id)
+        route = db.get(ModelRoute, req.capability)
+        estimate_credits = estimate_credits_micros(req.capability, req.payload, route.config if route else {})
+        if max(0, balance) - estimate_credits < 0:
+            raise HTTPException(429, "credits 余额不足，请先充值后再使用")
+    else:
+        # 尚未开通 credits 计费：回退到分类型月度配额（兼容存量用户）
+        used = db.scalar(select(func.coalesce(func.sum(UsageEvent.units), 0)).where(
+            UsageEvent.user_id == principal.user.id,
+            UsageEvent.unit_type == unit_type,
+            UsageEvent.status.in_(["reserved", "succeeded"]),
+            UsageEvent.created_at >= _month_start(),
+        )) or 0
+        limit = int((entitlement.quotas or {}).get(unit_type, 0))
+        if limit > 0 and used + estimate > limit:
+            raise HTTPException(429, f"本月{unit_type}额度已用完")
     event = UsageEvent(
         organization_id=principal.user.organization_id,
         user_id=principal.user.id,
@@ -424,6 +450,24 @@ def startup() -> None:
                     features={"admin": True},
                     quotas={key: 0 for key in DEFAULT_QUOTAS},
                 ))
+        # 统一计费（方案B）：为存量已授权用户一次性赠送默认 credits（CONTROL_DEFAULT_CREDITS）
+        default_credit_micros = settings.default_credit_micros
+        if default_credit_micros > 0:
+            for user, _ent in db.execute(
+                select(User, Entitlement).join(Entitlement, Entitlement.user_id == User.id)
+            ).all():
+                has_credit = db.scalar(select(func.count(CreditTransaction.id)).where(
+                    CreditTransaction.user_id == user.id,
+                )) or 0
+                if not has_credit:
+                    db.add(CreditTransaction(
+                        organization_id=user.organization_id,
+                        user_id=user.id,
+                        kind="grant",
+                        credits_micros=default_credit_micros,
+                        note="统一计费上线赠送额度",
+                        created_by=user.id,
+                    ))
 
 
 @app.get("/health")
@@ -592,12 +636,21 @@ def entitlements(principal: Principal = Depends(current_principal), db: Session 
     ent = db.scalar(select(Entitlement).where(Entitlement.user_id == principal.user.id))
     if not ent:
         raise HTTPException(404, "未找到服务授权")
+    credited = db.scalar(select(func.coalesce(func.sum(CreditTransaction.credits_micros), 0)).where(
+        CreditTransaction.user_id == principal.user.id,
+    )) or 0
+    balance = _credit_balance(db, principal.user.id)
     return {
         "status": ent.status,
         "valid_until": ent.valid_until,
         "device_limit": ent.device_limit,
         "features": ent.features,
         "quotas": ent.quotas,
+        "billing": {
+            "mode": "credits" if int(credited) > 0 else "quota",
+            "balance": _credits(balance),
+            "credited": _credits(credited),
+        },
         **_license_payload(principal.user, principal.device, ent),
     }
 
@@ -1084,6 +1137,49 @@ def admin_entitlement(user_id: str, req: EntitlementUpdate, admin: Principal = D
     _audit(db, admin.user.id, "update_entitlement", "user", user_id, req.model_dump(exclude_none=True))
     db.commit()
     return {"ok": True, "valid_until": ent.valid_until, "device_limit": ent.device_limit, "quotas": ent.quotas}
+
+
+@app.post("/api/v1/admin/users/{user_id}/credits")
+def admin_recharge(
+    user_id: str,
+    req: AdminCreditRechargeRequest,
+    admin: Principal = Depends(current_admin),
+    db: Session = Depends(get_db),
+):
+    """统一计费（方案B）：管理员为用户充值 credits（写入 credit_transactions 流水）。"""
+    user = db.get(User, user_id)
+    if not user or user.role == "admin":
+        raise HTTPException(404, "用户不存在")
+    if not db.scalar(select(Entitlement).where(Entitlement.user_id == user_id)):
+        raise HTTPException(404, "用户授权不存在")
+    credits_micros = int((Decimal(str(req.credits)) * Decimal("1000000")).quantize(Decimal("1"), rounding="ROUND_HALF_UP"))
+    if credits_micros <= 0:
+        raise HTTPException(400, "充值 credits 必须大于 0")
+    reference = req.reference_id or f"manual-{random_token(12)}"
+    db.add(CreditTransaction(
+        organization_id=user.organization_id,
+        user_id=user_id,
+        kind=req.kind,
+        credits_micros=credits_micros,
+        payment_amount_micros=req.payment_amount_micros,
+        currency=req.currency,
+        note=req.note or "管理员手动充值",
+        reference_id=reference,
+        created_by=admin.user.id,
+    ))
+    _audit(db, admin.user.id, "recharge_credits", "user", user_id, {
+        "credits": req.credits,
+        "kind": req.kind,
+        "reference_id": reference,
+    })
+    db.commit()
+    return {
+        "ok": True,
+        "user_id": user_id,
+        "credits": _credits(credits_micros),
+        "balance": _credits(_credit_balance(db, user_id)),
+        "reference_id": reference,
+    }
 
 
 @app.delete("/api/v1/admin/devices/{device_id}")

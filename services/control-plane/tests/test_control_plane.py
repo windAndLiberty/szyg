@@ -309,3 +309,153 @@ def test_admin_recharge_and_user_billing_summary(monkeypatch):
         row = next(item for item in users if item["id"] == user["user"]["id"])
         assert row["credits"]["credited"] == 10000
         assert row["credits"]["balance"] == payload["balance_credits"]
+
+
+def test_admin_recharge_endpoint_grants_credits_and_switches_to_unified_billing():
+    with TestClient(app) as client:
+        admin = login_admin(client)
+        user = invite_and_activate(client, admin["access_token"], "recharge-api@example.com")
+
+        # 初始：未开通 credits → billing mode = quota
+        entitlements = client.get("/api/v1/entitlements", headers=auth(user["access_token"]))
+        assert entitlements.json()["billing"]["mode"] == "quota"
+        assert entitlements.json()["billing"]["balance"] == 0
+
+        # 管理员充值 500 credits
+        recharged = client.post(
+            f"/api/v1/admin/users/{user['user']['id']}/credits",
+            headers=auth(admin["access_token"]),
+            json={"credits": 500, "note": "内测充值"},
+        )
+        assert recharged.status_code == 200, recharged.text
+        body = recharged.json()
+        assert body["credits"] == 500
+        assert body["balance"] == 500
+        assert body["reference_id"]
+
+        # 充值后进入统一计费（credits）模式
+        entitlements = client.get("/api/v1/entitlements", headers=auth(user["access_token"]))
+        assert entitlements.json()["billing"]["mode"] == "credits"
+        assert entitlements.json()["billing"]["balance"] == 500
+
+        billing = client.get("/api/v1/billing/summary", headers=auth(user["access_token"]))
+        assert billing.json()["credited_credits"] == 500
+        assert billing.json()["recharges"][0]["note"] == "内测充值"
+
+        users = client.get("/api/v1/admin/users", headers=auth(admin["access_token"])).json()["items"]
+        row = next(item for item in users if item["id"] == user["user"]["id"])
+        assert row["credits"]["credited"] == 500
+
+
+def test_admin_recharge_endpoint_validates_inputs():
+    with TestClient(app) as client:
+        admin = login_admin(client)
+        user = invite_and_activate(client, admin["access_token"], "recharge-validate@example.com")
+
+        missing = client.post(
+            f"/api/v1/admin/users/{user['user']['id']}/credits",
+            headers=auth(admin["access_token"]),
+            json={"credits": 0},
+        )
+        assert missing.status_code == 422
+
+        unknown_user = client.post(
+            "/api/v1/admin/users/does-not-exist/credits",
+            headers=auth(admin["access_token"]),
+            json={"credits": 10},
+        )
+        assert unknown_user.status_code == 404
+
+
+def test_unified_credits_gating_returns_429_when_balance_insufficient(monkeypatch):
+    async def fake_chat(self, model, payload):
+        return {
+            "choices": [{"message": {"role": "assistant", "content": "ok"}}],
+            "usage": {"total_tokens": 25},
+        }, "provider-request-low-credit"
+
+    monkeypatch.setattr("app.provider.ProviderGateway.chat", fake_chat)
+    with TestClient(app) as client:
+        admin = login_admin(client)
+        user = invite_and_activate(client, admin["access_token"], "low-credit@example.com")
+
+        # 开通 credits 但余额极低（0.000001 → 1 micro），远不足以完成一次估算
+        funded = client.post(
+            f"/api/v1/admin/users/{user['user']['id']}/credits",
+            headers=auth(admin["access_token"]),
+            json={"credits": 0.000001},
+        )
+        assert funded.status_code == 200
+
+        from app.database import ModelRoute, SessionLocal
+        with SessionLocal.begin() as db:
+            route = db.get(ModelRoute, "text.fast")
+            route.provider_model = "test-model"
+            route.enabled = True
+
+        response = client.post(
+            "/api/v1/inference/chat",
+            headers=auth(user["access_token"]),
+            json={
+                "capability": "text.fast",
+                "payload": {"messages": [{"role": "user", "content": "hello"}]},
+                "idempotency_key": "low-credit-0001",
+                "app_version": "1.0.0-test",
+            },
+        )
+        assert response.status_code == 429
+        assert "余额不足" in response.text
+
+
+def test_unified_credits_are_deducted_after_successful_inference(monkeypatch):
+    async def fake_chat(self, model, payload):
+        return {
+            "choices": [{"message": {"role": "assistant", "content": "ok"}}],
+            "usage": {"input_tokens": 1000, "output_tokens": 100},
+        }, "provider-request-credits"
+
+    monkeypatch.setattr("app.provider.ProviderGateway.chat", fake_chat)
+    with TestClient(app) as client:
+        admin = login_admin(client)
+        user = invite_and_activate(client, admin["access_token"], "spend-credit@example.com")
+
+        client.post(
+            f"/api/v1/admin/users/{user['user']['id']}/credits",
+            headers=auth(admin["access_token"]),
+            json={"credits": 1000},
+        )
+
+        from app.database import ModelRoute, SessionLocal
+        with SessionLocal.begin() as db:
+            route = db.get(ModelRoute, "text.fast")
+            route.provider_model = "test-model"
+            route.enabled = True
+
+        inference = client.post(
+            "/api/v1/inference/chat",
+            headers=auth(user["access_token"]),
+            json={
+                "capability": "text.fast",
+                "payload": {"messages": [{"role": "user", "content": "hello"}]},
+                "idempotency_key": "spend-credit-0001",
+                "app_version": "1.0.0-test",
+            },
+        )
+        assert inference.status_code == 200, inference.text
+
+        entitlements = client.get("/api/v1/entitlements", headers=auth(user["access_token"]))
+        balance = entitlements.json()["billing"]["balance"]
+        assert entitlements.json()["billing"]["mode"] == "credits"
+        assert balance < 1000
+        assert balance == 1000 - settle_credits_for_payload()
+
+
+def settle_credits_for_payload() -> float:
+    from app.usage_accounting import settle_usage
+    _, _, credits_micros, _ = settle_usage(
+        "text.fast",
+        {"usage": {"input_tokens": 1000, "output_tokens": 100}},
+        {"messages": [{"role": "user", "content": "hello"}]},
+        {},
+    )
+    return credits_micros / 1_000_000

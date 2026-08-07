@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
@@ -99,3 +100,29 @@ def settle_usage(
     credits = cost_cny / PROVIDER_COST_SHARE * CREDITS_PER_CNY
     credits_micros = int((credits * MICROS).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
     return usage, provider_cost_micros, credits_micros, pricing_version
+
+
+def estimate_credits_micros(capability: str, payload: dict, route_config: dict | None) -> int:
+    """预估算一次调用大致消耗的 credits（微单位，1 credits = 1e6 micros）。
+
+    用于统一计费模式下的额度预检：credits 余额不足时直接拦截，
+    实际扣减以 `settle_usage` 结算的真实用量为准。
+    """
+    pricing, _ = _pricing(capability, route_config)
+    cost_cny = Decimal("0")
+    if capability.startswith("text.") or capability == "embedding.standard":
+        input_tokens = max(1, len(json.dumps(payload, ensure_ascii=False)) // 2)
+        output_tokens = max(1, int(payload.get("max_tokens") or payload.get("max_new_tokens") or 1024))
+        cost_cny += Decimal(input_tokens) * pricing.get("input_million_cny", Decimal("0")) / Decimal("1000000")
+        cost_cny += Decimal(output_tokens) * pricing.get("output_million_cny", Decimal("0")) / Decimal("1000000")
+    elif capability == "image.standard":
+        count = max(1, int(payload.get("n") or 1))
+        cost_cny = Decimal(count) * pricing.get("image_cny", Decimal("0"))
+    elif capability == "video.standard":
+        duration = max(1, int(payload.get("duration") or 5))
+        cost_cny = Decimal(duration) * Decimal("1000") * pricing.get("token_million_cny", Decimal("0")) / Decimal("1000000")
+    elif capability == "speech.tts":
+        chars = max(1, len(str(payload.get("input") or payload.get("text") or "")))
+        cost_cny = Decimal(chars) * pricing.get("characters_10k_cny", Decimal("0")) / Decimal("10000")
+    credits = cost_cny / PROVIDER_COST_SHARE * CREDITS_PER_CNY
+    return max(1, int((credits * MICROS).quantize(Decimal("1"), rounding=ROUND_HALF_UP)))

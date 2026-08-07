@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal, ROUND_HALF_UP
 from functools import lru_cache
 
 from pydantic import Field
@@ -31,6 +32,12 @@ class Settings(BaseSettings):
     default_entitlement_days: int = 30
     log_prompt_content: bool = False
     environment: str = "development"
+    # 统一计费下每位用户开通 credits 时的默认赠送额度（credits 数，0 表示不赠送）
+    default_credits: float = 0
+
+    @property
+    def default_credit_micros(self) -> int:
+        return int((Decimal(str(self.default_credits)) * Decimal("1000000")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
     @property
     def provider_billing_enabled(self) -> bool:

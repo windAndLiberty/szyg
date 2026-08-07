@@ -70,6 +70,15 @@ class EntitlementUpdate(BaseModel):
     quotas: dict[str, int] | None = None
 
 
+class AdminCreditRechargeRequest(BaseModel):
+    credits: float = Field(gt=0)
+    kind: str = Field(default="recharge", pattern="^(recharge|adjust|grant|refund)$")
+    payment_amount_micros: int = Field(default=0, ge=0)
+    currency: str = Field(default="CNY", max_length=8)
+    note: str = Field(default="", max_length=240)
+    reference_id: str = Field(default="", max_length=120)
+
+
 class UserStatusUpdate(BaseModel):
     status: str = Field(pattern="^(active|suspended|expired)$")
 
