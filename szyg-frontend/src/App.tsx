@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react'
-import { Routes, Route, Navigate } from 'react-router'
+import { useEffect, useRef, type ReactNode } from 'react'
+import { Routes, Route, Navigate, useLocation, type Location } from 'react-router'
 import Layout from './components/Layout'
 import Sidebar from './components/Sidebar'
 import TopBar from './components/TopBar'
@@ -78,10 +78,13 @@ function NotFound() {
   )
 }
 
-export default function App() {
+// 页面保活:已访问页面保持挂载(隐藏而非卸载),返回时原样恢复工作现场
+// (聊天消息、浏览器工作台、表单输入、滚动位置等)。仅保留最近 MAX 个页面。
+const MAX_KEEP_ALIVE_PAGES = 20
+
+function AppRoutes({ location }: { location: Location }) {
   return (
-    <CloudAuthGate>
-    <Routes>
+    <Routes location={location}>
       {/* ── 超级员工：full-bleed 布局（系统默认首页）── */}
       <Route
         path="/"
@@ -152,6 +155,51 @@ export default function App() {
         <Route key={r.from} path={r.from} element={<Navigate to={r.to} replace />} />
       ))}
     </Routes>
+  )
+}
+
+export default function App() {
+  const location = useLocation()
+  const slotsRef = useRef<Map<string, Location>>(new Map())
+  const slotKey = location.pathname + location.search
+  const slots = slotsRef.current
+  slots.set(slotKey, location)
+  if (slots.size > MAX_KEEP_ALIVE_PAGES) {
+    let excess = slots.size - MAX_KEEP_ALIVE_PAGES
+    for (const key of slots.keys()) {
+      if (key === slotKey) continue
+      slots.delete(key)
+      excess -= 1
+      if (excess <= 0) break
+    }
+  }
+
+  // 通知隐藏中的页面(如超级员工浏览器工作台)让出原生窗口,避免遮挡/黑屏
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('szyg:keep-alive-active-changed', { detail: { path: slotKey } }))
+  }, [slotKey])
+
+  return (
+    <CloudAuthGate>
+      {[...slots.entries()].map(([key, slotLocation]) => {
+        const active = key === slotKey
+        return (
+          <div
+            key={key}
+            // 页面保活：隐藏页面保持挂载，但必须彻底不可见且不拦截事件，
+            // 否则其内部的 fixed 元素（TopBar/Sidebar/头像弹窗 portal）会遮挡当前页面，
+            // 导致点击头像后弹窗看不到/点不到。
+            style={{
+              display: active ? undefined : 'none',
+              visibility: active ? undefined : 'hidden',
+              pointerEvents: active ? undefined : 'none',
+            }}
+            aria-hidden={!active}
+          >
+            <AppRoutes location={slotLocation} />
+          </div>
+        )
+      })}
     </CloudAuthGate>
   )
 }

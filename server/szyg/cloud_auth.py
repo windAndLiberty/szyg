@@ -73,8 +73,13 @@ class CloudAuthManager:
         enabled = str(enabled_value).lower() in {"1", "true", "yes", "on"}
         return {"enabled": enabled and bool(url), "control_url": url, "app_version": str(section.get("app_version", "1.0.2"))}
 
-    def device(self) -> dict[str, str]:
-        if self._device_file.exists():
+    def device(self, *, force_rotate: bool = False) -> dict[str, str]:
+        """本机设备身份。指纹基于硬件信息保持不变,installation id 可旋转。
+
+        force_rotate 用于"设备被移除"冲突后的自动重备案——复用物理指纹,
+        仅更换安装序号,保证同一台机器可自动重新绑定,而不是把用户拦住。
+        """
+        if not force_rotate and self._device_file.exists():
             try:
                 return json.loads(self._device_file.read_text(encoding="utf-8"))
             except Exception:
@@ -89,6 +94,28 @@ class CloudAuthManager:
         }
         self._device_file.write_text(json.dumps(item, ensure_ascii=False, indent=2), encoding="utf-8")
         return item
+
+    @staticmethod
+    def _is_device_conflict(exc: CloudAuthError) -> bool:
+        """动态安全策略:设备被云端移除/解绑时,自动换新设备身份后重试绑定,
+        而不是直接报错拦住用户。仅当且仅当错误明确指向本机设备记录无效。"""
+        message = str(exc).lower()
+        return any(marker in message for marker in (
+            "设备已移除", "设备已被移除", "设备已删除", "设备已注销", "设备不存在",
+            "device has been removed", "device was removed", "device removed",
+            "device no longer", "device revoked", "device was revoked", "not bound",
+            "device not found", "已被移除", "已解绑",
+        ))
+
+    def _bind_with_rotation(self, fn) -> dict:
+        """先按当前设备尝试;若服务端判定该设备已被移除,自动更换设备记录重试一次。"""
+        try:
+            return fn()
+        except CloudAuthError as exc:
+            if self._is_device_conflict(exc):
+                self.device(force_rotate=True)
+                return fn()
+            raise
 
     def _save_refresh(self, refresh_token: str, license_data: dict | None = None, public_key: str = "") -> None:
         encrypted = base64.b64encode(_dpapi(refresh_token.encode("utf-8"))).decode("ascii")
@@ -107,6 +134,14 @@ class CloudAuthManager:
             return _dpapi(base64.b64decode(raw), decrypt=True).decode("utf-8")
         except Exception:
             return ""
+
+    def _cached_profile(self) -> dict[str, Any] | None:
+        """设备绑定策略:登录过即视为本机已认证,离线/云端抖动时沿用本地档案。"""
+        try:
+            profile = json.loads(self._session_file.read_text(encoding="utf-8")).get("profile")
+            return profile if isinstance(profile, dict) else None
+        except Exception:
+            return None
 
     def _request(self, method: str, path: str, *, json_body: dict | None = None, token: str = "") -> dict:
         cfg = self.config
@@ -155,20 +190,24 @@ class CloudAuthManager:
 
     def login(self, email: str, password: str) -> dict:
         with self._lock:
-            data = self._request("POST", "/api/v1/auth/login", json_body={
-                "email": email, "password": password, "device": self.device(),
-            })
-            return self._accept_session(data)
+            def attempt() -> dict:
+                data = self._request("POST", "/api/v1/auth/login", json_body={
+                    "email": email, "password": password, "device": self.device(),
+                })
+                return self._accept_session(data)
+            return self._bind_with_rotation(attempt)
 
     def activate(self, invitation_code: str, display_name: str, password: str) -> dict:
         with self._lock:
-            data = self._request("POST", "/api/v1/auth/activate", json_body={
-                "invitation_code": invitation_code,
-                "display_name": display_name,
-                "password": password,
-                "device": self.device(),
-            })
-            return self._accept_session(data)
+            def attempt() -> dict:
+                data = self._request("POST", "/api/v1/auth/activate", json_body={
+                    "invitation_code": invitation_code,
+                    "display_name": display_name,
+                    "password": password,
+                    "device": self.device(),
+                })
+                return self._accept_session(data)
+            return self._bind_with_rotation(attempt)
 
     def access_token(self, *, force_refresh: bool = False) -> str:
         with self._lock:
@@ -179,7 +218,11 @@ class CloudAuthManager:
             refresh_token = self._load_refresh()
             if not refresh_token:
                 raise CloudAuthError("请先登录")
-            data = self._request("POST", "/api/v1/auth/refresh", json_body={"refresh_token": refresh_token})
+
+            def refresh_once() -> dict:
+                return self._request("POST", "/api/v1/auth/refresh", json_body={"refresh_token": refresh_token})
+
+            data = self._bind_with_rotation(refresh_once)
             self._accept_session(data)
             return self._access_token
 
@@ -193,11 +236,16 @@ class CloudAuthManager:
             return {"configured": True, "authenticated": True, **profile}
         except CloudAuthError as exc:
             self._access_token = ""
+            # 设备绑定策略:一旦本机登录过,云端校验失败(换 IP/超时/网络抖动)
+            # 一律视为离线可用,不因云端状态变化要求用户重新登录。
+            if str(exc) == "请先登录":
+                return {"configured": True, "authenticated": False}
             offline = self._offline_session()
             if offline:
                 return offline
-            if str(exc) == "请先登录":
-                return {"configured": True, "authenticated": False}
+            cached = self._cached_profile()
+            if cached:
+                return {"configured": True, "authenticated": True, "offline": True, **cached}
             return {"configured": True, "authenticated": False, "message": str(exc)}
 
     def proxy(self, method: str, path: str, body: dict | None = None) -> dict:

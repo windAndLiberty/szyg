@@ -7,9 +7,8 @@ Usage:
     with TenantContext("oem_abc"):
         data_dir = get_tenant_data_dir()  # -> data/oem_abc/
 
-    # In FastAPI middleware:
-    tenant_id = request.headers.get("X-OEM-ID", "default")
-    set_current_tenant(tenant_id)
+    # Desktop requests always use the local default tenant. Organization
+    # identity is resolved by the authenticated cloud control plane.
 
 All data operations (publisher, scheduler, tools) use get_tenant_data_dir()
 to scope their data to the current tenant.
@@ -87,7 +86,7 @@ def resolve_oem_from_request(request) -> str:
 # ── FastAPI Middleware ──────────────────────────────────
 
 class TenantMiddleware:
-    """ASGI middleware for automatic tenant resolution"""
+    """Keep every desktop HTTP request in the local default tenant."""
 
     def __init__(self, app):
         self.app = app

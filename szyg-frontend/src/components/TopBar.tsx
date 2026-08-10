@@ -10,10 +10,13 @@ import {
   PanelLeftOpen,
   User,
 } from 'lucide-react'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import UserAvatar from '@/components/ui/UserAvatar'
+import AvatarSettingsDialog from '@/components/ui/AvatarSettingsDialog'
+import { cn } from '@/lib/utils'
 import { allNavChildren, pageTitleMap } from '@/lib/navConfig'
 import { useLayout } from '@/lib/layout'
 import { useI18n } from '@/lib/i18n'
+import { getCurrentUser } from '@/lib/api'
 
 export default function TopBar() {
   const location = useLocation()
@@ -22,8 +25,12 @@ export default function TopBar() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchValue, setSearchValue] = useState('')
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [avatarSettingsOpen, setAvatarSettingsOpen] = useState(false)
   const [superAgentHistoryCollapsed, setSuperAgentHistoryCollapsed] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
+  const currentUser = getCurrentUser()
+  const displayName = currentUser?.username ?? 'Admin'
+  const displayEmail = `${displayName}@szyg.local`
 
   // 从 navConfig 派生标题（支持全部路由）
   const pageTitle = t(pageTitleMap[location.pathname] || '领鹿员工')
@@ -139,17 +146,26 @@ export default function TopBar() {
 
           {/* User Dropdown */}
           <div className="relative" ref={userMenuRef}>
-            <button
-              onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-[rgba(255,255,255,0.03)] transition-colors"
-            >
-              <Avatar className="w-8 h-8">
-                <AvatarFallback className="bg-[#6366F1] text-white text-xs font-medium">
-                  AD
-                </AvatarFallback>
-              </Avatar>
-              <ChevronDown className="w-4 h-4 text-[#64748B]" />
-            </button>
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={() => {
+                  setUserMenuOpen(false)
+                  setAvatarSettingsOpen(true)
+                }}
+                className="p-1.5 rounded-lg hover:bg-[rgba(255,255,255,0.03)] transition-colors"
+                aria-label={t('点击设置头像')}
+                title={t('点击设置头像')}
+              >
+                <UserAvatar className="h-8 w-8" alt={displayName} />
+              </button>
+              <button
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="p-1.5 rounded-lg hover:bg-[rgba(255,255,255,0.03)] transition-colors"
+                aria-label={t('个人菜单')}
+              >
+                <ChevronDown className={cn('w-4 h-4 text-[#64748B] transition-transform', userMenuOpen && 'rotate-180')} />
+              </button>
+            </div>
 
             <AnimatePresence>
               {userMenuOpen && (
@@ -161,9 +177,19 @@ export default function TopBar() {
                   className="absolute right-0 top-full mt-1 w-48 bg-[#1A2235] border border-[#1E293B] rounded-lg shadow-lg overflow-hidden z-50"
                 >
                   <div className="px-3 py-2.5 border-b border-[#1E293B]">
-                    <p className="text-sm font-medium text-[#F1F5F9]">Admin</p>
-                    <p className="text-xs text-[#64748B]">admin@szyg.ai</p>
+                    <p className="text-sm font-medium text-[#F1F5F9]">{displayName}</p>
+                    <p className="text-xs text-[#64748B]">{displayEmail}</p>
                   </div>
+                  <button
+                    onClick={() => {
+                      setUserMenuOpen(false)
+                      setAvatarSettingsOpen(true)
+                    }}
+                    className="flex items-center w-full px-3 py-2 text-sm text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[rgba(255,255,255,0.03)] transition-colors"
+                  >
+                    <User className="w-4 h-4 mr-2 shrink-0" />
+                    {t('更换头像')}
+                  </button>
                   <button className="flex items-center w-full px-3 py-2 text-sm text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[rgba(255,255,255,0.03)] transition-colors">
                     <User className="w-4 h-4 mr-2 shrink-0" />
                     {t('个人资料')}
@@ -179,6 +205,8 @@ export default function TopBar() {
           </div>
         </div>
       </div>
+
+      <AvatarSettingsDialog open={avatarSettingsOpen} onClose={() => setAvatarSettingsOpen(false)} />
     </header>
   )
 }

@@ -362,6 +362,9 @@ def create_app() -> FastAPI:
     )
     if os.path.isdir(spa_dir):
         app.mount("/assets", StaticFiles(directory=os.path.join(spa_dir, "assets")), name="assets")
+        avatars_dir = os.path.join(spa_dir, "avatars")
+        if os.path.isdir(avatars_dir):
+            app.mount("/avatars", StaticFiles(directory=avatars_dir), name="avatars")
 
         @app.get("/favicon.svg")
         async def serve_favicon():

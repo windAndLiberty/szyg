@@ -41,6 +41,9 @@ server/server.log
 server/server_err.log
 *.log
 debug2.log
+/runtime/
+/main.js
+/assets/human_avatar/
 
 # szyg — temp / test
 _tmp/
@@ -48,6 +51,11 @@ _test_output/
 temp_*
 *.tmp
 test_output.*
+.tmp-*/
+.loop-agent/
+session-*.md
+@AutomationLog.txt
+账户*.txt
 
 # Node / frontend
 web/node_modules/

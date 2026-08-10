@@ -6,6 +6,11 @@ import { navGroups } from '@/lib/navConfig'
 import { useLayout, SIDEBAR_WIDTH_EXPANDED, SIDEBAR_WIDTH_COLLAPSED } from '@/lib/layout'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
+import {
+  getWorkDoneNotices,
+  clearWorkDone,
+  WORK_DONE_CHANGE_EVENT,
+} from '@/lib/workNotifications'
 
 const sidebarVariants = {
   expanded: { width: SIDEBAR_WIDTH_EXPANDED },
@@ -29,6 +34,25 @@ export default function Sidebar() {
   useEffect(() => {
     if (activeGroup && !expandedGroups.has(activeGroup.id)) {
       setExpandedGroups((prev) => new Set(prev).add(activeGroup.id))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname])
+
+  // 工作现场任务完成提示(绿点):仅在工作任务完成后显示
+  const [workDone, setWorkDone] = useState<Set<string>>(
+    () => new Set(Object.keys(getWorkDoneNotices())),
+  )
+
+  useEffect(() => {
+    const sync = () => setWorkDone(new Set(Object.keys(getWorkDoneNotices())))
+    window.addEventListener(WORK_DONE_CHANGE_EVENT, sync)
+    return () => window.removeEventListener(WORK_DONE_CHANGE_EVENT, sync)
+  }, [])
+
+  // 进入对应页面即视为已读,绿点消失
+  useEffect(() => {
+    if (workDone.has(location.pathname)) {
+      clearWorkDone(location.pathname)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname])
@@ -154,8 +178,11 @@ export default function Sidebar() {
                             )}
                             <ChildIcon className="w-4 h-4 shrink-0" />
                             <span className="text-[13px] whitespace-nowrap truncate">{t(child.label)}</span>
-                            {child.implemented && (
-                              <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#10B981] shrink-0" />
+                            {workDone.has(child.path) && (
+                              <span
+                                title={t('有已完成的工作,点击查看')}
+                                className="ml-auto w-1.5 h-1.5 rounded-full bg-[#10B981] shadow-[0_0_6px_rgba(16,185,129,0.8)] shrink-0"
+                              />
                             )}
                           </Link>
                         )

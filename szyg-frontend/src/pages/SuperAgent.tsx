@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { Monitor, Send } from 'lucide-react'
+import { useLocation } from 'react-router'
+import { Globe2, Send } from 'lucide-react'
 import type { ChatMessage, Conversation, CaseCard } from '@/types'
 import {
   autoLogin,
@@ -20,15 +21,19 @@ import {
 import ConversationPanel from '@/components/superagent/ConversationPanel'
 import WelcomeState from '@/components/superagent/WelcomeState'
 import ChatMessageView from '@/components/superagent/ChatMessageView'
-import EmployeeWorkView, {
-  type EmployeeApproval,
-  type EmployeeFrameMeta,
-  type EmployeePointer,
-  type EmployeeWorkEvent,
-  type EmployeeWorkPhase,
-} from '@/components/superagent/EmployeeWorkView'
+import BrowserWorkView, {
+  type BrowserApproval,
+  type BrowserWorkEvent,
+  type BrowserWorkPhase,
+} from '@/components/superagent/BrowserWorkView'
+import { notifyWorkDone } from '@/lib/workNotifications'
 
 const DEFAULT_MODEL = 'doubao-seed-2-0-pro-260215'
+
+// 会话现场恢复:刷新/重启后自动回到上次打开的对话
+const RESTORE_KEY = 'szyg.superagent.active-conversation'
+// 工作现场任务完成后,侧边栏「超级员工」导航显示绿点
+const WORK_NAV_PATH = '/'
 
 type HermesRuntimeStatus = {
   memory?: { enabled?: boolean }
@@ -64,44 +69,23 @@ function objectValue(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' ? value as Record<string, unknown> : {}
 }
 
-function desktopAppLabel(value: unknown) {
-  const raw = String(value || '').trim()
-  const aliases: Record<string, string> = {
-    calculator: '计算器',
-    calc: '计算器',
-    notepad: '记事本',
-    edge: '浏览器',
-    chrome: '浏览器',
-    browser: '浏览器',
-  }
-  return aliases[raw.toLowerCase()] || raw.replace(/\.exe$/i, '') || '应用'
-}
-
-function workToolPresentation(tool: string, rawArgs: unknown): Omit<EmployeeWorkEvent, 'id' | 'state'> | null {
+function workToolPresentation(tool: string, rawArgs: unknown): Omit<BrowserWorkEvent, 'id' | 'state'> | null {
   if (HIDDEN_WORK_TOOLS.has(tool)) return null
   const args = objectValue(rawArgs)
-  if (tool === 'szyg_open_desktop_app') {
-    const app = desktopAppLabel(args.app || args.name || args.application)
-    return { type: 'application', title: `打开${app}`, detail: '正在启动并确认窗口', technicalName: tool }
-  }
-  if (tool === 'computer_use') {
+  if (tool === 'szyg_browser') {
     const action = String(args.action || '').toLowerCase()
-    const app = desktopAppLabel(args.app || args.application)
     const mapping: Record<string, string> = {
-      capture: '确认当前画面',
-      click: '操作当前页面',
-      double_click: '操作当前页面',
-      type: '填写内容',
-      type_text: '填写内容',
-      set_value: '填写内容',
-      key: '使用键盘完成操作',
-      scroll: '浏览当前页面',
-      drag: '调整页面内容',
-      focus_app: `切换到${app}`,
-      open: `打开${app}`,
+      open: '打开网页',
+      navigate: '打开网页',
+      observe: '理解当前页面',
+      click: '操作页面内容',
+      type: '填写网页内容',
+      scroll: '浏览页面',
+      back: '返回上一页',
+      forward: '前往下一页',
+      refresh: '刷新网页',
     }
-    if (action === 'list_apps' || action === 'list_windows') return null
-    return { type: 'computer', title: mapping[action] || '操作当前应用', technicalName: `${tool}:${action || 'action'}` }
+    return { type: 'browser', title: mapping[action] || '操作网页', technicalName: `${tool}:${action || 'action'}` }
   }
   if (tool === 'terminal') return { type: 'system', title: '准备运行环境', technicalName: tool }
   if (/publish|upload/i.test(tool)) return { type: 'business', title: '提交发布任务', technicalName: tool }
@@ -131,34 +115,27 @@ export default function SuperAgent() {
   const [caseCardsLoading, setCaseCardsLoading] = useState(false)
   const [historyCollapsed, setHistoryCollapsed] = useState(false)
   const [hermesRuntime, setHermesRuntime] = useState<HermesRuntimeStatus | null>(null)
+  // 本组件所属 keep-alive 槽位的路径（App.tsx 按 slot 分别渲染，useLocation 返回本 slot 的路径）
+  const myLocation = useLocation()
+  const myPath = myLocation.pathname + myLocation.search
+
   const [currentUserName, setCurrentUserName] = useState(() => getCurrentUser()?.username || '')
   const [workViewOpen, setWorkViewOpen] = useState(false)
+  // 当前页面是否处于可见的 keep-alive 槽位(切走时为 false,工作台让出原生窗口)
+  const [pageActive, setPageActive] = useState(true)
   const [workTaskTitle, setWorkTaskTitle] = useState('')
   const [workResult, setWorkResult] = useState('')
   const [workStatus, setWorkStatus] = useState('')
-  const [workPhase, setWorkPhase] = useState<EmployeeWorkPhase>('idle')
-  const [workFrame, setWorkFrame] = useState('')
-  const [workFrameMeta, setWorkFrameMeta] = useState<EmployeeFrameMeta>({})
-  const [workPointer, setWorkPointer] = useState<EmployeePointer | null>(null)
-  const [workLive, setWorkLive] = useState(false)
-  const [workPreviewBlocked, setWorkPreviewBlocked] = useState(false)
-  const [workEvents, setWorkEvents] = useState<EmployeeWorkEvent[]>([])
-  const [workApproval, setWorkApproval] = useState<EmployeeApproval | null>(null)
+  const [workPhase, setWorkPhase] = useState<BrowserWorkPhase>('idle')
+  const [workEvents, setWorkEvents] = useState<BrowserWorkEvent[]>([])
+  const [workApproval, setWorkApproval] = useState<BrowserApproval | null>(null)
   const [workPaused, setWorkPaused] = useState(false)
-  const [workStartedAt, setWorkStartedAt] = useState<number | null>(null)
-  const [workFinishedAt, setWorkFinishedAt] = useState<number | null>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
   const messagesStateRef = useRef<ChatMessage[]>([])
   const streamMsgIdRef = useRef<string | null>(null)
   const streamBufRef = useRef<string>('')
   const pendingSessionIdRef = useRef(`szyg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`)
   const activeRuntimeSessionRef = useRef(pendingSessionIdRef.current)
-  const workFrameMetaRef = useRef<EmployeeFrameMeta>({})
-
-  useEffect(() => {
-    workFrameMetaRef.current = workFrameMeta
-  }, [workFrameMeta])
-
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
       if (messagesRef.current) messagesRef.current.scrollTop = messagesRef.current.scrollHeight
@@ -200,7 +177,7 @@ export default function SuperAgent() {
     }
   }, [])
 
-  useEffect(() => {
+useEffect(() => {
     ;(async () => {
       await autoLogin()
       try {
@@ -212,8 +189,18 @@ export default function SuperAgent() {
         /* Use the local account name when the cloud session is unavailable. */
       }
       await loadConversations()
+      const restored = sessionStorage.getItem(RESTORE_KEY)
+      if (restored && restored !== activeConvId) {
+        selectConversation(restored)
+      }
     })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadConversations])
+
+useEffect(() => {
+    if (activeConvId) sessionStorage.setItem(RESTORE_KEY, activeConvId)
+    else sessionStorage.removeItem(RESTORE_KEY)
+  }, [activeConvId])
 
   useEffect(() => {
     let active = true
@@ -236,6 +223,18 @@ export default function SuperAgent() {
     return () => window.removeEventListener('szyg:toggle-super-agent-history', handler)
   }, [])
 
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const path = (event as CustomEvent<{ path?: string }>).detail?.path
+      // 与「本 slot 自己的路径」比较，而不是全局 window.location——
+      // keep-alive 下切换页面后 window.location 已变为新页面地址，
+      // 用全局地址比较会让 pageActive 错误保持 true，导致浏览器区域不隐藏。
+      setPageActive(path === myPath)
+    }
+    window.addEventListener('szyg:keep-alive-active-changed', handler)
+    return () => window.removeEventListener('szyg:keep-alive-active-changed', handler)
+  }, [myPath])
+
   const newConversation = useCallback(() => {
     setActiveConvId(null)
     pendingSessionIdRef.current = `szyg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
@@ -245,15 +244,8 @@ export default function SuperAgent() {
     setWorkStatus('')
     setWorkPhase('idle')
     setWorkEvents([])
-    setWorkFrame('')
-    setWorkFrameMeta({})
-    setWorkPointer(null)
-    setWorkLive(false)
-    setWorkPreviewBlocked(false)
     setWorkApproval(null)
     setWorkPaused(false)
-    setWorkStartedAt(null)
-    setWorkFinishedAt(null)
     loadCaseCards()
   }, [loadCaseCards])
 
@@ -277,9 +269,10 @@ export default function SuperAgent() {
     [scrollToBottom],
   )
 
-  const saveConversation = useCallback(async () => {
+const saveConversation = useCallback(async (messagesSnapshot?: ChatMessage[]) => {
     try {
-      const currentMessages = messagesStateRef.current
+      // 仅在最新一次提交后保存,避免保存到"流式占位空消息"
+      const currentMessages = (messagesSnapshot ?? messagesStateRef.current).filter((m) => !m.isStreaming)
       const firstUser = currentMessages.find((m) => m.role === 'user' && m.type === 'text')
       const payload = {
         title: firstUser ? firstUser.content.slice(0, 50) : '新对话',
@@ -307,6 +300,17 @@ export default function SuperAgent() {
       /* ignore */
     }
   }, [activeConvId])
+
+  // 保存队列:发送流程结束后置 1,待最新状态提交后自动保存(消除竞态)
+  const [saveTick, setSaveTick] = useState(0)
+
+  useEffect(() => {
+    if (saveTick === 0) return
+    ;(async () => {
+      const snapshot = [...messagesStateRef.current]
+      await Promise.all([saveConversation(snapshot), loadConversations()])
+    })()
+  }, [saveTick, saveConversation])
 
   const handlePin = useCallback(
     async (conv: Conversation) => {
@@ -406,7 +410,7 @@ export default function SuperAgent() {
     setMessages((prev) => prev.map((message) => message.id === id ? { ...message, content } : message))
   }, [])
 
-  const upsertWorkEvent = useCallback((event: Omit<EmployeeWorkEvent, 'id'> & { id?: string }) => {
+  const upsertWorkEvent = useCallback((event: Omit<BrowserWorkEvent, 'id'> & { id?: string }) => {
     setWorkEvents((current) => {
       const eventId = event.id || nextId('work')
       let index = current.findIndex((item) => item.id === eventId)
@@ -451,7 +455,7 @@ export default function SuperAgent() {
           if (!presentation) break
           upsertWorkEvent({ id: String(ev.id || nextId('work')), ...presentation, state: 'running' })
           setWorkStatus(presentation.title)
-          if (name === 'computer_use' || name === 'szyg_open_desktop_app') {
+          if (name === 'szyg_browser') {
             setHistoryCollapsed(true)
             setWorkViewOpen(true)
           }
@@ -505,43 +509,9 @@ export default function SuperAgent() {
           }
           break
         }
-        case 'computer.frame':
-          if (typeof ev.image_url === 'string' && ev.image_url) setWorkFrame(ev.image_url)
-          setWorkFrameMeta({
-            appName: String(ev.app_name || ''),
-            windowTitle: String(ev.window_title || ev.content || ''),
-            sourceWidth: Number(ev.source_width || 0) || undefined,
-            sourceHeight: Number(ev.source_height || 0) || undefined,
-          })
-          setWorkPreviewBlocked(false)
-          setWorkViewOpen(true)
-          break
-        case 'computer.stream.started':
-          setWorkLive(true)
-          setWorkPreviewBlocked(false)
+        case 'browser.action':
+        case 'browser.state': {
           setHistoryCollapsed(true)
-          setWorkViewOpen(true)
-          break
-        case 'computer.stream.blocked':
-          setWorkLive(false)
-          setWorkPreviewBlocked(true)
-          setWorkViewOpen(true)
-          break
-        case 'computer.stream.stopped':
-          setWorkLive(false)
-          break
-        case 'computer.action': {
-          const args = objectValue(ev.args)
-          const x = Number(args.x)
-          const y = Number(args.y)
-          const frameMeta = workFrameMetaRef.current
-          if (Number.isFinite(x) && Number.isFinite(y) && frameMeta.sourceWidth && frameMeta.sourceHeight) {
-            setWorkPointer({
-              id: String(ev.id || nextId('pointer')),
-              xPercent: Math.max(0, Math.min(100, x / frameMeta.sourceWidth * 100)),
-              yPercent: Math.max(0, Math.min(100, y / frameMeta.sourceHeight * 100)),
-            })
-          }
           setWorkViewOpen(true)
           break
         }
@@ -560,35 +530,34 @@ export default function SuperAgent() {
           setStatusText('正在理解任务')
           setWorkPaused(false)
           setWorkPhase('running')
-          setWorkStartedAt((value) => value || Date.now())
-          setWorkFinishedAt(null)
           setWorkStatus('正在理解任务')
           break
         case 'run.paused':
-          setWorkLive(false)
           setWorkPaused(true)
           setWorkPhase('paused')
           setWorkStatus(String(ev.content || '已暂停'))
           break
-        case 'run.completed':
+case 'run.completed':
           ensureStreamMsg()
           if (!streamBufRef.current && ev.content) appendText(String(ev.content))
           setWorkEvents((current) => current.map((item) => item.state === 'running' ? { ...item, state: 'success', detail: undefined } : item))
           setWorkPaused(false)
-          setWorkLive(false)
           setWorkPhase('completed')
           setWorkResult(compactWorkResult(ev.content || streamBufRef.current))
-          setWorkFinishedAt(Date.now())
           setWorkStatus('任务已完成')
+          notifyWorkDone(WORK_NAV_PATH)
           break
-        case 'run.failed':
+case 'run.failed':
           ensureStreamMsg()
+          // 设备绑定策略:仅真正"请先登录"(从未登录/已退出)才要求重登;
+          // 401/过期/换 IP/超时等均不触发登录页
+          if (/(?:^|：|:)\s*(请先登录)\s*$/i.test(String(ev.content || '').trim())) {
+            window.dispatchEvent(new Event('szyg:cloud-session-expired'))
+          }
           replaceStreamText(toUserFacingMessage(ev.content, '当前操作未完成'))
           setWorkEvents((current) => current.map((item) => item.state === 'running' ? { ...item, state: 'error', detail: '任务在这一步停止' } : item))
           setWorkPhase(String(ev.code || '') === 'cancelled' ? 'cancelled' : 'failed')
-          setWorkFinishedAt(Date.now())
           setWorkStatus(toUserFacingMessage(ev.content, '当前操作未完成'))
-          setWorkLive(false)
           break
         case 'error':
           ensureStreamMsg()
@@ -712,15 +681,8 @@ export default function SuperAgent() {
         setWorkStatus('正在理解任务')
         setWorkPhase('running')
         setWorkEvents([])
-        setWorkFrame('')
-        setWorkFrameMeta({})
-        setWorkPointer(null)
-        setWorkLive(false)
-        setWorkPreviewBlocked(false)
         setWorkApproval(null)
         setWorkPaused(false)
-        setWorkStartedAt(Date.now())
-        setWorkFinishedAt(null)
       }
 
       // 生成请求 → 真实 REST 端点；普通对话 → hermes/chat SSE
@@ -751,8 +713,7 @@ export default function SuperAgent() {
         }
         setStatusText('')
         setStreaming(false)
-        await saveConversation()
-        await loadConversations()
+        setSaveTick((t) => t + 1)
         streamMsgIdRef.current = null
         streamBufRef.current = ''
         scrollToBottom()
@@ -783,7 +744,6 @@ export default function SuperAgent() {
       } else {
         setWorkPaused(false)
         setWorkPhase('cancelled')
-        setWorkFinishedAt(Date.now())
         setWorkStatus('任务已停止')
       }
     } catch (error) {
@@ -829,10 +789,10 @@ export default function SuperAgent() {
           <button
             onClick={() => setWorkViewOpen(true)}
             className="absolute right-4 top-3 z-10 w-9 h-9 grid place-items-center border border-[#273449] bg-[#111827]/90 text-[#94A3B8] hover:text-[#E2E8F0] hover:border-[#475569]"
-            aria-label="打开工作现场"
-            title="工作现场"
+            aria-label="打开浏览器操作"
+            title="浏览器操作"
           >
-            <Monitor className="w-4 h-4" />
+            <Globe2 className="w-4 h-4" />
           </button>
         )}
         {messages.length === 0 ? (
@@ -895,23 +855,17 @@ export default function SuperAgent() {
         )}
       </div>
 
-      <EmployeeWorkView
+<BrowserWorkView
         open={workViewOpen}
+        pageActive={pageActive}
         taskTitle={workTaskTitle}
         result={workResult}
         status={workStatus}
         phase={workPhase}
-        frameUrl={workFrame}
-        frameMeta={workFrameMeta}
-        pointer={workPointer}
-        live={workLive}
-        previewBlocked={workPreviewBlocked}
         events={workEvents}
         approval={workApproval}
         paused={workPaused}
         busy={streaming}
-        startedAt={workStartedAt}
-        finishedAt={workFinishedAt}
         onClose={() => setWorkViewOpen(false)}
         onTakeover={() => controlRuntime('takeover')}
         onResume={() => controlRuntime('resume')}

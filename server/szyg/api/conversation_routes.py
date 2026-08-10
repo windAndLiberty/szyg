@@ -22,8 +22,17 @@ MAX_CONVERSATIONS = 50
 class ConversationMessage(BaseModel):
     role: str
     content: str = ""
-    type: str = "text"  # text / tool_call / tool_result / thinking / error
+    type: str = "text"  # text / image / video / video_pending / tool_call / tool_result / thinking / error
     timestamp: Optional[float] = None
+    # 媒体与任务字段:必须显式声明,否则 Pydantic 会静默丢弃,导致历史图片/视频丢失
+    image_url: Optional[str] = None
+    prompt: Optional[str] = None
+    video_url: Optional[str] = None
+    task_id: Optional[str] = None
+    status: Optional[str] = None
+    progress: Optional[float] = None
+
+    model_config = {"extra": "allow"}
 
 
 class ConversationCreate(BaseModel):

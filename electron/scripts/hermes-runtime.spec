@@ -24,6 +24,15 @@ hiddenimports.extend([
     "szyg.hermes_windows_computer",
 ])
 
+# vendor/hermes_agent is imported from the sys.path-inserted data directory
+# (not from the analyzed tree), so its Windows-only import of
+# concurrent_log_handler is invisible to static analysis. The CLH chain
+# (concurrent_log_handler -> portalocker) must be pinned explicitly.
+hiddenimports.extend([
+    "concurrent_log_handler",
+    "portalocker",
+])
+
 datas = [
     (str(HERMES_ROOT), "vendor/hermes_agent"),
 ]

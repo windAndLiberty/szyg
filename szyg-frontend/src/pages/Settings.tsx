@@ -25,6 +25,8 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
+import UserAvatar from '@/components/ui/UserAvatar'
+import AvatarSettingsDialog from '@/components/ui/AvatarSettingsDialog'
 import { cn } from '@/lib/utils'
 import { useAsync } from '@/lib/hooks'
 import { useTheme } from '@/lib/theme'
@@ -79,9 +81,10 @@ const notificationEvents = [
 /* ------------------------------------------------------------------ */
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general')
+const [activeTab, setActiveTab] = useState<SettingsTab>('general')
   const [unsaved, setUnsaved] = useState(false)
   const [notice, setNotice] = useState('')
+  const [avatarSettingsOpen, setAvatarSettingsOpen] = useState(false)
   const noticeTimerRef = useRef<number | null>(null)
 
   const showNotice = (message: string) => {
@@ -544,17 +547,29 @@ export default function SettingsPage() {
             <motion.div variants={cardVariant}>
               <h2 className="text-heading-sm text-[#F1F5F9] mb-1">{t('个人信息')}</h2>
               <p className="text-body-sm text-[#64748B] mb-4">{t('管理你的个人资料信息。')}</p>
-              <div className="glass-card rounded-[16px] border border-[#1E293B] p-5 space-y-5">
+<div className="glass-card rounded-[16px] border border-[#1E293B] p-5 space-y-5">
                 {/* Avatar + Name */}
                 <div className="flex items-center gap-4">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#6366F1] to-[#8B5CF6] flex items-center justify-center text-2xl font-bold text-white">
-                    {profileName.charAt(0)}
-                  </div>
-                  <div>
+                  <UserAvatar
+                    alt="我的头像"
+                    className="h-20 w-20 border-2 border-[#26334B]"
+                    onClick={() => setAvatarSettingsOpen(true)}
+                  />
+                  <div className="min-w-0 flex-1">
                     <p className="text-heading-sm text-[#F1F5F9]">{profileName}</p>
                     <p className="text-body-sm text-[#64748B]">{cloudSession?.user?.email || profileEmail}</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-2 border-[#1E293B] text-[#94A3B8] hover:text-[#F1F5F9] hover:border-[#334155]"
+                      onClick={() => setAvatarSettingsOpen(true)}
+                    >
+                      <User className="w-3.5 h-3.5 mr-1.5" />
+                      {t('更换头像')}
+                    </Button>
                   </div>
                 </div>
+                <p className="text-xs text-[#64748B] -mt-3">{t('头像仅保存在本机，不会上传云端')}</p>
 
                 <Separator className="bg-[#1E293B]" />
 
@@ -752,6 +767,8 @@ export default function SettingsPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AvatarSettingsDialog open={avatarSettingsOpen} onClose={() => setAvatarSettingsOpen(false)} onError={showNotice} />
     </motion.div>
   )
 }

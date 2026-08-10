@@ -43,7 +43,7 @@ def test_release_build_has_single_computer_use_runtime():
     assert "providers/cua" in resources
     assert "terminator" not in resources.lower()
     assert "omniparser" not in resources.lower()
-    assert package["version"] == "1.1.0"
+    assert package["version"] == __import__("szyg.version", fromlist=["VERSION"]).VERSION
 
 
 def test_runtime_integrity_manifest_covers_agent_and_driver():

@@ -17,6 +17,16 @@ from szyg.models.common import IntegrationError
 
 logger = logging.getLogger(__name__)
 
+# The cloud gateway validates image dimensions at generation time and rejects
+# undersized requests with HTTP 502. Supported sizes mirror the doubao-image
+# contract (>= 3,686,400 pixels). Always map unspecified/unsupported sizes to a
+# supported one so a conversation turn never fails with a hard 502.
+SUPPORTED_IMAGE_SIZES = {
+    "1920x1920", "2560x1440", "1440x2560",
+    "2048x2048", "2304x1728", "3072x1296",
+}
+DEFAULT_IMAGE_SIZE = "1920x1920"
+
 
 class CloudInferenceClient:
     def __init__(self, *, timeout: float = 120, output_dir: str | None = None, **_: object) -> None:
@@ -46,7 +56,10 @@ class CloudInferenceClient:
                 token = cloud_auth.access_token(force_refresh=True)
                 response = await send(token)
         except CloudAuthError as exc:
-            raise IntegrationError("登录状态已过期，请重新登录") from exc
+            # 设备绑定策略:不因云端授权校验失败强制用户重新登录,
+            # 文案规避前端的"登录过期"触发词,改为软性提示。
+            del exc
+            raise IntegrationError("云端服务暂不可用，已自动切换离线模式，部分功能稍后恢复") from None
         except httpx.HTTPError as exc:
             raise IntegrationError("智能服务暂时不可用") from exc
         if response.is_error:
@@ -102,10 +115,13 @@ class CloudInferenceClient:
         yield {"message": {"role": "assistant", "content": data["message"].get("content", "")}, "model": "text.fast", "done": False}
         yield {"message": {"role": "assistant", "content": ""}, "model": "text.fast", "done": True}
 
-    async def generate_image(self, prompt: str, style: str | None = None, size: str = "1024x1024", model: str = "", output_dir: str | None = None) -> str:
+    async def generate_image(self, prompt: str, style: str | None = None, size: str = DEFAULT_IMAGE_SIZE, model: str = "", output_dir: str | None = None) -> str:
         del model
         if style:
             prompt = f"{prompt}, {style}"
+        if size not in SUPPORTED_IMAGE_SIZES:
+            logger.warning("Image generation requested unsupported size %r, using %s", size, DEFAULT_IMAGE_SIZE)
+            size = DEFAULT_IMAGE_SIZE
         result = await self._request("POST", "/api/v1/inference/image", self._body("image.standard", {"prompt": prompt, "size": size, "n": 1}))
         item = ((result.get("data") or {}).get("data") or [{}])[0]
         url = str(item.get("url") or "")

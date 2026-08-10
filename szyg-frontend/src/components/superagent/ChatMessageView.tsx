@@ -7,8 +7,8 @@ import {
   Loader2,
   Film,
   Download,
-  UserRound,
 } from 'lucide-react'
+import UserAvatar from '@/components/ui/UserAvatar'
 import type { ChatMessage } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -78,21 +78,11 @@ function renderRichText(text: string): React.ReactNode[] {
   })
 }
 
-function userInitial(name?: string): string | null {
-  const character = Array.from((name || '').trim()).find((value) => /[A-Za-z0-9\u3400-\u9FFF]/.test(value))
-  return character ? character.toUpperCase() : null
-}
-
 const Avatar: React.FC<{ role: string; userName?: string }> = ({ role, userName }) => {
   // system 角色（工具调用卡片）不显示头像，但保留占位以对齐
   if (role === 'system') return <div className="w-8 h-8 shrink-0" />
   if (role === 'user') {
-    const initial = userInitial(userName)
-    return (
-      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#334155] to-[#1E293B] flex items-center justify-center text-[12px] font-semibold text-[#F1F5F9] shrink-0">
-        {initial || <UserRound className="h-4 w-4 text-[#94A3B8]" aria-hidden="true" />}
-      </div>
-    )
+    return <UserAvatar className="h-8 w-8 shrink-0" />
   }
   return (
     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#6366F1] to-[#8B5CF6] flex items-center justify-center shrink-0 shadow-glow overflow-hidden">

@@ -44,10 +44,10 @@ class ImageRouter:
     async def generate(
         self, user_input: str, style: str | None = None,
         size: str = "768*768", backend: str | None = None,
-    ) -> dict:
+) -> dict:
         """增强提示词并调用云端图像生成服务。"""
         intent = await self._analyze_intent(user_input, style)
-        paths = [await self.volcengine.generate_image(intent["enhanced_prompt"])]
+        paths = [await self.volcengine.generate_image(intent["enhanced_prompt"], size=size)]
 
         return {
             "backend": "volcengine",

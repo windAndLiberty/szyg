@@ -8,7 +8,6 @@ import json
 import os
 import sys
 import threading
-import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
@@ -101,7 +100,7 @@ class RuntimeState:
                     model="text.fast",
                     max_iterations=60,
                     enabled_toolsets=[
-                        "szyg", "memory", "skills", "delegation", "computer_use",
+                        "szyg", "memory", "skills", "delegation",
                         "terminal", "web", "vision", "file", "todo",
                     ],
                     quiet_mode=True,
@@ -183,6 +182,7 @@ def create_app() -> FastAPI:
 
         install_windows_computer_backend()
     from tools.computer_use.tool import set_approval_callback
+
     set_approval_callback(_computer_approval)
     app = FastAPI(title="Hermes Runtime", docs_url=None, redoc_url=None, openapi_url=None)
     expected = os.environ["SZYG_HERMES_RUNTIME_TOKEN"]
@@ -222,12 +222,14 @@ def create_app() -> FastAPI:
                 ],
             }
         from tools.computer_use.permissions import computer_use_status
+
         return await asyncio.to_thread(computer_use_status)
 
     @app.post("/v1/computer/action")
     async def computer_action(body: ComputerActionRequest, x_szyg_hermes_token: str = Header(default="")):
         authorize(x_szyg_hermes_token)
         from tools.computer_use.tool import handle_computer_use
+
         marker = _direct_action_approved.set(bool(body.approved))
         try:
             result = await asyncio.to_thread(
@@ -379,9 +381,7 @@ def create_app() -> FastAPI:
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
         tool_ids: dict[str, str] = {}
-        frame_stop = threading.Event()
-        frame_thread: threading.Thread | None = None
-        desktop_tools = {"computer_use", "szyg_open_desktop_app"}
+        browser_tools = {"szyg_browser"}
 
         def emit(event: dict[str, Any]) -> None:
             loop.call_soon_threadsafe(queue.put_nowait, event)
@@ -391,84 +391,32 @@ def create_app() -> FastAPI:
             if text:
                 emit({"type": "text", "content": text})
 
-        def frame_pump() -> None:
-            sequence = 0
-            blocked_reported = False
-            deadline = time.monotonic() + 300
-            while not frame_stop.is_set():
-                if time.monotonic() >= deadline:
-                    emit({"type": "computer.stream.stopped", "reason": "preview_timeout"})
-                    return
-                try:
-                    from szyg.hermes_windows_computer import latest_computer_frame
-
-                    frame = latest_computer_frame(session_id, stream=True)
-                    if frame and frame.get("blocked"):
-                        if not blocked_reported:
-                            emit({"type": "computer.stream.blocked", "content": frame.get("content", "")})
-                            blocked_reported = True
-                    elif frame:
-                        blocked_reported = False
-                        sequence += 1
-                        emit({
-                            "type": "computer.frame",
-                            **frame,
-                            "sequence": sequence,
-                            "captured_at": time.time(),
-                            "live": True,
-                        })
-                except Exception:
-                    pass
-                frame_stop.wait(0.5)
-
-        def ensure_frame_stream() -> None:
-            nonlocal frame_thread
-            if frame_thread and frame_thread.is_alive():
-                return
-            frame_stop.clear()
-            emit({"type": "computer.stream.started", "fps": 2})
-            frame_thread = threading.Thread(
-                target=frame_pump,
-                name=f"desktop-preview-{session_id[:12]}",
-                daemon=True,
-            )
-            frame_thread.start()
-
-        def stop_frame_stream() -> None:
-            if not frame_thread:
-                return
-            frame_stop.set()
-            frame_thread.join(timeout=1.5)
-            emit({"type": "computer.stream.stopped"})
-
         def on_tool_start(call_id: str, name: str, args: Any, *_: Any, **__: Any) -> None:
             tool_ids[name] = call_id
             emit({"type": "tool.started", "id": call_id, "tool": name, "args": args})
-            if name in desktop_tools:
-                ensure_frame_stream()
 
         def on_tool_complete(call_id: str, name: str, args: Any, result: Any, *_: Any, **__: Any) -> None:
             emit({"type": "tool.completed", "id": call_id, "tool": name, "args": args, "result": str(result or "")[:12000]})
-            if name in desktop_tools:
-                action = (args or {}).get("action", "") if name == "computer_use" else "打开应用"
+            if name in browser_tools:
                 emit({
-                    "type": "computer.action",
+                    "type": "browser.action",
                     "id": call_id,
-                    "action": action,
+                    "action": (args or {}).get("action", ""),
                     "args": args or {},
-                    "content": "桌面操作已执行",
+                    "content": "浏览器操作已执行",
                 })
-                if name == "szyg_open_desktop_app" or (args or {}).get("action") == "capture":
-                    try:
-                        from szyg.hermes_windows_computer import latest_computer_frame
-
-                        frame = latest_computer_frame(session_id)
-                        if frame and frame.get("blocked"):
-                            emit({"type": "computer.stream.blocked", "content": frame.get("content", "")})
-                        elif frame:
-                            emit({"type": "computer.frame", **frame})
-                    except Exception:
-                        pass
+                try:
+                    parsed = json.loads(str(result or "{}"))
+                    browser_state = parsed.get("result") or {}
+                    if isinstance(browser_state, dict):
+                        emit({
+                            "type": "browser.state",
+                            "url": browser_state.get("url", ""),
+                            "title": browser_state.get("title", ""),
+                            "action": (args or {}).get("action", ""),
+                        })
+                except (TypeError, ValueError):
+                    pass
 
         def on_tool_progress(event_type: str, name: str, preview: Any = None, args: Any = None, **extra: Any) -> None:
             if event_type in {"tool.started", "tool.completed"}:
@@ -514,7 +462,6 @@ def create_app() -> FastAPI:
             except BaseException as exc:
                 emit({"type": "run.failed", "content": str(exc)[:600]})
             finally:
-                stop_frame_stream()
                 with state.guard:
                     state.active_emitters.pop(session_id, None)
                 reset_execution_context(token)

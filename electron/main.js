@@ -5,6 +5,8 @@ const fs = require('fs')
 const path = require('path')
 const http = require('http')
 const net = require('net')
+const { BrowserSessionManager } = require('./browser/browser-session-manager')
+const { startBrowserControlServer } = require('./browser/browser-control-server')
 
 // Disable GPU acceleration for RDP/VM compatibility
 // Falls back to software rendering — works everywhere
@@ -25,6 +27,15 @@ let tray = null
 let backendProcess = null
 let isQuitting = false
 const desktopToken = crypto.randomBytes(32).toString('hex')
+const browserControlToken = crypto.randomBytes(32).toString('hex')
+let browserControlUrl = ''
+let browserControlServer = null
+const blockedBrowserOrigins = [
+  `http://localhost:${FRONTEND_PORT}`,
+  `http://127.0.0.1:${FRONTEND_PORT}`,
+  ...Array.from({ length: 11 }, (_, index) => `http://127.0.0.1:${8000 + index}`),
+]
+const browserManager = new BrowserSessionManager({ blockedOrigins: blockedBrowserOrigins })
 
 function getProjectRoot() {
   return isDev ? path.join(__dirname, '..') : process.resourcesPath
@@ -147,11 +158,13 @@ async function startBackend() {
     SZYG_DATA_DIR: runtimeDataDir,
     SZYG_AUTH_DB: path.join(runtimeDataDir, 'auth.db'),
     SZYG_SAU_RUNTIME_HOME: path.join(runtimeDataDir, 'social_auto_upload'),
-    SZYG_CLOUD_ENABLED: isDev ? (process.env.SZYG_CLOUD_ENABLED || 'false') : 'true',
-    SZYG_CONTROL_URL: isDev ? (process.env.SZYG_CONTROL_URL || '') : PRODUCTION_CONTROL_URL,
+    SZYG_CLOUD_ENABLED: process.env.SZYG_CLOUD_ENABLED || 'true',
+    SZYG_CONTROL_URL: process.env.SZYG_CONTROL_URL || PRODUCTION_CONTROL_URL,
     SZYG_LOCAL_AUTH_ENABLED: isDev ? (process.env.SZYG_LOCAL_AUTH_ENABLED || 'false') : 'false',
     SZYG_PRODUCTION: isDev ? 'false' : 'true',
     SZYG_DESKTOP_TOKEN: desktopToken,
+    SZYG_BROWSER_CONTROL_URL: browserControlUrl,
+    SZYG_BROWSER_CONTROL_TOKEN: browserControlToken,
     SZYG_BACKEND_PORT: String(PORT),
     SZYG_SECRET_KEY: isDev ? (process.env.SZYG_SECRET_KEY || '') : crypto.randomBytes(48).toString('base64url'),
     SZYG_CONFIG_PATH: path.join(projectRoot, 'config.yaml'),
@@ -175,6 +188,12 @@ async function startBackend() {
     SZYG_CORS_ORIGINS: isDev
       ? 'http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:8000'
       : `http://127.0.0.1:${PORT}`,
+    // Force the packaged patchright browser registry to the bundle-internal
+    // `.local-browsers` directory (see szyg-backend.spec). Without this,
+    // patchright resolves chromium-1208 from %LOCALAPPDATA%\ms-playwright,
+    // which does not exist on end-user machines, breaking account login and
+    // publishing with "Executable doesn't exist".
+    PLAYWRIGHT_BROWSERS_PATH: isDev ? (process.env.PLAYWRIGHT_BROWSERS_PATH || '') : '0',
   }
 
   let command
@@ -256,6 +275,7 @@ async function createWindow() {
     minWidth: 900,
     minHeight: 600,
     frame: true,
+    autoHideMenuBar: true,
     show: true,
     backgroundColor: '#0a0e14',
     webPreferences: {
@@ -267,6 +287,29 @@ async function createWindow() {
       spellcheck: false,
     },
   })
+  // 去掉系统级顶栏菜单（File/Edit/...），只保留业务界面
+  if (process.platform !== 'darwin') {
+    Menu.setApplicationMenu(null)
+  } else {
+    // macOS 无法彻底去掉菜单栏，改用最简菜单（仅应用名：关于/隐藏/退出）
+    Menu.setApplicationMenu(
+      Menu.buildFromTemplate([
+        {
+          label: app.name,
+          submenu: [
+            { role: 'about', label: `关于 ${app.name}` },
+            { type: 'separator' },
+            { role: 'hide', label: `隐藏 ${app.name}` },
+            { role: 'hideOthers', label: '隐藏其他' },
+            { role: 'unhide', label: '全部显示' },
+            { type: 'separator' },
+            { role: 'quit', label: `退出 ${app.name}` },
+          ],
+        },
+      ])
+    )
+  }
+  browserManager.setHostWindow(mainWindow)
 
   // DevTools shortcut: F12 or Ctrl+Shift+I
   if (enableDevTools) {
@@ -330,7 +373,10 @@ async function createWindow() {
     }
   })
 
-  mainWindow.on('closed', () => { mainWindow = null })
+  mainWindow.on('closed', () => {
+    browserManager.setHostWindow(null)
+    mainWindow = null
+  })
 }
 
 // ── Tray ──
@@ -364,10 +410,17 @@ ipcMain.on('window-maximize', () => {
 ipcMain.on('window-close', () => mainWindow?.close())
 ipcMain.handle('window-is-maximized', () => mainWindow?.isMaximized() ?? false)
 ipcMain.handle('get-version', () => app.getVersion())
+ipcMain.handle('browser-set-visible', (_event, visible) => browserManager.setVisible(visible))
+ipcMain.handle('browser-set-bounds', (_event, bounds) => browserManager.setBounds(bounds))
+ipcMain.handle('browser-state', () => browserManager.state())
+ipcMain.handle('browser-action', (_event, payload) => browserManager.action(payload || {}))
 
 // ── App lifecycle ──
 app.whenReady().then(async () => {
   createTray()
+  const browserControl = await startBrowserControlServer(browserManager, browserControlToken)
+  browserControlServer = browserControl.server
+  browserControlUrl = browserControl.url
   try {
     await startBackend()
     await waitForBackend(40)
@@ -380,6 +433,9 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   isQuitting = true
+  browserManager.destroy()
+  browserControlServer?.close()
+  browserControlServer = null
   stopBackend()
 })
 

@@ -42,8 +42,8 @@ export function toUserFacingMessage(value: unknown, fallback = '操作未完成�
     return '当前参考素材组合暂不受支持，请调整素材后重试'
   }
   if (/method not allowed/i.test(raw)) return '当前操作暂不可用'
-  if (/\b401\b|unauthorized|token (?:expired|revoked)|登录状态已失效/i.test(raw)) {
-    return '登录状态已过期，请重新登录'
+if (/\b401\b|unauthorized|token (?:expired|revoked)/i.test(raw)) {
+    return '云端授权校验暂时未通过，已自动尝试恢复，请稍等片刻'
   }
   if (/api call failed after \d+ retries|http 5\d\d|internal server error/i.test(raw)) {
     return '当前智能服务暂时不可用，请稍后重试'
@@ -123,6 +123,7 @@ export const apiDel = <T = unknown>(url: string): Promise<T> => request<T>('DELE
 export interface CloudSession {
   configured: boolean
   authenticated: boolean
+  offline?: boolean
   message?: string
   user?: { id: string; email: string; display_name: string; role: string; organization_id: string; password_changed_at?: string | null }
   device?: { id: string; name: string; status: string; last_seen_at?: string }

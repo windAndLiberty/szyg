@@ -98,17 +98,17 @@ class TestGetTenantDataFile:
 
 
 class TestResolveOemFromRequest:
-    def test_header_priority(self):
+    def test_untrusted_header_is_ignored(self):
         request = MagicMock()
         request.headers = {"X-OEM-ID": "header_oem"}
         request.query_params = {"oem_id": "query_oem"}
-        assert resolve_oem_from_request(request) == "header_oem"
+        assert resolve_oem_from_request(request) == DEFAULT_TENANT
 
-    def test_query_param_fallback(self):
+    def test_untrusted_query_param_is_ignored(self):
         request = MagicMock()
         request.headers = {"X-OEM-ID": "", "Authorization": ""}
         request.query_params = {"oem_id": "query_oem"}
-        assert resolve_oem_from_request(request) == "query_oem"
+        assert resolve_oem_from_request(request) == DEFAULT_TENANT
 
     def test_returns_default_when_nothing(self):
         request = MagicMock()
@@ -116,21 +116,21 @@ class TestResolveOemFromRequest:
         request.query_params = {}
         assert resolve_oem_from_request(request) == DEFAULT_TENANT
 
-    def test_jwt_claim_extraction(self):
+    def test_unverified_oem_jwt_claim_is_ignored(self):
         from jose import jwt as jose_jwt
         token = jose_jwt.encode({"oem_id": "jwt_oem"}, "secret", algorithm="HS256")
         request = MagicMock()
         request.headers = {"X-OEM-ID": "", "Authorization": f"Bearer {token}"}
         request.query_params = {}
-        assert resolve_oem_from_request(request) == "jwt_oem"
+        assert resolve_oem_from_request(request) == DEFAULT_TENANT
 
-    def test_jwt_tenant_claim(self):
+    def test_unverified_tenant_jwt_claim_is_ignored(self):
         from jose import jwt as jose_jwt
         token = jose_jwt.encode({"tenant": "jwt_tenant"}, "secret", algorithm="HS256")
         request = MagicMock()
         request.headers = {"X-OEM-ID": "", "Authorization": f"Bearer {token}"}
         request.query_params = {}
-        assert resolve_oem_from_request(request) == "jwt_tenant"
+        assert resolve_oem_from_request(request) == DEFAULT_TENANT
 
     def test_invalid_jwt_falls_to_default(self):
         request = MagicMock()
@@ -138,16 +138,16 @@ class TestResolveOemFromRequest:
         request.query_params = {}
         assert resolve_oem_from_request(request) == DEFAULT_TENANT
 
-    def test_strips_whitespace(self):
+    def test_whitespace_header_is_ignored(self):
         request = MagicMock()
         request.headers = {"X-OEM-ID": "  spaced_oem  "}
         request.query_params = {}
-        assert resolve_oem_from_request(request) == "spaced_oem"
+        assert resolve_oem_from_request(request) == DEFAULT_TENANT
 
 
 class TestTenantMiddleware:
     @pytest.mark.asyncio
-    async def test_sets_tenant_from_header(self):
+    async def test_ignores_tenant_header(self):
         app_called = []
 
         async def mock_app(scope, receive, send):
@@ -159,7 +159,7 @@ class TestTenantMiddleware:
             "headers": [(b"x-oem-id", b"middleware_tenant")],
         }
         await middleware(scope, None, None)
-        assert app_called[0] == "middleware_tenant"
+        assert app_called[0] == DEFAULT_TENANT
         # Cleanup
         set_current_tenant(DEFAULT_TENANT)
 

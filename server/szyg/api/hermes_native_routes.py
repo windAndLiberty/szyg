@@ -114,11 +114,12 @@ def _system_prompt(agent_id: str, expert_prompt: str) -> str:
     return (
         f"{role}{expert}\n\n"
         "用自然、明确的中文与用户协作。优先使用领鹿业务工具取得真实数据，不编造执行结果。"
-        "用户要求打开记事本或计算器等可见桌面应用时，必须使用打开桌面应用能力，不要通过命令行启动；"
-        "桌面任务完成前应确认目标窗口已出现。"
+        "需要打开、浏览或操作网页时，必须使用右侧可见的浏览器操作能力；先打开网页并理解当前页面，"
+        "再根据页面返回的元素完成点击或填写，任务结束前重新理解页面以确认真实结果。"
+        "不要使用命令行启动浏览器，也不要尝试操作用户电脑上的其他应用。"
         "涉及外发、删除、登录、付款、加好友或批量操作时必须等待用户明确确认。"
         "不要向用户暴露模型、工具协议、运行时或内部技术名称。"
-        "完成桌面操作后，只用一到两句话说明结果和仍需用户处理的事项，不复述操作过程，"
+        "完成浏览器操作后，只用一到两句话说明结果和仍需用户处理的事项，不复述操作过程，"
         "不使用‘已完成操作’等机械前缀，也不要声称未通过画面确认的结果。"
     )
 
@@ -297,6 +298,34 @@ async def call_capability(
     return {"ok": True, "result": result}
 
 
+def _normalize_tools(tools: Any) -> list[dict[str, Any]]:
+    """把扁平或嵌套 tools schema 统一为云网关可解析的嵌套格式。
+
+    云网关要求 OpenAI 风格的 ``{"type": "function", "function": {...}}``。
+    部分调用方（Hermes 运行时）会传扁平结构 ``{"type": "function", "name": ...}``，
+    网关无法解析并返回 502。此处统一改写后再转发。
+    """
+    normalized: list[dict[str, Any]] = []
+    for item in tools or []:
+        row = dict(item) if isinstance(item, dict) else {}
+        fn = row.get("function")
+        if isinstance(fn, dict) and isinstance(fn.get("name"), str):
+            normalized.append(row)
+            continue
+        name = str(row.get("name") or "").strip()
+        if not name:
+            continue
+        normalized.append({
+            "type": "function",
+            "function": {
+                "name": name,
+                "description": str(row.get("description") or ""),
+                "parameters": row.get("parameters") or {"type": "object", "properties": {}},
+            },
+        })
+    return normalized
+
+
 def _normalize_tool_calls(calls: Any) -> list[dict[str, Any]]:
     normalized = []
     for item in calls or []:
@@ -325,14 +354,16 @@ async def openai_chat(body: dict[str, Any], authorization: str = Header(default=
         "temperature": float(body.get("temperature", 0.6)),
     }
     if body.get("tools"):
-        payload["tools"] = body["tools"]
+        payload["tools"] = _normalize_tools(body["tools"])
     if body.get("tool_choice") is not None:
         payload["tool_choice"] = body["tool_choice"]
     capability = "text.reasoning" if body.get("reasoning_effort") or body.get("reasoning") else "text.fast"
     try:
         result = await client._request("POST", "/api/v1/inference/chat", client._body(capability, payload))
     except IntegrationError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        message = str(exc)
+        status_code = 401 if "登录状态" in message or "请先登录" in message else 503
+        raise HTTPException(status_code=status_code, detail=message) from exc
     data = result.get("data") or {}
     choice = (data.get("choices") or [{}])[0]
     message = dict(choice.get("message") or {"role": "assistant", "content": ""})

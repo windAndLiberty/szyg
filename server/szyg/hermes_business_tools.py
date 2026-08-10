@@ -106,34 +106,11 @@ def register_szyg_tools() -> None:
             description=item["description"],
         )
 
-    def open_desktop_app_handler(args: dict[str, Any], session_id: str = "", **_: Any) -> str:
-        from szyg.hermes_windows_computer import open_desktop_app
+    from szyg.hermes_browser import register_browser_tool
 
-        return json.dumps(
-            open_desktop_app(str((args or {}).get("app") or ""), session_id=session_id),
-            ensure_ascii=False,
+    register_browser_tool(
+        lambda action, args, summary: (
+            _approval_callback(action, args, summary) if _approval_callback else "deny"
         )
-
-    registry.register(
-        name="szyg_open_desktop_app",
-        toolset="szyg",
-        schema={
-            "name": "szyg_open_desktop_app",
-            "description": "打开用户可见的 Windows 桌面应用。用户要求打开记事本或计算器时必须使用此能力。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "app": {
-                        "type": "string",
-                        "enum": ["notepad", "calculator"],
-                        "description": "要打开的应用：notepad 为记事本，calculator 为计算器。",
-                    },
-                },
-                "required": ["app"],
-                "additionalProperties": False,
-            },
-        },
-        handler=open_desktop_app_handler,
-        description="打开记事本或计算器，并展示应用窗口。",
     )
     _registered = True

@@ -2784,6 +2784,8 @@ function sendWindowStateChanged(nextIsFullscreen) {
 }
 
 function buildApplicationMenu() {
+  // 纯粹用户体验：去掉系统级 File/Edit/View/Window/Help 菜单，
+  // 仅保留 macOS 应用菜单（关于 / 检查更新 / 隐藏 / 退出）。
   const template = []
   const checkForUpdatesItem = {
     label: 'Check for Updates…',
@@ -2796,95 +2798,26 @@ function buildApplicationMenu() {
         { role: 'about', label: `About ${APP_NAME}` },
         checkForUpdatesItem,
         { type: 'separator' },
-        { role: 'services' },
-        { type: 'separator' },
-        { role: 'hide' },
+        { role: 'hide', label: `Hide ${APP_NAME}` },
         { role: 'hideOthers' },
         { role: 'unhide' },
         { type: 'separator' },
+        {
+          // 保留 Cmd+W 关闭窗口（原 File 菜单提供）
+          accelerator: 'CommandOrControl+W',
+          label: 'Close Window',
+          click: () => {
+            if (previewShortcutActive) {
+              sendClosePreviewRequested()
+            } else {
+              mainWindow?.close()
+            }
+          }
+        },
         { role: 'quit' }
       ]
     })
   }
-
-  template.push({
-    label: 'File',
-    submenu: [
-      IS_MAC
-        ? {
-            accelerator: 'CommandOrControl+W',
-            click: () => {
-              if (previewShortcutActive) {
-                sendClosePreviewRequested()
-              } else {
-                mainWindow?.close()
-              }
-            },
-            label: 'Close'
-          }
-        : { role: 'quit' }
-    ]
-  })
-  template.push({
-    label: 'Edit',
-    submenu: [
-      { role: 'undo' },
-      { role: 'redo' },
-      { type: 'separator' },
-      { role: 'cut' },
-      { role: 'copy' },
-      { role: 'paste' },
-      { role: 'delete' },
-      { role: 'selectAll' }
-    ]
-  })
-  template.push({
-    label: 'View',
-    submenu: [
-      { role: 'reload' },
-      { role: 'forceReload' },
-      { role: 'toggleDevTools' },
-      { type: 'separator' },
-      {
-        label: 'Actual Size',
-        accelerator: 'CommandOrControl+0',
-        click: () => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.setZoomLevel(0) }
-      },
-      {
-        label: 'Zoom In',
-        accelerator: 'CommandOrControl+Plus',
-        click: () => {
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            const next = Math.min(mainWindow.webContents.getZoomLevel() + 0.1, 9)
-            mainWindow.webContents.setZoomLevel(next)
-          }
-        }
-      },
-      {
-        label: 'Zoom Out',
-        accelerator: 'CommandOrControl+-',
-        click: () => {
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            const next = Math.max(mainWindow.webContents.getZoomLevel() - 0.1, -9)
-            mainWindow.webContents.setZoomLevel(next)
-          }
-        }
-      },
-      { type: 'separator' },
-      { role: 'togglefullscreen' }
-    ]
-  })
-  template.push({
-    label: 'Window',
-    submenu: IS_MAC
-      ? [{ role: 'minimize' }, { role: 'zoom' }, { role: 'front' }]
-      : [{ role: 'minimize' }, { role: 'close' }]
-  })
-  template.push({
-    label: 'Help',
-    role: 'help',
-    submenu: [checkForUpdatesItem]
-  })
 
   return Menu.buildFromTemplate(template)
 }

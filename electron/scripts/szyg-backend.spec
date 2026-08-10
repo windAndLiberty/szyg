@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import os
+
 from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
 
 
@@ -36,12 +38,69 @@ datas.extend([
         "third_party_licenses/social-auto-upload",
     ),
 ])
+
+# patchright (`n`) resolves its browser registry to
+# `<driver>/package/.local-browsers` when PLAYWRIGHT_BROWSERS_PATH is unset/0
+# (see lib/server/registry/index.js). The bundled Chromium version is pinned by
+# patchright's browsers.json — installing the revision at build time and shipping
+# it under .local-browsers keeps the packaged runtime self-contained. Without
+# this, account login / publishing fails with "Executable doesn't exist".
+#
+# Two binaries are required: the full Chromium (headed launches) and the
+# headless shell (headless launches, which the publisher uses with
+# LOCAL_CHROME_HEADLESS=True). Both are pinned to the same revision (1208).
+_patchright_browser_names = [
+    "chromium-1208",
+    "chromium_headless_shell-1208",
+]
+_patchright_browser_candidates = [
+    Path(os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "")) / name
+    for name in _patchright_browser_names
+] + [
+    Path.home() / "AppData" / "Local" / "ms-playwright" / name
+    for name in _patchright_browser_names
+]
+_missing_browsers = []
+for _name in _patchright_browser_names:
+    _rel_exe = (
+        "chrome-win64/chrome.exe"
+        if _name.startswith("chromium-1")
+        else "chrome-headless-shell-win64/chrome-headless-shell.exe"
+    )
+    _src = next(
+        (
+            p
+            for p in _patchright_browser_candidates
+            if p.name == _name and (p / _rel_exe).exists()
+        ),
+        None,
+    )
+    if _src is None:
+        _missing_browsers.append(_name)
+        continue
+    datas.extend([
+        (str(_src), f"patchright/driver/package/.local-browsers/{_name}"),
+    ])
+if _missing_browsers:
+    raise SystemExit(
+        "patchright bundled Chromium missing: "
+        + ", ".join(_missing_browsers)
+        + " — run `n install chromium` first."
+    )
 binaries = collect_dynamic_libs("uiautomation")
 
 hiddenimports = [
     name for name in collect_submodules("szyg")
     if not name.startswith("szyg.integrations.omniparser_vendor")
 ]
+
+# vendor/hermes_agent is loaded from a data directory (sys.path insertion),
+# not the analyzed tree, so its Windows-only import of concurrent_log_handler
+# escapes static analysis. Pin the whole CLH chain (-> portalocker).
+hiddenimports.extend([
+    "concurrent_log_handler",
+    "portalocker",
+])
 
 a = Analysis(
     [str(SERVER_ROOT / "szyg_backend_entry.py")],

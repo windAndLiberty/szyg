@@ -442,7 +442,7 @@ class PipelineExecutor:
         path = await self.client.generate_image(
             prompt=params.get("prompt", ""),
             style=params.get("style"),
-            size=params.get("size", "1024x1024"),
+            size=params.get("size", "1920x1920"),
             model=node.model or "doubao-image",
         )
         ctx.set_artifacts(node.output_key, [path])
