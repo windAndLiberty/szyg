@@ -46,12 +46,19 @@ class ProviderBillingClient:
         response.raise_for_status()
         return response.json()
 
-    @staticmethod
-    def _is_ark_line(item: dict) -> bool:
+    def _is_ark_line(self, item: dict) -> bool:
         text = " ".join(str(item.get(key) or "") for key in (
             "Product", "ProductZh", "ConfigurationName", "SolutionZh", "SubjectName"
         )).lower()
-        return any(marker in text for marker in ARK_MARKERS)
+        if not any(marker in text for marker in ARK_MARKERS):
+            return False
+        expected_project = self.settings.provider_billing_project.strip().lower()
+        if not expected_project:
+            return True
+        project_text = " ".join(str(item.get(key) or "") for key in (
+            "Project", "ProjectId", "ProjectName", "ProjectDisplayName"
+        )).lower()
+        return expected_project in project_text
 
     def fetch_daily_cost(self, billing_date: date) -> tuple[int, int, str]:
         offset = 0

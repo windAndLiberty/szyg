@@ -8,6 +8,9 @@ const net = require('net')
 const { BrowserSessionManager } = require('./browser/browser-session-manager')
 const { startBrowserControlServer } = require('./browser/browser-control-server')
 
+const APP_ICON_PATH = path.join(__dirname, 'assets', 'app-icon.png')
+const TRAY_ICON_PATH = path.join(__dirname, 'assets', 'tray-icon.png')
+
 // Disable GPU acceleration for RDP/VM compatibility
 // Falls back to software rendering — works everywhere
 app.disableHardwareAcceleration()
@@ -160,6 +163,7 @@ async function startBackend() {
     SZYG_SAU_RUNTIME_HOME: path.join(runtimeDataDir, 'social_auto_upload'),
     SZYG_CLOUD_ENABLED: process.env.SZYG_CLOUD_ENABLED || 'true',
     SZYG_CONTROL_URL: process.env.SZYG_CONTROL_URL || PRODUCTION_CONTROL_URL,
+    SZYG_APP_VERSION: app.getVersion(),
     SZYG_LOCAL_AUTH_ENABLED: isDev ? (process.env.SZYG_LOCAL_AUTH_ENABLED || 'false') : 'false',
     SZYG_PRODUCTION: isDev ? 'false' : 'true',
     SZYG_DESKTOP_TOKEN: desktopToken,
@@ -277,6 +281,7 @@ async function createWindow() {
     frame: true,
     autoHideMenuBar: true,
     show: true,
+    icon: APP_ICON_PATH,
     backgroundColor: '#0a0e14',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -381,13 +386,7 @@ async function createWindow() {
 
 // ── Tray ──
 function createTray() {
-  // Create a visible tray icon (blue square) so user can find it
-  const icon = nativeImage.createFromBuffer(
-    Buffer.from(
-      'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAOVJREFUWEftlrENwjAURM9WoGAGSkbICIyARMoKGSEjMAIlI2QERqBkBEaA/wRIlmTZloPvJAqkF7/v+/d9dhzDMAxKqS2AHTADygB4C9xzzq9CCGutBzAFHoAVsBMRTym9c84fEXkCmwj4BDa+718BNsBGRO4islFKJ2AKvE3At4g8ABvgFgEH4M33/SuwBpYi8goci8gG2BqBPbA2Ag/B/C3a+L5fy+8V5gXITUBdQLoAawGE1gSEbQR4DIDBPYXGMyPwCfjzPBhGAeFLTkBrANgABMAW+HLBVwBcA+AT8AUvL8Cg5aGbGgAAAABJRU5ErkJggg==',
-      'base64'
-    )
-  )
+  const icon = nativeImage.createFromPath(TRAY_ICON_PATH)
   tray = new Tray(icon.resize({ width: 16, height: 16 }))
   tray.setToolTip('领鹿员工 - 双击打开')
   const menu = Menu.buildFromTemplate([

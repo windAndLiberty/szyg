@@ -84,3 +84,25 @@ class TestCloudInferenceImageSizeNormalization:
             asyncio.run(client.generate_image("一只猫", size="2048x2048"))
 
         assert sent["body"]["payload"]["size"] == "2048x2048"
+
+    def test_credit_exhaustion_is_not_reported_as_provider_outage(self, client):
+        from szyg.integrations.cloud_inference_client import CloudInferenceError
+
+        with respx.mock:
+            respx.post(URL).mock(Response(429, json={"detail": "credits 余额不足，请先充值后再使用"}))
+            with pytest.raises(CloudInferenceError) as caught:
+                asyncio.run(client.generate_image("一只猫"))
+
+        assert caught.value.status_code == 429
+        assert "Credits 余额不足" in str(caught.value)
+
+    def test_expired_session_requires_sign_in(self, client):
+        from szyg.integrations.cloud_inference_client import CloudInferenceError
+
+        with respx.mock:
+            respx.post(URL).mock(Response(401, json={"detail": "登录状态已失效"}))
+            with pytest.raises(CloudInferenceError) as caught:
+                asyncio.run(client.generate_image("一只猫"))
+
+        assert caught.value.status_code == 401
+        assert str(caught.value) == "登录状态已失效，请重新登录"

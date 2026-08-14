@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
+import mimetypes
 import secrets
 import time
 from datetime import datetime, timedelta, timezone
@@ -10,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
@@ -65,7 +67,7 @@ from .security import (
     verify_password,
     verify_totp,
 )
-from .usage_accounting import estimate_credits_micros, settle_usage
+from .usage_accounting import CREDITS_PER_CNY, estimate_credits_micros, settle_usage
 
 settings = get_settings()
 app = FastAPI(title="SZYG Control", version="1.0.0", docs_url=None if settings.environment == "production" else "/docs")
@@ -76,6 +78,90 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-App-Version"],
 )
+
+
+def _reference_root() -> Path:
+    root = Path(settings.reference_temp_dir).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _reference_signature(reference_id: str, expires_at: int) -> str:
+    message = f"{reference_id}:{expires_at}".encode("utf-8")
+    return hmac.new(settings.jwt_secret.encode("utf-8"), message, hashlib.sha256).hexdigest()
+
+
+def _cleanup_reference_uploads() -> None:
+    now = int(time.time())
+    root = _reference_root()
+    for metadata_path in root.glob("*.json"):
+        try:
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            if int(metadata.get("expires_at") or 0) > now:
+                continue
+            (root / str(metadata.get("stored_name") or "")).unlink(missing_ok=True)
+            metadata_path.unlink(missing_ok=True)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+
+
+@app.post("/api/v1/inference/references")
+async def upload_inference_reference(
+    file: UploadFile = File(...),
+    principal: Principal = Depends(current_principal),
+):
+    del principal
+    _cleanup_reference_uploads()
+    suffix = Path(file.filename or "reference.bin").suffix.lower()
+    allowed = {".jpg", ".jpeg", ".png", ".webp", ".mp4", ".mov", ".mp3", ".wav"}
+    if suffix not in allowed:
+        raise HTTPException(400, "参考素材格式暂不支持")
+    reference_id = secrets.token_hex(24)
+    stored_name = f"{reference_id}{suffix}"
+    target = _reference_root() / stored_name
+    limit = settings.reference_max_mb * 1024 * 1024
+    size = 0
+    try:
+        with target.open("wb") as handle:
+            while chunk := await file.read(1024 * 1024):
+                size += len(chunk)
+                if size > limit:
+                    raise HTTPException(413, f"单个参考素材不能超过 {settings.reference_max_mb}MB")
+                handle.write(chunk)
+    except Exception:
+        target.unlink(missing_ok=True)
+        raise
+    if not size:
+        target.unlink(missing_ok=True)
+        raise HTTPException(400, "参考素材为空")
+    expires_at = int(time.time()) + settings.reference_ttl_hours * 3600
+    content_type = file.content_type or mimetypes.guess_type(stored_name)[0] or "application/octet-stream"
+    metadata = {"stored_name": stored_name, "content_type": content_type, "expires_at": expires_at}
+    (_reference_root() / f"{reference_id}.json").write_text(json.dumps(metadata), encoding="utf-8")
+    signature = _reference_signature(reference_id, expires_at)
+    base = settings.public_base_url.rstrip("/")
+    return {
+        "url": f"{base}/api/v1/inference/references/{reference_id}?expires={expires_at}&signature={signature}",
+        "expires_at": datetime.fromtimestamp(expires_at, tz=timezone.utc),
+        "size": size,
+    }
+
+
+@app.get("/api/v1/inference/references/{reference_id}")
+def read_inference_reference(reference_id: str, expires: int, signature: str):
+    if expires <= int(time.time()) or not hmac.compare_digest(signature, _reference_signature(reference_id, expires)):
+        raise HTTPException(404, "参考素材已过期")
+    metadata_path = _reference_root() / f"{reference_id}.json"
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        raise HTTPException(404, "参考素材不存在")
+    if int(metadata.get("expires_at") or 0) != expires:
+        raise HTTPException(404, "参考素材不存在")
+    target = _reference_root() / str(metadata.get("stored_name") or "")
+    if not target.is_file() or target.parent != _reference_root():
+        raise HTTPException(404, "参考素材不存在")
+    return FileResponse(target, media_type=str(metadata.get("content_type") or "application/octet-stream"))
 
 DEFAULT_QUOTAS = {
     "text_tokens": 1_000_000,
@@ -91,6 +177,7 @@ CAPABILITY_UNITS = {
     "text.reasoning": "text_tokens",
     "image.standard": "image_count",
     "video.standard": "video_seconds",
+    "video.presenter": "video_seconds",
     "speech.tts": "speech_characters",
     "embedding.standard": "embedding_tokens",
 }
@@ -109,6 +196,21 @@ def _credit_balance(db: Session, user_id: str) -> int:
         UsageEvent.status == "succeeded",
     )) or 0
     return int(credited) - int(spent)
+
+
+def _available_credit_balance(db: Session, user_id: str) -> int:
+    reserved = db.scalar(select(func.coalesce(func.sum(UsageEvent.credits_charged_micros), 0)).where(
+        UsageEvent.user_id == user_id,
+        UsageEvent.status == "reserved",
+    )) or 0
+    return _credit_balance(db, user_id) - int(reserved)
+
+
+def _billing_mode(user: User, entitlement: Entitlement) -> str:
+    configured = str((entitlement.features or {}).get("billing_mode") or "").strip().lower()
+    if configured in {"credits", "internal"}:
+        return configured
+    return "internal" if user.role == "admin" else "credits"
 
 
 def _month_start() -> datetime:
@@ -315,7 +417,7 @@ def _estimate_units(capability: str, payload: dict) -> int:
         return max(1, len(json.dumps(payload, ensure_ascii=False)) // 2)
     if capability == "image.standard":
         return max(1, int(payload.get("n") or 1))
-    if capability == "video.standard":
+    if capability in {"video.standard", "video.presenter"}:
         return max(1, int(payload.get("duration") or 5))
     if capability == "speech.tts":
         return max(1, len(str(payload.get("input") or payload.get("text") or "")))
@@ -340,27 +442,20 @@ def _reserve_usage(db: Session, principal: Principal, req: InferenceRequest) -> 
     if not unit_type:
         raise HTTPException(400, "未知的智能能力")
     estimate = _estimate_units(req.capability, req.payload)
-    credited = db.scalar(select(func.coalesce(func.sum(CreditTransaction.credits_micros), 0)).where(
-        CreditTransaction.user_id == principal.user.id,
-    )) or 0
-    if int(credited) > 0:
-        # 统一计费（方案B）：credits 为唯一拦截额度，text/图片/视频统一从一个池子扣
-        balance = _credit_balance(db, principal.user.id)
+    billing_mode = _billing_mode(principal.user, entitlement)
+    if billing_mode == "credits":
+        # 普通用户始终使用预付 Credits。没有充值记录也不能回退到免费月度配额。
+        balance = _available_credit_balance(db, principal.user.id)
         route = db.get(ModelRoute, req.capability)
-        estimate_credits = estimate_credits_micros(req.capability, req.payload, route.config if route else {})
+        estimate_credits = estimate_credits_micros(
+            req.capability,
+            req.payload,
+            route.config if route else {},
+            route.provider_model if route else "",
+        )
         if max(0, balance) - estimate_credits < 0:
-            raise HTTPException(429, "credits 余额不足，请先充值后再使用")
-    else:
-        # 尚未开通 credits 计费：回退到分类型月度配额（兼容存量用户）
-        used = db.scalar(select(func.coalesce(func.sum(UsageEvent.units), 0)).where(
-            UsageEvent.user_id == principal.user.id,
-            UsageEvent.unit_type == unit_type,
-            UsageEvent.status.in_(["reserved", "succeeded"]),
-            UsageEvent.created_at >= _month_start(),
-        )) or 0
-        limit = int((entitlement.quotas or {}).get(unit_type, 0))
-        if limit > 0 and used + estimate > limit:
-            raise HTTPException(429, f"本月{unit_type}额度已用完")
+            raise HTTPException(429, "Credits 余额不足，请联系管理员调整额度")
+    route = db.get(ModelRoute, req.capability)
     event = UsageEvent(
         organization_id=principal.user.organization_id,
         user_id=principal.user.id,
@@ -370,6 +465,8 @@ def _reserve_usage(db: Session, principal: Principal, req: InferenceRequest) -> 
         status="reserved",
         units=estimate,
         unit_type=unit_type,
+        provider_model=route.provider_model if route else "",
+        credits_charged_micros=estimate_credits if billing_mode == "credits" else 0,
         app_version=req.app_version or principal.device.app_version,
     )
     db.add(event)
@@ -384,21 +481,26 @@ def _complete_usage(
     request_id: str,
     payload: dict,
     route_config: dict | None,
+    provider_model: str,
 ) -> None:
-    usage, provider_cost_micros, credits_micros, pricing_version = settle_usage(
+    resolved_provider_model = str(data.get("provider_model") or provider_model)
+    usage, provider_cost_micros, credits_micros, pricing_version, pricing_snapshot = settle_usage(
         event.capability,
         data,
         payload,
         route_config,
+        resolved_provider_model,
     )
     if event.unit_type in {"text_tokens", "embedding_tokens"}:
         event.units = int(usage.get("total_tokens") or usage.get("input_tokens") or event.units)
     event.status = "succeeded"
     event.latency_ms = latency_ms
     event.provider_usage = usage
+    event.provider_model = resolved_provider_model
     event.provider_cost_micros = provider_cost_micros
     event.credits_charged_micros = credits_micros
     event.pricing_version = pricing_version
+    event.pricing_snapshot = pricing_snapshot
     event.estimated_cost = provider_cost_micros / 1_000_000
     event.provider_request_id = request_id
     event.completed_at = utcnow()
@@ -407,6 +509,7 @@ def _complete_usage(
 def _fail_usage(event: UsageEvent, exc: Exception, latency_ms: int) -> None:
     event.status = "failed"
     event.units = 0
+    event.credits_charged_micros = 0
     event.latency_ms = latency_ms
     event.error_code = getattr(exc, "code", "request_failed")[:80]
     event.error_message = "智能服务暂时不可用"
@@ -447,10 +550,18 @@ def startup() -> None:
                     user_id=admin.id,
                     valid_until=utcnow() + timedelta(days=3650),
                     device_limit=10,
-                    features={"admin": True},
+                    features={"admin": True, "billing_mode": "internal"},
                     quotas={key: 0 for key in DEFAULT_QUOTAS},
                 ))
-        # 统一计费（方案B）：为存量已授权用户一次性赠送默认 credits（CONTROL_DEFAULT_CREDITS）
+        # Billing mode is explicit. Regular users are prepaid; administrators are internal.
+        for user, entitlement in db.execute(
+            select(User, Entitlement).join(Entitlement, Entitlement.user_id == User.id)
+        ).all():
+            features = dict(entitlement.features or {})
+            if "billing_mode" not in features:
+                features["billing_mode"] = "internal" if user.role == "admin" else "credits"
+                entitlement.features = features
+        # Optional operator-controlled grants. Production default remains zero.
         default_credit_micros = settings.default_credit_micros
         if default_credit_micros > 0:
             for user, _ent in db.execute(
@@ -501,7 +612,7 @@ def activate(req: ActivateRequest, db: Session = Depends(get_db)):
         user_id=user.id,
         valid_until=utcnow() + timedelta(days=invitation.entitlement_days),
         device_limit=invitation.device_limit,
-        features={"cloud_models": True},
+        features={"cloud_models": True, "billing_mode": "credits"},
         quotas={**DEFAULT_QUOTAS, **(invitation.quotas or {})},
     )
     db.add(entitlement)
@@ -647,7 +758,7 @@ def entitlements(principal: Principal = Depends(current_principal), db: Session 
         "features": ent.features,
         "quotas": ent.quotas,
         "billing": {
-            "mode": "credits" if int(credited) > 0 else "quota",
+            "mode": _billing_mode(principal.user, ent),
             "balance": _credits(balance),
             "credited": _credits(credited),
         },
@@ -815,7 +926,7 @@ async def _run_inference(req: InferenceRequest, principal: Principal, db: Sessio
             raise HTTPException(400, "请使用视频任务接口")
         latency = int((time.perf_counter() - started) * 1000)
         event = db.get(UsageEvent, event.id)
-        _complete_usage(event, data, latency, provider_request_id, req.payload, route.config)
+        _complete_usage(event, data, latency, provider_request_id, req.payload, route.config, route.provider_model)
         db.commit()
         return {"request_id": event.id, "data": data}
     except HTTPException:
@@ -867,7 +978,7 @@ async def inference_embeddings(req: InferenceRequest, principal: Principal = Dep
 
 @app.post("/api/v1/inference/video/tasks")
 async def create_video_task(req: InferenceRequest, principal: Principal = Depends(current_principal), db: Session = Depends(get_db)):
-    if req.capability != "video.standard":
+    if req.capability not in {"video.standard", "video.presenter"}:
         raise HTTPException(400, "能力类型与接口不匹配")
     route = db.get(ModelRoute, req.capability)
     if not route or not route.enabled or not route.provider_model:
@@ -889,6 +1000,7 @@ async def create_video_task(req: InferenceRequest, principal: Principal = Depend
             user_id=principal.user.id,
             device_id=principal.device.id,
             provider_task_id=provider_task_id,
+            model_alias=req.capability,
             usage_event_id=event.id,
         )
         db.add(task)
@@ -921,6 +1033,7 @@ async def get_video_task(task_id: str, principal: Principal = Depends(current_pr
             provider_request_id or event.provider_request_id,
             {"duration": event.units},
             route.config if route else {},
+            route.provider_model if route else event.provider_model,
         )
     elif task.status == "failed" and event.status != "failed":
         _fail_usage(event, RuntimeError("video_failed"), event.latency_ms)
@@ -997,7 +1110,7 @@ def admin_create_user(req: AdminUserCreateRequest, admin: Principal = Depends(cu
         user_id=user.id,
         valid_until=utcnow() + timedelta(days=req.entitlement_days),
         device_limit=req.device_limit,
-        features={"cloud_models": True},
+        features={"cloud_models": True, "billing_mode": "credits"},
         quotas={**DEFAULT_QUOTAS, **req.quotas},
     )
     db.add(entitlement)
@@ -1240,8 +1353,11 @@ def admin_usage(admin: Principal = Depends(current_admin), db: Session = Depends
         "units": row.units,
         "unit_type": row.unit_type,
         "provider_usage": row.provider_usage,
+        "provider_model": row.provider_model,
         "provider_cost_cny": round(row.provider_cost_micros / 1_000_000, 6),
         "credits_charged": round(row.credits_charged_micros / 1_000_000, 6),
+        "pricing_version": row.pricing_version,
+        "pricing_snapshot": row.pricing_snapshot,
         "latency_ms": row.latency_ms,
         "error_code": row.error_code,
         "created_at": row.created_at,
@@ -1251,19 +1367,62 @@ def admin_usage(admin: Principal = Depends(current_admin), db: Session = Depends
 @app.get("/api/v1/admin/provider-billing")
 def admin_provider_billing(admin: Principal = Depends(current_admin), db: Session = Depends(get_db), limit: int = 31):
     del admin
-    rows = db.scalars(
-        select(ProviderBillingDaily)
-        .order_by(ProviderBillingDaily.billing_date.desc())
-        .limit(min(max(limit, 1), 366))
-    ).all()
-    return {"items": [{
-        "provider": row.provider,
-        "billing_date": row.billing_date,
-        "actual_cost_cny": round(row.actual_cost_micros / 1_000_000, 6),
-        "currency": row.currency,
-        "line_count": row.line_count,
-        "synced_at": row.synced_at,
-    } for row in rows]}
+    zone = ZoneInfo("Asia/Shanghai")
+    today = datetime.now(zone).date()
+    item_count = min(max(limit, 1), 366)
+    actual_rows = {
+        row.billing_date: row
+        for row in db.scalars(select(ProviderBillingDaily).where(
+            ProviderBillingDaily.billing_date >= today - timedelta(days=item_count - 1),
+        )).all()
+    }
+    items = []
+    for days_ago in range(item_count):
+        billing_date = today - timedelta(days=days_ago)
+        start_local = datetime.combine(billing_date, datetime.min.time(), tzinfo=zone)
+        start = start_local.astimezone(timezone.utc)
+        end = (start_local + timedelta(days=1)).astimezone(timezone.utc)
+        settled_cost, credits_revenue = db.execute(select(
+            func.coalesce(func.sum(UsageEvent.provider_cost_micros), 0),
+            func.coalesce(func.sum(UsageEvent.credits_charged_micros), 0),
+        ).where(
+            UsageEvent.status == "succeeded",
+            UsageEvent.completed_at >= start,
+            UsageEvent.completed_at < end,
+        )).one()
+        row = actual_rows.get(billing_date)
+        actual_cost = int(row.actual_cost_micros) if row else None
+        reference_cost = actual_cost if actual_cost is not None else int(settled_cost or 0)
+        revenue_micros = int(Decimal(int(credits_revenue or 0)) / CREDITS_PER_CNY)
+        gross_profit = revenue_micros - reference_cost
+        gross_margin = (gross_profit / revenue_micros) if revenue_micros > 0 else None
+        variance = (
+            (actual_cost - int(settled_cost or 0)) / int(settled_cost)
+            if actual_cost is not None and int(settled_cost or 0) > 0
+            else None
+        )
+        status = "awaiting_bill"
+        if actual_cost is not None:
+            status = "healthy" if gross_margin is not None and gross_margin >= 0.35 and abs(variance or 0) <= 0.05 else "review"
+        items.append({
+            "provider": "volcengine",
+            "billing_date": billing_date,
+            "actual_cost_cny": round(actual_cost / 1_000_000, 6) if actual_cost is not None else None,
+            "settled_cost_cny": round(int(settled_cost or 0) / 1_000_000, 6),
+            "credits_revenue_cny": round(revenue_micros / 1_000_000, 6),
+            "gross_profit_cny": round(gross_profit / 1_000_000, 6),
+            "gross_margin_percent": round(gross_margin * 100, 2) if gross_margin is not None else None,
+            "billing_variance_percent": round(variance * 100, 2) if variance is not None else None,
+            "status": status,
+            "currency": row.currency if row else "CNY",
+            "line_count": row.line_count if row else 0,
+            "synced_at": row.synced_at if row else None,
+        })
+    return {
+        "provider_billing_configured": settings.provider_billing_enabled,
+        "target_provider_cost_share": 0.60,
+        "items": items,
+    }
 
 
 @app.get("/api/v1/admin/feedback")

@@ -57,3 +57,8 @@ with billing read access and set `CONTROL_PROVIDER_BILLING_ACCESS_KEY` and
 `CONTROL_PROVIDER_BILLING_SECRET_KEY` on the server. The worker refreshes the
 current and previous three billing days. These credentials must never be reused
 as inference credentials or copied into the desktop package.
+
+Set `CONTROL_PROVIDER_BILLING_PROJECT` to the dedicated VolcEngine project used
+by SZYG. Without this filter, other Ark usage under the same payer account may be
+included in the reconciliation total. A daily API cost share above 65% or a
+provider-bill variance above 5% is emitted as an operator alert.

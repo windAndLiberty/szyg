@@ -85,8 +85,8 @@ const Avatar: React.FC<{ role: string; userName?: string }> = ({ role, userName 
     return <UserAvatar className="h-8 w-8 shrink-0" />
   }
   return (
-    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#6366F1] to-[#8B5CF6] flex items-center justify-center shrink-0 shadow-glow overflow-hidden">
-      <img src="/logo1.png" alt="超级员工" className="w-full h-full object-cover" />
+    <div className="w-8 h-8 rounded-full bg-[#0B1020] flex items-center justify-center shrink-0 shadow-glow overflow-hidden p-0.5">
+      <img src="/logo1.png" alt="超级员工" className="w-full h-full object-contain" />
     </div>
   )
 }

@@ -1248,6 +1248,8 @@ const DIGITAL_HUMAN_ROLE_NAMES: Record<DigitalHumanAssetRole, string> = {
   motion_reference: '动作',
   voice_reference: '声音',
   brand_asset: '品牌',
+  inspiration_reference: '灵感',
+  scene_reference: '背景',
 }
 
 function withDigitalHumanAliases(items: DigitalHumanAsset[]): DigitalHumanAsset[] {

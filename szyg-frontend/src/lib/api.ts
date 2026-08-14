@@ -95,6 +95,9 @@ async function request<T>(method: string, url: string, body?: unknown, _retry = 
     } catch {
       /* ignore */
     }
+    if (res.status === 401 && !url.startsWith('/api/cloud/login')) {
+      window.dispatchEvent(new Event('szyg:cloud-session-expired'))
+    }
     if (detail && typeof detail === 'object' && 'message' in detail) {
       const rawMessage = String((detail as { message: unknown }).message)
       console.error(`[API] ${method} ${url}:`, rawMessage)
@@ -927,6 +930,8 @@ export type DigitalHumanAssetRole =
   | 'motion_reference'
   | 'voice_reference'
   | 'brand_asset'
+  | 'inspiration_reference'
+  | 'scene_reference'
 
 export interface DigitalHumanAsset {
   id: string
@@ -938,20 +943,27 @@ export interface DigitalHumanAsset {
   size: number
   path: string
   url: string
+  profile_id?: string
+  project_id?: string
+  source?: string
+  created_at?: string
 }
 
 export interface DigitalHumanConfig {
   ok: boolean
-  provider: string
-  model_label: string
+  provider?: string
+  model_label?: string
   configured: boolean
   configuration_message: string
-  durations: number[]
-  sizes: Array<'720p' | '1080p' | '4K'>
-  ratios: Array<'9:16' | '16:9' | '1:1'>
-  max_assets: number
-  max_inline_asset_mb: number
-  native_audio: boolean
+  durations?: number[]
+  duration?: { min: number; max: number; segment_max: number }
+  sizes: Array<'480p' | '720p' | '1080p' | '4K'>
+  ratios: Array<'9:16' | '16:9' | '1:1' | '4:3' | '3:4' | '21:9'>
+  max_assets?: number
+  max_references?: number
+  max_inline_asset_mb?: number
+  native_audio?: boolean
+  supported_profile_types?: string[]
 }
 
 export interface DigitalHumanCreateResult {
@@ -968,10 +980,16 @@ export async function fetchDigitalHumanConfig(): Promise<DigitalHumanConfig> {
   return apiGet<DigitalHumanConfig>('/api/digital-human/config')
 }
 
-export async function uploadDigitalHumanAsset(file: File, role: DigitalHumanAssetRole): Promise<DigitalHumanAsset> {
+export async function uploadDigitalHumanAsset(
+  file: File,
+  role: DigitalHumanAssetRole,
+  owner?: { profileId?: string; projectId?: string },
+): Promise<DigitalHumanAsset> {
   const formData = new FormData()
   formData.append('file', file)
   formData.append('role', role)
+  if (owner?.profileId) formData.append('profile_id', owner.profileId)
+  if (owner?.projectId) formData.append('project_id', owner.projectId)
   const send = async (retry = false): Promise<DigitalHumanAsset> => {
     const token = getToken()
     const res = await fetch('/api/digital-human/assets', {
@@ -1008,6 +1026,114 @@ export async function createDigitalHumanVideo(payload: {
 }): Promise<DigitalHumanCreateResult> {
   return apiPost<DigitalHumanCreateResult>('/api/digital-human/create', payload)
 }
+
+export interface DigitalHumanProfile {
+  id: string
+  name: string
+  profile_type: 'virtual' | 'real'
+  avatar_asset_ids: string[]
+  voice_asset_id: string
+  cover_asset_id: string
+  default_style: string
+  outfit: string
+  notes: string
+  created_at: string
+  updated_at: string
+}
+
+export interface InspirationAnalysis {
+  transcript?: string
+  hook?: string
+  selling_points?: string[]
+  visual_structure?: string
+  shot_rhythm?: string
+  actions?: string[]
+  subtitles?: string
+  cta?: string
+  segments?: Array<Record<string, unknown>>
+  reusable_scenes?: string[]
+}
+
+export interface DigitalHumanInspiration {
+  id: string
+  name: string
+  asset_id: string
+  source_url: string
+  status: 'ready' | 'analyzed'
+  analysis?: InspirationAnalysis | null
+  created_at: string
+  updated_at: string
+}
+
+export interface DigitalHumanScene {
+  id: string
+  order: number
+  spoken_text: string
+  visual_prompt: string
+  duration: number
+  presenter_mode: 'full' | 'pip' | 'hidden'
+  visual_mode: 'presenter' | 'full_image' | 'product_closeup' | 'integrated' | 'creative_cutaway'
+  reference_asset_ids: string[]
+  transition: string
+  subtitle: boolean
+  sound_prompt: string
+}
+
+export interface DigitalHumanProject {
+  id: string
+  name: string
+  profile_id: string
+  inspiration_ids: string[]
+  scenes: DigitalHumanScene[]
+  ratio: '9:16' | '16:9' | '1:1' | '4:3' | '3:4' | '21:9'
+  size: '480p' | '720p'
+  visual_style: string
+  subtitle_enabled: boolean
+  subtitle_style: string
+  version: number
+  created_at: string
+  updated_at: string
+}
+
+export interface DigitalHumanRenderSegment {
+  id: string
+  index: number
+  scene_ids: string[]
+  duration: number
+  status: string
+  error: string
+  video_path: string
+}
+
+export interface DigitalHumanRender {
+  id: string
+  project_id: string
+  status: 'processing' | 'succeeded' | 'failed'
+  progress: number
+  segments: DigitalHumanRenderSegment[]
+  output_path: string
+  output_url: string
+  material?: { id: string; name: string; type: 'video'; url: string; path: string; size: number; created_at: string } | null
+}
+
+export const fetchDigitalHumanAssets = (query = '') => apiGet<{ items: DigitalHumanAsset[] }>(`/api/digital-human/assets${query}`)
+export const fetchDigitalHumanProfiles = () => apiGet<{ items: DigitalHumanProfile[] }>('/api/digital-human/profiles')
+export const createDigitalHumanProfile = (payload: Omit<DigitalHumanProfile, 'id' | 'created_at' | 'updated_at'>) => apiPost<DigitalHumanProfile>('/api/digital-human/profiles', payload)
+export const updateDigitalHumanProfile = (id: string, payload: Omit<DigitalHumanProfile, 'id' | 'created_at' | 'updated_at'>) => apiPut<DigitalHumanProfile>(`/api/digital-human/profiles/${encodeURIComponent(id)}`, payload)
+export const deleteDigitalHumanProfile = (id: string) => apiDel(`/api/digital-human/profiles/${encodeURIComponent(id)}`)
+export const fetchDigitalHumanInspirations = () => apiGet<{ items: DigitalHumanInspiration[] }>('/api/digital-human/inspirations')
+export const importDigitalHumanInspiration = (payload: { name: string; asset_id?: string; source_url?: string }) => apiPost<DigitalHumanInspiration>('/api/digital-human/inspirations/import', payload)
+export const analyzeDigitalHumanInspiration = (id: string) => apiPost<DigitalHumanInspiration>(`/api/digital-human/inspirations/${encodeURIComponent(id)}/analyze`)
+export const deleteDigitalHumanInspiration = (id: string) => apiDel(`/api/digital-human/inspirations/${encodeURIComponent(id)}`)
+export const fetchDigitalHumanProjects = () => apiGet<{ items: DigitalHumanProject[] }>('/api/digital-human/projects')
+export const createDigitalHumanProject = (payload: Partial<DigitalHumanProject>) => apiPost<DigitalHumanProject>('/api/digital-human/projects', payload)
+export const updateDigitalHumanProject = (id: string, payload: Partial<DigitalHumanProject>) => apiPut<DigitalHumanProject>(`/api/digital-human/projects/${encodeURIComponent(id)}`, payload)
+export const deleteDigitalHumanProject = (id: string) => apiDel(`/api/digital-human/projects/${encodeURIComponent(id)}`)
+export const planDigitalHumanProject = (id: string, instruction: string) => apiPost<{ scenes: DigitalHumanScene[]; total_duration: number }>(`/api/digital-human/projects/${encodeURIComponent(id)}/plan`, { instruction })
+export const generateDigitalHumanSceneImage = (id: string, sceneId: string, prompt: string) => apiPost<DigitalHumanAsset>(`/api/digital-human/projects/${encodeURIComponent(id)}/scene-images`, { scene_id: sceneId, prompt })
+export const createDigitalHumanRender = (projectId: string) => apiPost<DigitalHumanRender>(`/api/digital-human/projects/${encodeURIComponent(projectId)}/renders`)
+export const fetchDigitalHumanRender = (renderId: string) => apiGet<DigitalHumanRender>(`/api/digital-human/renders/${encodeURIComponent(renderId)}`)
+export const retryDigitalHumanRenderSegment = (renderId: string, segmentId: string) => apiPost<DigitalHumanRender>(`/api/digital-human/renders/${encodeURIComponent(renderId)}/segments/${encodeURIComponent(segmentId)}/retry`)
 
 export interface ComposeAssetRef {
   id: string

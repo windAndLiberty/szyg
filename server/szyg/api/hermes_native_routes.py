@@ -362,7 +362,7 @@ async def openai_chat(body: dict[str, Any], authorization: str = Header(default=
         result = await client._request("POST", "/api/v1/inference/chat", client._body(capability, payload))
     except IntegrationError as exc:
         message = str(exc)
-        status_code = 401 if "登录状态" in message or "请先登录" in message else 503
+        status_code = int(getattr(exc, "status_code", 503))
         raise HTTPException(status_code=status_code, detail=message) from exc
     data = result.get("data") or {}
     choice = (data.get("choices") or [{}])[0]

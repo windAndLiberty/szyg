@@ -34,6 +34,7 @@ import {
   SlidersHorizontal,
   Palette,
   UsersRound,
+  UserRound,
   CreditCard,
   type LucideIcon,
 } from 'lucide-react'
@@ -81,6 +82,7 @@ export const navGroups: NavGroup[] = [
     defaultChild: '/content/production',
     children: [
       { path: '/content/production', label: '内容生成', icon: PenLine, module: 'content-generation', implemented: true },
+      { path: '/content/digital-human', label: '数字人创作', icon: UserRound, module: 'digital-human', implemented: true },
       { path: '/content/assets', label: '素材管理与发布', icon: ImageIcon, module: 'materials' },
       { path: '/publish/accounts', label: '渠道账号', icon: KeyRound, module: 'platforms' },
       { path: '/publish/center', label: '发布看板', icon: Send, module: 'publisher' },
@@ -174,8 +176,7 @@ export const legacyRedirects: { from: string; to: string }[] = [
   { from: '/ai-staff', to: '/' },
   { from: '/ai-staff/chat', to: '/' },
   { from: '/dashboard', to: '/insights/dashboard' },
-  { from: '/digital-human', to: '/' },
-  { from: '/content/digital-human', to: '/' },
+  { from: '/digital-human', to: '/content/digital-human' },
   { from: '/agents', to: '/ai-staff/market' },
   { from: '/video', to: '/content/production' },
   { from: '/image', to: '/content/production' },

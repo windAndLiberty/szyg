@@ -42,5 +42,11 @@ The upstream checkout does not contain the LICENSE file referenced by its
 README. Its README is bundled alongside the frozen modules to retain the
 project's attribution and license declaration.
 
+## FFmpeg
+
+- Project: FFmpeg
+- License: LGPL/GPL depending on the bundled build configuration
+- Distribution: pinned Windows executable used for local digital presenter video normalization and composition, with the distributor license text
+
 Third-party components remain subject to their respective licenses. This file
 does not change or replace those terms.

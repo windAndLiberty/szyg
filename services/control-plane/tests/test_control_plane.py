@@ -238,6 +238,11 @@ def test_idempotency_prevents_duplicate_usage(monkeypatch):
     with TestClient(app) as client:
         admin = login_admin(client)
         user = invite_and_activate(client, admin["access_token"], "usage@example.com")
+        client.post(
+            f"/api/v1/admin/users/{user['user']['id']}/credits",
+            headers=auth(admin["access_token"]),
+            json={"credits": 100},
+        )
         from app.database import ModelRoute, SessionLocal
         with SessionLocal.begin() as db:
             route = db.get(ModelRoute, "text.fast")
@@ -316,9 +321,9 @@ def test_admin_recharge_endpoint_grants_credits_and_switches_to_unified_billing(
         admin = login_admin(client)
         user = invite_and_activate(client, admin["access_token"], "recharge-api@example.com")
 
-        # 初始：未开通 credits → billing mode = quota
+        # 普通用户从激活起即进入预付 Credits 模式，不再回退到免费配额。
         entitlements = client.get("/api/v1/entitlements", headers=auth(user["access_token"]))
-        assert entitlements.json()["billing"]["mode"] == "quota"
+        assert entitlements.json()["billing"]["mode"] == "credits"
         assert entitlements.json()["billing"]["balance"] == 0
 
         # 管理员充值 500 credits
@@ -345,6 +350,113 @@ def test_admin_recharge_endpoint_grants_credits_and_switches_to_unified_billing(
         users = client.get("/api/v1/admin/users", headers=auth(admin["access_token"])).json()["items"]
         row = next(item for item in users if item["id"] == user["user"]["id"])
         assert row["credits"]["credited"] == 500
+
+
+def test_regular_user_without_credits_cannot_call_cloud_models():
+    with TestClient(app) as client:
+        admin = login_admin(client)
+        user = invite_and_activate(client, admin["access_token"], "prepaid-only@example.com")
+        from app.database import ModelRoute, SessionLocal
+        with SessionLocal.begin() as db:
+            route = db.get(ModelRoute, "text.fast")
+            route.provider_model = "deepseek-v4-flash-ga-260731"
+            route.enabled = True
+
+        response = client.post(
+            "/api/v1/inference/chat",
+            headers=auth(user["access_token"]),
+            json={
+                "capability": "text.fast",
+                "payload": {"messages": [{"role": "user", "content": "hello"}]},
+                "idempotency_key": "no-credit-request-0001",
+                "app_version": "1.0.0-test",
+            },
+        )
+        assert response.status_code == 429
+        assert "余额不足" in response.text
+
+
+def test_inflight_video_reservation_prevents_credit_overspend(monkeypatch):
+    calls = 0
+
+    async def fake_create_video(self, model, payload):
+        nonlocal calls
+        calls += 1
+        return {"id": f"provider-video-{calls}"}, f"provider-request-{calls}"
+
+    monkeypatch.setattr("app.provider.ProviderGateway.create_video", fake_create_video)
+    with TestClient(app) as client:
+        admin = login_admin(client)
+        user = invite_and_activate(client, admin["access_token"], "video-hold@example.com")
+        client.post(
+            f"/api/v1/admin/users/{user['user']['id']}/credits",
+            headers=auth(admin["access_token"]),
+            json={"credits": 1000},
+        )
+        from app.database import ModelRoute, SessionLocal
+        with SessionLocal.begin() as db:
+            route = db.get(ModelRoute, "video.standard")
+            route.provider_model = "doubao-seedance-2.0"
+            route.enabled = True
+
+        payload = {
+            "capability": "video.standard",
+            "payload": {"duration": 4, "resolution": "720p"},
+            "idempotency_key": "video-hold-request-0001",
+            "app_version": "1.0.0-test",
+        }
+        first = client.post("/api/v1/inference/video/tasks", headers=auth(user["access_token"]), json=payload)
+        assert first.status_code == 200, first.text
+
+        payload["idempotency_key"] = "video-hold-request-0002"
+        second = client.post("/api/v1/inference/video/tasks", headers=auth(user["access_token"]), json=payload)
+        assert second.status_code == 429
+        assert "余额不足" in second.text
+        assert calls == 1
+
+
+def test_presenter_video_uses_separate_route_and_reference_upload(monkeypatch):
+    async def fake_create_video(self, model, payload):
+        assert model == "doubao-seedance-2-5-260628"
+        assert payload["duration"] == 4
+        return {"id": "provider-presenter-1"}, "provider-request-presenter"
+
+    monkeypatch.setattr("app.provider.ProviderGateway.create_video", fake_create_video)
+    with TestClient(app) as client:
+        admin = login_admin(client)
+        user = invite_and_activate(client, admin["access_token"], "presenter@example.com")
+        client.post(
+            f"/api/v1/admin/users/{user['user']['id']}/credits",
+            headers=auth(admin["access_token"]),
+            json={"credits": 1000},
+        )
+        uploaded = client.post(
+            "/api/v1/inference/references",
+            headers=auth(user["access_token"]),
+            files={"file": ("avatar.png", b"virtual-avatar", "image/png")},
+        )
+        assert uploaded.status_code == 200, uploaded.text
+        from urllib.parse import urlsplit
+        ref = urlsplit(uploaded.json()["url"])
+        fetched = client.get(f"{ref.path}?{ref.query}")
+        assert fetched.status_code == 200
+        assert fetched.content == b"virtual-avatar"
+
+        created = client.post(
+            "/api/v1/inference/video/tasks",
+            headers=auth(user["access_token"]),
+            json={
+                "capability": "video.presenter",
+                "payload": {"duration": 4, "resolution": "720p", "content": []},
+                "idempotency_key": "presenter-video-request-0001",
+                "app_version": "1.1.3-test",
+            },
+        )
+        assert created.status_code == 200, created.text
+        from app.database import SessionLocal, VideoTask
+        with SessionLocal() as db:
+            task = db.get(VideoTask, created.json()["task_id"])
+            assert task.model_alias == "video.presenter"
 
 
 def test_admin_recharge_endpoint_validates_inputs():
@@ -452,7 +564,7 @@ def test_unified_credits_are_deducted_after_successful_inference(monkeypatch):
 
 def settle_credits_for_payload() -> float:
     from app.usage_accounting import settle_usage
-    _, _, credits_micros, _ = settle_usage(
+    _, _, credits_micros, _, _ = settle_usage(
         "text.fast",
         {"usage": {"input_tokens": 1000, "output_tokens": 100}},
         {"messages": [{"role": "user", "content": "hello"}]},

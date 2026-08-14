@@ -52,6 +52,7 @@ class ProviderGateway:
         body["model"] = model
         body.setdefault("stream", False)
         data, request_id = await self._request("POST", "chat/completions", payload=body)
+        data["provider_model"] = str(data.get("model") or model)
         data["model"] = "text.fast"
         return data, request_id
 
@@ -59,6 +60,7 @@ class ProviderGateway:
         body = dict(payload)
         body["model"] = model
         data, request_id = await self._request("POST", "responses", payload=body)
+        data["provider_model"] = str(data.get("model") or model)
         data["model"] = "text.vision"
         return data, request_id
 
@@ -66,6 +68,7 @@ class ProviderGateway:
         body = dict(payload)
         body["model"] = model
         data, request_id = await self._request("POST", "images/generations", payload=body)
+        data["provider_model"] = str(data.get("model") or model)
         data["model"] = "image.standard"
         return data, request_id
 
@@ -81,6 +84,7 @@ class ProviderGateway:
         body = dict(payload)
         body["model"] = model
         data, request_id = await self._request("POST", "embeddings", payload=body)
+        data["provider_model"] = str(data.get("model") or model)
         data["model"] = "embedding.standard"
         return data, request_id
 

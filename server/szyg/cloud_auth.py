@@ -71,7 +71,8 @@ class CloudAuthManager:
         url = os.environ.get("SZYG_CONTROL_URL", str(section.get("control_url", ""))).strip().rstrip("/")
         enabled_value = os.environ.get("SZYG_CLOUD_ENABLED", section.get("enabled", bool(url)))
         enabled = str(enabled_value).lower() in {"1", "true", "yes", "on"}
-        return {"enabled": enabled and bool(url), "control_url": url, "app_version": str(section.get("app_version", "1.0.2"))}
+        app_version = os.environ.get("SZYG_APP_VERSION", str(section.get("app_version", "1.1.3"))).strip()
+        return {"enabled": enabled and bool(url), "control_url": url, "app_version": app_version}
 
     def device(self, *, force_rotate: bool = False) -> dict[str, str]:
         """本机设备身份。指纹基于硬件信息保持不变,installation id 可旋转。
@@ -117,13 +118,36 @@ class CloudAuthManager:
                 return fn()
             raise
 
-    def _save_refresh(self, refresh_token: str, license_data: dict | None = None, public_key: str = "") -> None:
+    def _cached_session_data(self) -> dict[str, Any]:
+        try:
+            data = json.loads(self._session_file.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+        except Exception:
+            return {}
+
+    def _save_refresh(
+        self,
+        refresh_token: str,
+        license_data: dict | None = None,
+        public_key: str | None = None,
+    ) -> None:
+        """Persist a rotated token before any optional follow-up request.
+
+        Refresh tokens are single-use. Losing the replacement token because a
+        later license-key request timed out leaves an otherwise valid desktop
+        installation unable to use cloud features until the user signs in
+        again. Preserve the cached offline license and write the replacement
+        token atomically first.
+        """
+        cached = self._cached_session_data()
+        if not refresh_token:
+            raise CloudAuthError("登录状态已失效，请重新登录")
         encrypted = base64.b64encode(_dpapi(refresh_token.encode("utf-8"))).decode("ascii")
         temp = self._session_file.with_suffix(".tmp")
         temp.write_text(json.dumps({
             "refresh_token": encrypted,
-            "license": license_data or {},
-            "public_key": public_key,
+            "license": license_data if isinstance(license_data, dict) else cached.get("license", {}),
+            "public_key": public_key if public_key is not None else str(cached.get("public_key") or ""),
             "profile": self._profile,
         }), encoding="utf-8")
         os.replace(temp, self._session_file)
@@ -166,13 +190,22 @@ class CloudAuthManager:
     def _accept_session(self, data: dict) -> dict:
         self._access_token = str(data.get("access_token", ""))
         self._profile = {"user": data.get("user", {}), "device": data.get("device", {})}
-        key_data = self._request("GET", "/api/v1/auth/license-key")
+        refresh_token = str(data.get("refresh_token", ""))
+        license_data = data.get("license") if isinstance(data.get("license"), dict) else None
+
+        # The replacement refresh token must be durable before any secondary
+        # network request. The public key is useful for offline mode, but it is
+        # not required for the active online session.
         self._save_refresh(
-            str(data.get("refresh_token", "")),
-            data.get("license") if isinstance(data.get("license"), dict) else {},
-            str(key_data.get("public_key", "")),
+            refresh_token,
+            license_data,
         )
-        return self.session()
+        try:
+            key_data = self._request("GET", "/api/v1/auth/license-key")
+            self._save_refresh(refresh_token, license_data, str(key_data.get("public_key", "")))
+        except CloudAuthError:
+            pass
+        return {"configured": True, "authenticated": True, **self._profile}
 
     def _offline_session(self) -> dict | None:
         try:

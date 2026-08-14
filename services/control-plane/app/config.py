@@ -21,8 +21,12 @@ class Settings(BaseSettings):
     provider_billing_access_key: str = ""
     provider_billing_secret_key: str = ""
     provider_billing_region: str = "cn-beijing"
+    provider_billing_project: str = ""
     cors_origins: str = ""
     public_base_url: str = "http://127.0.0.1:18080"
+    reference_temp_dir: str = "./data/reference_uploads"
+    reference_ttl_hours: int = 24
+    reference_max_mb: int = 200
     access_token_minutes: int = 15
     refresh_token_days: int = 30
     offline_license_days: int = 7
@@ -48,6 +52,7 @@ class Settings(BaseSettings):
     model_text_reasoning: str = Field(default="", validation_alias="MODEL_TEXT_REASONING")
     model_image_standard: str = Field(default="", validation_alias="MODEL_IMAGE_STANDARD")
     model_video_standard: str = Field(default="", validation_alias="MODEL_VIDEO_STANDARD")
+    model_video_presenter: str = Field(default="doubao-seedance-2-5-260628", validation_alias="MODEL_VIDEO_PRESENTER")
     model_speech_tts: str = Field(default="", validation_alias="MODEL_SPEECH_TTS")
     model_embedding_standard: str = Field(default="", validation_alias="MODEL_EMBEDDING_STANDARD")
 
@@ -59,6 +64,7 @@ class Settings(BaseSettings):
             "text.reasoning": self.model_text_reasoning,
             "image.standard": self.model_image_standard,
             "video.standard": self.model_video_standard,
+            "video.presenter": self.model_video_presenter,
             "speech.tts": self.model_speech_tts,
             "embedding.standard": self.model_embedding_standard,
         }

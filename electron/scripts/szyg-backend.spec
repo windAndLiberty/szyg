@@ -89,6 +89,18 @@ if _missing_browsers:
     )
 binaries = collect_dynamic_libs("uiautomation")
 
+# Digital presenter renders are normalized locally. Bundle one audited FFmpeg
+# executable so customer machines never depend on a system installation.
+_ffmpeg_root = Path(os.environ.get("SZYG_FFMPEG_BUILD_DIR", r"D:\tools\ffmpeg"))
+_ffmpeg_exe = _ffmpeg_root / "bin" / "ffmpeg.exe"
+_ffmpeg_license = _ffmpeg_root / "LICENSE.txt"
+if not _ffmpeg_exe.is_file() or not _ffmpeg_license.is_file():
+    raise SystemExit(
+        "Bundled FFmpeg source is missing. Set SZYG_FFMPEG_BUILD_DIR to a licensed FFmpeg distribution."
+    )
+binaries.append((str(_ffmpeg_exe), "third_party/ffmpeg"))
+datas.append((str(_ffmpeg_license), "third_party_licenses/ffmpeg"))
+
 hiddenimports = [
     name for name in collect_submodules("szyg")
     if not name.startswith("szyg.integrations.omniparser_vendor")

@@ -92,8 +92,8 @@ const WelcomeState: React.FC<WelcomeStateProps> = ({
             className="absolute inset-0 rounded-2xl blur-2xl opacity-40"
             style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.6) 0%, transparent 70%)' }}
           />
-          <div className="relative w-32 h-32 rounded-2xl overflow-hidden shadow-glow-strong">
-            <img src="/logo1.png" alt="超级员工" className="w-full h-full object-cover" />
+          <div className="relative w-32 h-32 rounded-2xl overflow-hidden bg-[#0B1020]/70 p-2 shadow-glow-strong">
+            <img src="/logo1.png" alt="超级员工" className="w-full h-full object-contain" />
           </div>
         </div>
         <div className="text-center">

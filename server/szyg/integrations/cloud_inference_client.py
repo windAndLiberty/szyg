@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import mimetypes
 import time
 import uuid
 from pathlib import Path
@@ -26,6 +27,15 @@ SUPPORTED_IMAGE_SIZES = {
     "2048x2048", "2304x1728", "3072x1296",
 }
 DEFAULT_IMAGE_SIZE = "1920x1920"
+
+
+class CloudInferenceError(IntegrationError):
+    """User-safe cloud failure with an HTTP status for local API routes."""
+
+    def __init__(self, message: str, *, status_code: int = 503, request_id: str = "") -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.request_id = request_id
 
 
 class CloudInferenceClient:
@@ -56,18 +66,20 @@ class CloudInferenceClient:
                 token = cloud_auth.access_token(force_refresh=True)
                 response = await send(token)
         except CloudAuthError as exc:
-            # 设备绑定策略:不因云端授权校验失败强制用户重新登录,
-            # 文案规避前端的"登录过期"触发词,改为软性提示。
-            del exc
-            raise IntegrationError("云端服务暂不可用，已自动切换离线模式，部分功能稍后恢复") from None
+            message = str(exc)
+            if any(marker in message for marker in ("请先登录", "登录状态", "令牌", "设备已被移除", "设备不存在")):
+                raise CloudInferenceError("登录状态已失效，请重新登录", status_code=401) from None
+            raise CloudInferenceError("账户服务暂时不可用，请稍后重试", status_code=503) from None
         except httpx.HTTPError as exc:
-            raise IntegrationError("智能服务暂时不可用") from exc
+            raise CloudInferenceError("智能服务暂时不可用，请稍后重试", status_code=503) from exc
         if response.is_error:
+            detail: object = ""
             try:
-                detail = response.json().get("detail", {})
-                request_id = detail.get("request_id", "") if isinstance(detail, dict) else ""
+                detail = response.json().get("detail", "")
+                request_id = str(detail.get("request_id") or "") if isinstance(detail, dict) else ""
+                detail_message = str(detail.get("message") or "") if isinstance(detail, dict) else str(detail)
             except Exception:
-                request_id = ""
+                request_id, detail_message = "", ""
             logger.warning(
                 "Cloud inference request failed: status=%s path=%s request_id=%s",
                 response.status_code,
@@ -75,7 +87,15 @@ class CloudInferenceClient:
                 request_id or "-",
             )
             suffix = f"（请求编号：{request_id}）" if request_id else ""
-            raise IntegrationError(f"智能服务暂时不可用{suffix}")
+            if response.status_code == 401:
+                raise CloudInferenceError("登录状态已失效，请重新登录", status_code=401, request_id=request_id)
+            if response.status_code == 403:
+                message = "服务授权已到期，请联系管理员" if "到期" in detail_message else "当前账户暂时无法使用此能力，请联系管理员"
+                raise CloudInferenceError(message, status_code=403, request_id=request_id)
+            if response.status_code == 429:
+                message = "Credits 余额不足，请联系管理员" if any(word in detail_message.lower() for word in ("credit", "余额", "额度")) else "请求较多，请稍后重试"
+                raise CloudInferenceError(message, status_code=429, request_id=request_id)
+            raise CloudInferenceError(f"智能服务暂时不可用{suffix}", status_code=503, request_id=request_id)
         return response.json()
 
     def _body(self, capability: str, payload: dict) -> dict:
@@ -156,6 +176,84 @@ class CloudInferenceClient:
         payload = {"content": content, "resolution": size, "ratio": ratio, "duration": duration, "generate_audio": native_audio, "watermark": False}
         result = await self._request("POST", "/api/v1/inference/video/tasks", self._body("video.standard", payload))
         return {"task_id": result.get("task_id", ""), "status": result.get("status", "queued"), "model": "video.standard", "prompt": prompt}
+
+    async def upload_reference(self, path: str) -> str:
+        """Upload a local reference through the authenticated, short-lived gateway."""
+        source = Path(path)
+        if not source.exists() or not source.is_file():
+            raise CloudInferenceError("参考素材不存在", status_code=400)
+        cfg = cloud_auth.config
+
+        async def send(token: str) -> httpx.Response:
+            async with httpx.AsyncClient(timeout=max(self.timeout, 180), trust_env=False) as client:
+                with source.open("rb") as handle:
+                    return await client.post(
+                        cfg["control_url"] + "/api/v1/inference/references",
+                        headers={"Authorization": f"Bearer {token}"},
+                        files={"file": (source.name, handle, mimetypes.guess_type(source.name)[0] or "application/octet-stream")},
+                    )
+
+        try:
+            response = await send(cloud_auth.access_token())
+            if response.status_code == 401:
+                response = await send(cloud_auth.access_token(force_refresh=True))
+        except (CloudAuthError, httpx.HTTPError) as exc:
+            raise CloudInferenceError("参考素材上传失败，请稍后重试") from exc
+        if response.is_error:
+            try:
+                detail = response.json().get("detail") or "参考素材上传失败"
+            except Exception:
+                detail = "参考素材上传失败"
+            raise CloudInferenceError(str(detail), status_code=response.status_code)
+        url = str(response.json().get("url") or "")
+        if not url:
+            raise CloudInferenceError("参考素材上传失败，请稍后重试")
+        return url
+
+    async def generate_presenter_video(
+        self,
+        prompt: str,
+        reference_assets: list[dict],
+        *,
+        duration: int,
+        size: str = "720p",
+        ratio: str = "9:16",
+        output_format: str = "mp4",
+        return_last_frame: bool = True,
+        idempotency_key: str = "",
+    ) -> dict:
+        content: list[dict] = [{"type": "text", "text": prompt}]
+        for item in reference_assets:
+            kind = str(item.get("type") or "")
+            url = str(item.get("url") or "")
+            if kind not in {"image_url", "video_url", "audio_url"} or not url:
+                continue
+            content.append({
+                "type": kind,
+                kind: {"url": url},
+                "role": str(item.get("role") or f"reference_{kind.split('_')[0]}"),
+            })
+        payload = {
+            "content": content,
+            "resolution": size,
+            "ratio": ratio,
+            "duration": duration,
+            "generate_audio": True,
+            "watermark": False,
+            "omni_reference_task_type": "auto",
+            "return_last_frame": return_last_frame,
+            "output_format": output_format,
+        }
+        body = self._body("video.presenter", payload)
+        if idempotency_key:
+            body["idempotency_key"] = idempotency_key
+        result = await self._request("POST", "/api/v1/inference/video/tasks", body)
+        return {
+            "task_id": str(result.get("task_id") or ""),
+            "status": str(result.get("status") or "queued"),
+            "model": "video.presenter",
+            "prompt": prompt,
+        }
 
     async def get_video_task(self, task_id: str, model: str = "") -> dict:
         del model

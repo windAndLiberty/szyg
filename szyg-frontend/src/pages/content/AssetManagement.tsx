@@ -59,7 +59,7 @@ import { resolveGeneratedAssetUrl } from '@/lib/generatedAssets'
 type AssetType = 'all' | 'image' | 'video' | 'audio' | 'text'
 const MAX_COMPOSE_ASSETS = 5
 
-interface Asset {
+export interface Asset {
   id: string
   name: string
   type: 'image' | 'video' | 'audio' | 'text'
@@ -546,7 +546,7 @@ async function expandGraphicDraftAssets(selected: Asset[], allAssets: Asset[]): 
   return uniqueAssets(expanded)
 }
 
-function PublishSelectedDrawer({
+export function PublishSelectedDrawer({
   assets,
   directGraphicDraftId = '',
   onClose,

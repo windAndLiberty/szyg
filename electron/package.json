@@ -29,7 +29,8 @@
     "files": [
       "main.js",
       "preload.js",
-      "browser/**/*"
+      "browser/**/*",
+      "assets/**/*"
     ],
     "extraResources": [
       {
@@ -94,6 +95,9 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "领鹿员工",
+      "installerIcon": "../assets/szyg.ico",
+      "uninstallerIcon": "../assets/szyg.ico",
+      "installerHeaderIcon": "../assets/szyg.ico",
       "uninstallDisplayName": "领鹿员工 ${version}",
       "deleteAppDataOnUninstall": false,
       "installerLanguages": [

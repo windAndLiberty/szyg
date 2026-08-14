@@ -20,6 +20,7 @@ import ComputerUse from './pages/ai-staff/ComputerUse'
 // 占位页面 — 内容创作
 import ContentProduction from './pages/content/ContentProduction'
 import AssetManagement from './pages/content/AssetManagement'
+import DigitalHumanStudio from './pages/content/DigitalHumanStudio'
 // 占位页面 — 营销获客
 import PrivateDomain from './pages/marketing/PrivateDomain'
 import Intelligence from './pages/marketing/Intelligence'
@@ -105,6 +106,7 @@ function AppRoutes({ location }: { location: Location }) {
 
         {/* 内容创作 */}
         <Route path="/content/production" element={<ContentProduction />} />
+        <Route path="/content/digital-human" element={<DigitalHumanStudio />} />
         <Route path="/content/assets" element={<AssetManagement />} />
 
         {/* 营销获客 */}

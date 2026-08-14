@@ -13,6 +13,10 @@ const files = [
     target: 'backend/sau-cli.exe',
   },
   {
+    source: path.join(electronDir, 'runtime', 'backend', 'szyg-backend', '_internal', 'third_party', 'ffmpeg', 'ffmpeg.exe'),
+    target: 'backend/_internal/third_party/ffmpeg/ffmpeg.exe',
+  },
+  {
     source: path.join(electronDir, 'runtime', 'hermes', 'hermes-runtime', 'hermes-runtime.exe'),
     target: 'runtime/hermes/hermes-runtime.exe',
   },

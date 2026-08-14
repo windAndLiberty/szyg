@@ -68,6 +68,30 @@ async def generate_image(req: GenerateRequest):
     size = req.size if req.size in VALID_SIZES else "1920x1920"
     final_prompt = _apply_style(req.prompt, req.style)
 
+    # Production desktop builds always use the authenticated cloud gateway.
+    # Keep this as one explicit path so account, billing and authorization
+    # errors are not swallowed by a second legacy-provider fallback.
+    from szyg.cloud_auth import cloud_auth
+    if cloud_auth.config["enabled"]:
+        from szyg.integrations.cloud_inference_client import CloudInferenceClient, CloudInferenceError
+
+        client = CloudInferenceClient(output_dir=str(get_media_output_dir("image")))
+        try:
+            paths = [
+                await client.generate_image(prompt=final_prompt, size=size)
+                for _ in range(req.count)
+            ]
+        except CloudInferenceError as exc:
+            raise HTTPException(exc.status_code, str(exc)) from exc
+        return {
+            "backend": "cloud",
+            "images": [_resolve_url(path) for path in paths],
+            "paths": [_resolve_local_path(path) for path in paths],
+            "size": size,
+            "count": len(paths),
+            "final_prompt": final_prompt,
+        }
+
     # ── Try VolcEngine first ──
     try:
         from szyg.config.loader import load_config

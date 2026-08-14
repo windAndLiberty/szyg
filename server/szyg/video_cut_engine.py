@@ -17,7 +17,9 @@ import json
 import logging
 import os
 import random
+import shutil
 import subprocess
+import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -28,6 +30,9 @@ logger = logging.getLogger(__name__)
 # ── FFmpeg ────────────────────────────────────────────
 
 FFMPEG_PATHS = [
+    os.environ.get("SZYG_FFMPEG_PATH", ""),
+    str(Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent)) / "third_party" / "ffmpeg" / "ffmpeg.exe"),
+    str(Path(sys.executable).parent / "third_party" / "ffmpeg" / "ffmpeg.exe"),
     "ffmpeg",
     r"D:\tools\ffmpeg\bin\ffmpeg.exe",
     r"D:\tools\ffmpeg\ffmpeg.exe",
@@ -40,7 +45,7 @@ def _get_ffmpeg() -> str:
     if _ffmpeg:
         return _ffmpeg
     for path in FFMPEG_PATHS:
-        if Path(path).exists() or _which(path):
+        if path and (Path(path).exists() or _which(path)):
             _ffmpeg = path
             return path
     # Try which
@@ -123,6 +128,35 @@ def concat_videos(input_files: list[str], output_path: str) -> str:
     if result.returncode != 0:
         raise RuntimeError(result.stderr[:500])
     return output_path
+
+
+def concat_videos_normalized(input_files: list[str], output_path: str, ratio: str = "9:16") -> str:
+    """Normalize generated clips before concatenation to avoid codec/size drift."""
+    if not input_files:
+        raise ValueError("No video segments provided")
+    dimensions = {
+        "9:16": (720, 1280), "16:9": (1280, 720), "1:1": (720, 720),
+        "4:3": (960, 720), "3:4": (720, 960), "21:9": (1680, 720),
+    }
+    width, height = dimensions.get(ratio, dimensions["9:16"])
+    work_dir = Path(tempfile.mkdtemp(prefix="szyg-video-normalize-"))
+    normalized: list[str] = []
+    try:
+        for index, input_file in enumerate(input_files):
+            target = work_dir / f"segment_{index:03d}.mp4"
+            result = _ffmpeg_run([
+                "-i", input_file,
+                "-vf", f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30",
+                "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
+                "-c:a", "aac", "-ar", "48000", "-ac", "2", "-movflags", "+faststart",
+                str(target),
+            ], timeout=600)
+            if result.returncode != 0:
+                raise RuntimeError(result.stderr[:500])
+            normalized.append(str(target))
+        return concat_videos(normalized, output_path)
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
 
 
 def change_speed(input_path: str, speed: float, output_path: str) -> str:
@@ -325,7 +359,7 @@ def list_fonts() -> list[str]:
 # ── Quick exports ─────────────────────────────────────
 
 __all__ = [
-    "cut_video", "concat_videos", "change_speed", "add_text_overlay",
+    "cut_video", "concat_videos", "concat_videos_normalized", "change_speed", "add_text_overlay",
     "replace_audio", "mix_audio", "extract_frame", "get_video_info",
     "list_templates", "render_template", "list_fonts",
 ]

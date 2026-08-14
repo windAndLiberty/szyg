@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronLeft, ChevronRight, ChevronDown, Workflow } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 import { navGroups } from '@/lib/navConfig'
 import { useLayout, SIDEBAR_WIDTH_EXPANDED, SIDEBAR_WIDTH_COLLAPSED } from '@/lib/layout'
 import { cn } from '@/lib/utils'
@@ -77,7 +77,7 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="h-16 flex items-center px-4 border-b border-[#1E293B] shrink-0">
         <Link to="/" className="flex items-center gap-3 min-w-0">
-          <Workflow className="w-7 h-7 text-[#6366F1] shrink-0" />
+          <img src="/logo1.png" alt="领鹿员工" className="h-8 w-8 shrink-0 object-contain" />
           <AnimatePresence>
             {!collapsed && (
               <motion.div
