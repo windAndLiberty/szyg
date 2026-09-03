@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 40" fill="none">
+  <defs>
+    <linearGradient id="logoGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="50%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#06B6D4"/>
+    </linearGradient>
+  </defs>
+  <!-- Icon -->
+  <g transform="translate(0,0)">
+    <circle cx="10" cy="14" r="5" stroke="url(#logoGrad2)" stroke-width="2" fill="none"/>
+    <line x1="15" y1="14" x2="20" y2="22" stroke="url(#logoGrad2)" stroke-width="2" stroke-linecap="round"/>
+    <polygon points="22,17 28,27 16,27" stroke="url(#logoGrad2)" stroke-width="2" fill="none" stroke-linejoin="round"/>
+    <line x1="25" y1="24" x2="30" y2="28" stroke="url(#logoGrad2)" stroke-width="2" stroke-linecap="round"/>
+    <rect x="28" y="24" width="8" height="8" rx="1" stroke="url(#logoGrad2)" stroke-width="2" fill="none"/>
+  </g>
+  <!-- Text -->
+  <text x="44" y="25" font-family="Space Grotesk, system-ui, sans-serif" font-size="20" font-weight="700" fill="#F1F5F9" letter-spacing="-0.02em">DealFlow</text>
+</svg>

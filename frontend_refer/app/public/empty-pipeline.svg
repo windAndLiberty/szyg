@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <defs>
+    <linearGradient id="pipeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#6366F1" stop-opacity="0.2"/>
+    </linearGradient>
+  </defs>
+  <!-- Funnel shape with dotted outline -->
+  <path d="M60 40 L140 40 L120 100 L100 120 L80 100 Z" 
+        stroke="url(#pipeGrad)" 
+        stroke-width="2" 
+        stroke-dasharray="8 4"
+        fill="rgba(139,92,246,0.05)"/>
+  <!-- Top opening highlight -->
+  <ellipse cx="100" cy="40" rx="40" ry="4" 
+           stroke="rgba(139,92,246,0.3)" 
+           stroke-width="1.5" 
+           stroke-dasharray="6 3"
+           fill="none"/>
+  <!-- Bottom drop -->
+  <circle cx="100" cy="145" r="4" fill="#8B5CF6" fill-opacity="0.3">
+    <animate attributeName="cy" values="135;155;135" dur="3s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.6;0;0.6" dur="3s" repeatCount="indefinite"/>
+  </circle>
+  <!-- Glow effect -->
+  <circle cx="100" cy="90" r="50" fill="url(#pipeGrad)" opacity="0.15"/>
+</svg>

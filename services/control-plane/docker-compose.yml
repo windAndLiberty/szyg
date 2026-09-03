@@ -1,0 +1,74 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: szyg_control
+      POSTGRES_USER: szyg
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U szyg -d szyg_control"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  control-api:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    secrets:
+      - offline_license_private_key
+      - offline_license_public_key
+    ports:
+      - "127.0.0.1:18080:18080"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:18080/health')"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  control-worker:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    command: ["python", "-m", "app.worker"]
+    depends_on:
+      control-api:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    profiles: ["public"]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      CONTROL_DOMAIN: ${CONTROL_DOMAIN:-control.example.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      control-api:
+        condition: service_healthy
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  offline_license_private_key:
+    file: ./secrets/offline_license_private.pem
+  offline_license_public_key:
+    file: ./secrets/offline_license_public.pem
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

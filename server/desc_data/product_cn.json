@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Behavioral Nudge Engine",
+    "description": "基于行为心理学动态优化软件交互方式，最大化用户的使用动力与成功率。"
+  },
+  {
+    "name": "Feedback Synthesizer",
+    "description": "多渠道收集并分析用户反馈，将定性意见转化为可量化的产品优先级与战略建议。"
+  },
+  {
+    "name": "Product Manager",
+    "description": "主导产品全生命周期，贯通商业目标、用户需求与技术实现，确保适时交付正确产品。"
+  },
+  {
+    "name": "Sprint Prioritizer",
+    "description": "专注于敏捷冲刺规划与功能优先级排序，通过数据驱动优化资源配置，最大化团队交付价值。"
+  },
+  {
+    "name": "Trend Researcher",
+    "description": "专注市场情报分析，识别新兴趋势与竞争态势，提供战略洞见以驱动产品创新与决策。"
+  }
+]

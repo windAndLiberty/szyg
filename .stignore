@@ -1,0 +1,39 @@
+// Local Git metadata and orchestration state
+/.git
+/.local-dev
+
+// Python, Node, and generated build trees
+/.venv
+/.venv_old
+**/__pycache__
+**/.pytest_cache
+**/*.egg-info
+**/node_modules
+**/dist
+**/.build
+**/out
+/electron/runtime
+/electron/data
+/server/.hermes-venv
+
+// Runtime assets and mutable application data are migrated separately
+/runtime
+/server/szyg/storage
+/data
+/server/data
+
+// Logs and caches
+**/*.log
+**/*.tmp
+**/.cache
+
+// Credentials and machine-local configuration
+/config.yaml
+/账号密码.*
+/.env
+/.env.*
+**/*.key
+**/*.pem
+**/*.pfx
+**/secrets.yaml
+**/config.local.yaml

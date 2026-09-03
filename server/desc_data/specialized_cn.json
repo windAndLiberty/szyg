@@ -1,0 +1,214 @@
+[
+  {
+    "name": "Accounts Payable Agent",
+    "description": "自动处理供应商付款和定期账单，支持加密货币、法币及稳定币等多种支付通道。"
+  },
+  {
+    "name": "Agentic Identity & Trust Architect",
+    "description": "为多智能体环境设计身份认证与信任验证体系，确保代理身份可信、行为可追溯。"
+  },
+  {
+    "name": "Agents Orchestrator",
+    "description": "自主管理工作流管道，统筹协调整个开发流程的全流程编排器。"
+  },
+  {
+    "name": "Automation Governance Architect",
+    "description": "以治理为先导，在实施前审计业务自动化的价值、风险与可维护性。"
+  },
+  {
+    "name": "Business Strategist",
+    "description": "资深管理咨询专家，提供竞争分析、市场进入策略与商业模式设计等战略决策支持。"
+  },
+  {
+    "name": "Change Management Consultant",
+    "description": "运用ADKAR和Prosci等框架，引导组织变革实施并确保成果长期固化。"
+  },
+  {
+    "name": "Chief Financial Officer",
+    "description": "战略财务高管，统筹资本配置与财务规划，驱动业务绩效与投资者信心。"
+  },
+  {
+    "name": "Corporate Training Designer",
+    "description": "企业培训体系设计专家，精通需求分析与课程开发，持续优化培训效果。"
+  },
+  {
+    "name": "Customer Service",
+    "description": "友好专业的客服专家，高效处理咨询与投诉，致力提升客户满意度。"
+  },
+  {
+    "name": "Customer Success Manager",
+    "description": "战略客户成功专家，负责客户引导与续约管理，驱动长期合作伙伴关系。"
+  },
+  {
+    "name": "Data Consolidation Agent",
+    "description": "将销售数据整合至实时仪表板，提供区域与管道等维度的汇总概览。"
+  },
+  {
+    "name": "Data Privacy Officer",
+    "description": "企业数据隐私专家，构建全球隐私合规体系，涵盖数据映射与风险评估。"
+  },
+  {
+    "name": "ESG & Sustainability Officer",
+    "description": "企业可持续发展与ESG报告专家，管理信息披露并推动脱碳与合规战略落地。"
+  },
+  {
+    "name": "Government Digital Presales Consultant",
+    "description": "政府数字化售前专家，精通政策解读与方案设计，熟悉等保密评与信创合规要求。"
+  },
+  {
+    "name": "Grant Writer",
+    "description": "非营利与科研机构资助申请专家，涵盖课题调研与提案撰写全流程。"
+  },
+  {
+    "name": "Healthcare Customer Service",
+    "description": "富有同理心的医疗客服专家，处理患者支持与账单查询，提升就医体验。"
+  },
+  {
+    "name": "Healthcare Marketing Compliance Specialist",
+    "description": "中国医疗营销合规专家，精通广告法与药品管理法，保障健康营销合法合规。"
+  },
+  {
+    "name": "Hospitality Guest Services",
+    "description": "酒店餐饮宾客服务专家，涵盖预订入住与投诉处理，打造卓越宾客体验。"
+  },
+  {
+    "name": "HR Onboarding",
+    "description": "入职管理专家，负责新员工引导与合规跟踪，助力人才快速融入与留存。"
+  },
+  {
+    "name": "Identity Graph Operator",
+    "description": "维护共享身份图谱，确保多智能体系统对实体身份的解析一致且确定。"
+  },
+  {
+    "name": "Language Translator",
+    "description": "实时西英互译专家，融合文化背景与方言差异，精准应对商务及应急场景。"
+  },
+  {
+    "name": "Legal Billing & Time Tracking",
+    "description": "法律计费与工时追踪专家，确保精准计时开票，最大化营收同时维护客户关系。"
+  },
+  {
+    "name": "Legal Client Intake",
+    "description": "法律客户收案专家，负责资格审核与利益冲突排查，生成律师就绪的案件摘要。"
+  },
+  {
+    "name": "Legal Document Review",
+    "description": "法律文档审查专家，审阅合同与诉讼文件，标记风险条款并确保合规性。"
+  },
+  {
+    "name": "Loan Officer Assistant",
+    "description": "贷款专员助理，覆盖借款人准入与文件收集，协调抵押及商业贷款结案全流程。"
+  },
+  {
+    "name": "LSP/Index Engineer",
+    "description": "语言服务器协议专家，通过客户端编排与语义索引构建统一代码智能系统。"
+  },
+  {
+    "name": "M&A Integration Manager",
+    "description": "并购整合专家，设计并执行投后整合方案，涵盖Day 1准备与百天计划协同推进。"
+  },
+  {
+    "name": "Medical Billing & Coding Specialist",
+    "description": "医疗计费与编码专家，精通ICD与CPT编码，优化收入周期并提高理赔通过率。"
+  },
+  {
+    "name": "Operations Manager",
+    "description": "运营管理专家，运用精益六西格玛与系统思维优化流程、产能与供应商绩效。"
+  },
+  {
+    "name": "Organizational Psychologist",
+    "description": "应用组织心理学家，诊断团队动力与心理安全，助力构建高韧性健康组织。"
+  },
+  {
+    "name": "Personal Growth Mentor",
+    "description": "跨领域个人成长导师，帮助明确目标与设计习惯，提供务实可行的战略决策建议。"
+  },
+  {
+    "name": "Real Estate Buyer & Seller",
+    "description": "房地产买卖助理，支持买家代理与谈判议价，覆盖从看房到结案的全流程服务。"
+  },
+  {
+    "name": "Recruitment Specialist",
+    "description": "招聘运营与人才获取专家，精通中国主流招聘平台，助力雇主品牌建设。"
+  },
+  {
+    "name": "Report Distribution Agent",
+    "description": "自动化销售报告分发代理，根据区域参数将整合报告定向推送至对应销售代表。"
+  },
+  {
+    "name": "Retail Customer Returns",
+    "description": "零售退换货处理专家，管理退换与退款流程，平衡政策执行与客户忠诚度维护。"
+  },
+  {
+    "name": "Sales Data Extraction Agent",
+    "description": "专注监控Excel文件并提取关键销售指标，支持月度与年度实时内部报告。"
+  },
+  {
+    "name": "Sales Outreach",
+    "description": "顾问式B2B销售拓展专家，精通线索跟进与提案撰写，推动商机转化与成交。"
+  },
+  {
+    "name": "Chief of Staff",
+    "description": "创始人与高管的得力协调人，过滤噪音并确保决策落地，让领导专注核心思考。"
+  },
+  {
+    "name": "Civil Engineer",
+    "description": "土木与结构工程专家，覆盖欧标美标国标等多元标准体系，胜任国际化项目设计。"
+  },
+  {
+    "name": "Cultural Intelligence Strategist",
+    "description": "文化智能策略师，识别隐性排斥并研究全球语境，确保产品包容多元身份群体。"
+  },
+  {
+    "name": "Developer Advocate",
+    "description": "开发者关系专家，建设技术社区并优化开发者体验，推动平台采用与生态增长。"
+  },
+  {
+    "name": "Document Generator",
+    "description": "专业文档生成专家，通过代码创建格式规范的PDF、PPTX及DOCX等办公文件。"
+  },
+  {
+    "name": "French Consulting Market Navigator",
+    "description": "法国IT咨询自由职业市场导航，解读费率模式与薪资结算机制等生态规则。"
+  },
+  {
+    "name": "Korean Business Navigator",
+    "description": "韩国商务文化导航，解读决策流程与商务礼仪，助力外籍人士高效开展本地业务。"
+  },
+  {
+    "name": "MCP Builder",
+    "description": "模型上下文协议开发专家，设计并构建MCP服务器以扩展AI代理的底层能力。"
+  },
+  {
+    "name": "Model QA Specialist",
+    "description": "独立模型质量审核专家，对机器学习与统计模型进行端到端审计与复现验证。"
+  },
+  {
+    "name": "Pricing Analyst",
+    "description": "专业定价分析师，通过市场研究与成本评估制定最优策略，驱动竞争优势。"
+  },
+  {
+    "name": "Salesforce Architect",
+    "description": "Salesforce平台架构专家，精通多云设计与集成模式，确保企业级架构合规。"
+  },
+  {
+    "name": "Strategy Duel Agent",
+    "description": "运用博弈论与三十六计进行实时策略对决，以智谋推演辅助决策。"
+  },
+  {
+    "name": "Workflow Architect",
+    "description": "工作流设计专家，绘制完整流程树并覆盖故障恢复，输出可直接实施的规格说明。"
+  },
+  {
+    "name": "Study Abroad Advisor",
+    "description": "全方位留学规划专家，涵盖选校与文书指导，为学子提供一站式出国申请服务。"
+  },
+  {
+    "name": "Supply Chain Strategist",
+    "description": "供应链管理与采购策略专家，立足中国制造生态打造高效稳健的可持续供应链。"
+  },
+  {
+    "name": "ZK Steward",
+    "description": "卢曼卡片盒理念的知识库管家，以原子化笔记和跨域决策支持助力知识体系建设。"
+  }
+]

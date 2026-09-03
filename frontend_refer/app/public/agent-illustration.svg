@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" fill="none">
+  <defs>
+    <linearGradient id="flowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="nodeGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#6366F1" stop-opacity="0.1"/>
+    </linearGradient>
+    <linearGradient id="nodeGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B82F6" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#06B6D4" stop-opacity="0.1"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Connection lines with flowing effect -->
+  <line x1="50" y1="55" x2="350" y2="55" stroke="url(#flowGrad)" stroke-width="1.5" opacity="0.3"/>
+  <line x1="50" y1="55" x2="350" y2="55" stroke="url(#flowGrad)" stroke-width="2" stroke-dasharray="12 24" opacity="0.6">
+    <animate attributeName="stroke-dashoffset" values="0;-36" dur="2s" repeatCount="indefinite"/>
+  </line>
+  
+  <!-- Node 1 -->
+  <circle cx="50" cy="55" r="18" fill="url(#nodeGrad1)" stroke="#8B5CF6" stroke-width="1.5"/>
+  <circle cx="50" cy="55" r="6" fill="#8B5CF6" opacity="0.8"/>
+  <text x="50" y="92" font-family="Inter, system-ui, sans-serif" font-size="10" fill="#94A3B8" text-anchor="middle">Parse</text>
+  
+  <!-- Node 2 -->
+  <circle cx="110" cy="55" r="18" fill="url(#nodeGrad1)" stroke="#6366F1" stroke-width="1.5"/>
+  <rect x="102" y="47" width="16" height="16" rx="2" stroke="#6366F1" stroke-width="1.5" fill="none"/>
+  <text x="110" y="92" font-family="Inter, system-ui, sans-serif" font-size="10" fill="#94A3B8" text-anchor="middle">Extract</text>
+  
+  <!-- Node 3 -->
+  <circle cx="170" cy="55" r="18" fill="url(#nodeGrad2)" stroke="#3B82F6" stroke-width="1.5"/>
+  <polygon points="170,47 178,61 162,61" stroke="#3B82F6" stroke-width="1.5" fill="none"/>
+  <text x="170" y="92" font-family="Inter, system-ui, sans-serif" font-size="10" fill="#94A3B8" text-anchor="middle">Analyze</text>
+  
+  <!-- Node 4 -->
+  <circle cx="230" cy="55" r="18" fill="url(#nodeGrad2)" stroke="#06B6D4" stroke-width="1.5"/>
+  <circle cx="230" cy="55" r="8" stroke="#06B6D4" stroke-width="1.5" fill="none"/>
+  <circle cx="230" cy="55" r="3" fill="#06B6D4" opacity="0.8"/>
+  <text x="230" y="92" font-family="Inter, system-ui, sans-serif" font-size="10" fill="#94A3B8" text-anchor="middle">Draft</text>
+  
+  <!-- Node 5 -->
+  <circle cx="290" cy="55" r="18" fill="url(#nodeGrad1)" stroke="#8B5CF6" stroke-width="1.5"/>
+  <path d="M282 55 L288 61 L298 49" stroke="#8B5CF6" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="290" y="92" font-family="Inter, system-ui, sans-serif" font-size="10" fill="#94A3B8" text-anchor="middle">Review</text>
+  
+  <!-- Node 6 -->
+  <circle cx="350" cy="55" r="18" fill="url(#nodeGrad1)" stroke="#10B981" stroke-width="1.5"/>
+  <rect x="342" y="51" width="16" height="8" rx="1" stroke="#10B981" stroke-width="1.5" fill="none"/>
+  <line x1="346" y1="59" x2="354" y2="59" stroke="#10B981" stroke-width="1"/>
+  <text x="350" y="92" font-family="Inter, system-ui, sans-serif" font-size="10" fill="#94A3B8" text-anchor="middle">Sync</text>
+</svg>

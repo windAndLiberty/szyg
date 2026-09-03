@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <defs>
+    <linearGradient id="custGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#3B82F6" stop-opacity="0.2"/>
+    </linearGradient>
+  </defs>
+  <!-- Contact book outline -->
+  <rect x="45" y="30" width="90" height="120" rx="8" 
+        stroke="url(#custGrad)" 
+        stroke-width="2" 
+        stroke-dasharray="8 4"
+        fill="rgba(99,102,241,0.05)"/>
+  <!-- Book spine -->
+  <line x1="65" y1="30" x2="65" y2="150" stroke="url(#custGrad)" stroke-width="1.5" stroke-dasharray="6 3"/>
+  <!-- Person icon inside -->
+  <circle cx="90" cy="65" r="12" stroke="url(#custGrad)" stroke-width="1.5" fill="none"/>
+  <path d="M72 105 Q72 85 90 85 Q108 85 108 105" stroke="url(#custGrad)" stroke-width="1.5" fill="none"/>
+  <!-- Lines for contact info -->
+  <line x1="75" y1="115" x2="110" y2="115" stroke="url(#custGrad)" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="6 3"/>
+  <line x1="75" y1="128" x2="100" y2="128" stroke="url(#custGrad)" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="6 3"/>
+  <!-- Magnifying glass -->
+  <circle cx="140" cy="140" r="22" stroke="url(#custGrad)" stroke-width="2" fill="rgba(99,102,241,0.05)"/>
+  <line x1="156" y1="156" x2="175" y2="175" stroke="url(#custGrad)" stroke-width="3" stroke-linecap="round"/>
+  <!-- Glow -->
+  <circle cx="100" cy="90" r="55" fill="url(#custGrad)" opacity="0.1"/>
+</svg>

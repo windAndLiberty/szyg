@@ -1,0 +1,30 @@
+[
+  {
+    "name": "Experiment Tracker",
+    "description": "专注实验设计与数据驱动决策，系统管理A/B测试与假设验证。"
+  },
+  {
+    "name": "Jira Workflow Steward",
+    "description": "强化Jira与Git工作流规范，确保提交可追溯、PR结构清晰及分支策略安全。"
+  },
+  {
+    "name": "Meeting Notes Specialist",
+    "description": "从会议记录中提取决策、行动项和待定问题，生成四段式清晰摘要。"
+  },
+  {
+    "name": "Project Shepherd",
+    "description": "协调跨职能项目、管理进度与干系人，推动项目从概念到交付的全流程落地。"
+  },
+  {
+    "name": "Studio Operations",
+    "description": "优化工作室日常运营流程，协调资源分配，维护团队生产力与工作效率标准。"
+  },
+  {
+    "name": "Studio Producer",
+    "description": "统筹创意与技术项目及资源分配，管理多项目组合，对齐商业目标与创意愿景。"
+  },
+  {
+    "name": "Senior Project Manager",
+    "description": "将需求规格拆解为可执行任务，参考历史项目经验，聚焦务实范围与精确需求。"
+  }
+]

@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240" fill="none">
+  <defs>
+    <linearGradient id="obGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#3B82F6" stop-opacity="0.15"/>
+    </linearGradient>
+    <linearGradient id="aiGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <radialGradient id="glowGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#8B5CF6" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="transparent"/>
+    </radialGradient>
+  </defs>
+  
+  <!-- Background glow -->
+  <circle cx="160" cy="120" r="100" fill="url(#glowGrad)"/>
+  
+  <!-- Sales person (left) -->
+  <g transform="translate(70, 50)">
+    <!-- Body -->
+    <rect x="15" y="50" width="50" height="70" rx="10" fill="rgba(99,102,241,0.15)" stroke="url(#obGrad)" stroke-width="1.5"/>
+    <!-- Head -->
+    <circle cx="40" cy="30" r="18" fill="rgba(99,102,241,0.15)" stroke="url(#obGrad)" stroke-width="1.5"/>
+    <!-- Eye -->
+    <circle cx="34" cy="27" r="2" fill="#94A3B8"/>
+    <circle cx="46" cy="27" r="2" fill="#94A3B8"/>
+    <!-- Smile -->
+    <path d="M32 35 Q40 40 48 35" stroke="#94A3B8" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <!-- Arm extended for handshake -->
+    <rect x="55" y="65" width="30" height="12" rx="6" fill="rgba(99,102,241,0.15)" stroke="url(#obGrad)" stroke-width="1.5"/>
+  </g>
+  
+  <!-- AI assistant (right) -->
+  <g transform="translate(170, 50)">
+    <!-- Hologram base -->
+    <ellipse cx="40" cy="125" rx="30" ry="6" fill="url(#aiGrad)" opacity="0.3"/>
+    <!-- AI Body -->
+    <rect x="15" y="50" width="50" height="70" rx="10" fill="rgba(139,92,246,0.1)" stroke="url(#aiGrad)" stroke-width="1.5" stroke-dasharray="4 2"/>
+    <!-- AI Head -->
+    <circle cx="40" cy="30" r="18" fill="rgba(139,92,246,0.1)" stroke="url(#aiGrad)" stroke-width="1.5"/>
+    <!-- AI Eye -->
+    <rect x="30" y="25" width="8" height="3" rx="1.5" fill="#8B5CF6" opacity="0.8"/>
+    <rect x="42" y="25" width="8" height="3" rx="1.5" fill="#8B5CF6" opacity="0.8"/>
+    <!-- AI Smile -->
+    <path d="M34 36 Q40 41 46 36" stroke="#8B5CF6" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.8"/>
+    <!-- Circuit lines -->
+    <line x1="25" y1="60" x2="55" y2="60" stroke="url(#aiGrad)" stroke-width="1" opacity="0.5"/>
+    <line x1="30" y1="75" x2="50" y2="75" stroke="url(#aiGrad)" stroke-width="1" opacity="0.5"/>
+    <line x1="35" y1="90" x2="45" y2="90" stroke="url(#aiGrad)" stroke-width="1" opacity="0.5"/>
+    <!-- Arm extended -->
+    <rect x="-15" y="65" width="30" height="12" rx="6" fill="rgba(139,92,246,0.1)" stroke="url(#aiGrad)" stroke-width="1.5" stroke-dasharray="4 2"/>
+  </g>
+  
+  <!-- Handshake connection glow -->
+  <circle cx="160" cy="115" r="15" fill="url(#aiGrad)" opacity="0.2">
+    <animate attributeName="r" values="12;18;12" dur="2s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.3;0.1;0.3" dur="2s" repeatCount="indefinite"/>
+  </circle>
+</svg>

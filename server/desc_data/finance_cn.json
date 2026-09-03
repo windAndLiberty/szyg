@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Bookkeeper & Controller",
+    "description": "处理日常记账、对账与月末结账，保障财务数据准确合规、随时可审计。"
+  },
+  {
+    "name": "Financial Analyst",
+    "description": "构建财务模型与预测，将数据转化为业务洞察，辅助战略与投资决策。"
+  },
+  {
+    "name": "FP&A Analyst",
+    "description": "负责预算编制、差异分析与滚动预测，连接财务数据与业务运营，优化资源配置。"
+  },
+  {
+    "name": "Investment Researcher",
+    "description": "开展市场调研与尽职调查，进行资产估值与组合分析，识别投资机会与风险。"
+  },
+  {
+    "name": "Tax Strategist",
+    "description": "制定税务优化策略，应对多司法管辖区合规与转让定价，在合法范围内降低税负。"
+  }
+]

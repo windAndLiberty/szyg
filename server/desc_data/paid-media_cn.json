@@ -1,0 +1,30 @@
+[
+  {
+    "name": "Paid Media Auditor",
+    "description": "系统审计Google Ads、Meta等平台广告账户，输出含优先级建议与预期影响的可执行报告。"
+  },
+  {
+    "name": "Ad Creative Strategist",
+    "description": "广告创意与文案优化专家，架起投放数据与营销信息之间的桥梁，提升广告说服力。"
+  },
+  {
+    "name": "Paid Social Strategist",
+    "description": "跨平台社交媒体广告专家，覆盖Meta、TikTok、LinkedIn等渠道，定制从拉新到再营销的全漏斗策略。"
+  },
+  {
+    "name": "PPC Campaign Strategist",
+    "description": "搜索与购物广告策略专家，设计账户结构与出价方案，助力月消费从万级到千万级的投放规模。"
+  },
+  {
+    "name": "Programmatic & Display Buyer",
+    "description": "程序化展示广告与媒体购买专家，覆盖GDN、DV360及ABM定向策略，精准触达目标客户。"
+  },
+  {
+    "name": "Search Query Analyst",
+    "description": "搜索词分析与否定关键词优化专家，消除浪费流量，放大高意向搜索词带来的优质流量。"
+  },
+  {
+    "name": "Tracking & Measurement Specialist",
+    "description": "转化追踪与归因建模专家，通过GTM、GA4等工具确保广告效果可衡量、每一分钱有迹可循。"
+  }
+]

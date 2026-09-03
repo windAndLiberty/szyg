@@ -1,0 +1,11 @@
+{
+  "name": "NousResearch/hermes-agent",
+  "version": "0.19.1",
+  "tag": "v2026.7.30",
+  "commit": "cc4cab2f592e60a197e796506de9168f74baf3ea",
+  "tag_object": "d25e2dbdbc40b49808c0a0e9cfed21cc90cffab3",
+  "archive_url": "https://github.com/NousResearch/hermes-agent/archive/refs/tags/v2026.7.30.zip",
+  "archive_sha256": "31034ddd3e3e998981b317220f8f7e53fee1134aac43ba207b01d67d72c79137",
+  "license": "MIT",
+  "source_directory": "server/vendor/hermes_agent"
+}

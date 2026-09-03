@@ -1,0 +1,47 @@
+# szyg × Hermes Agent v0.15 — 深度集成配置
+
+model:
+  default: "deepseek/deepseek-v4-pro"
+  provider: "deepseek"
+  # api_key from env: DEEPSEEK_API_KEY
+
+# MCP Servers — szyg 的 6 个子系统，35 个工具
+mcp_servers:
+  publisher:
+    command: "python3"
+    args: ["server/szyg/mcp_servers/publisher_mcp.py"]
+  scheduler:
+    command: "python3"
+    args: ["server/szyg/mcp_servers/scheduler_mcp.py"]
+  tools:
+    command: "python3"
+    args: ["server/szyg/mcp_servers/tools_mcp.py"]
+  knowledge:
+    command: "python3"
+    args: ["server/szyg/mcp_servers/knowledge_mcp.py"]
+  agents:
+    command: "python3"
+    args: ["server/szyg/mcp_servers/agents_mcp.py"]
+  oem:
+    command: "python3"
+    args: ["server/szyg/mcp_servers/oem_mcp.py"]
+  platforms:
+    command: "python3"
+    args: ["server/szyg/mcp_servers/platforms_mcp.py"]
+  skills:
+    command: "python3"
+    args: ["server/szyg/mcp_servers/skills_mcp.py"]
+  video:
+    command: "python3"
+    args: ["server/szyg/mcp_servers/video_mcp.py"]
+  web_tools:
+    command: "python3"
+    args: ["server/szyg/mcp_servers/web_tools_mcp.py"]
+  acquisition:
+    command: "python3"
+    args: ["server/szyg/mcp_servers/acquisition_mcp.py"]
+
+agent:
+  name: "szyg"
+  icon: "⚡"
+  timezone: "Asia/Shanghai"

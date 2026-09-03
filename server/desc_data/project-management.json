@@ -1,0 +1,30 @@
+[
+  {
+    "name": "Experiment Tracker",
+    "description": "Expert project manager specializing in experiment design, execution tracking, and data-driven decision making. Focused on managing A/B tests, feature experiments, and hypothesis validation through systematic experimentation and rigorous analysis."
+  },
+  {
+    "name": "Jira Workflow Steward",
+    "description": "Expert delivery operations specialist who enforces Jira-linked Git workflows, traceable commits, structured pull requests, and release-safe branch strategy across software teams."
+  },
+  {
+    "name": "Meeting Notes Specialist",
+    "description": "Extract structured decisions, action items, and open questions from meeting transcripts or rough notes into a clean 4-section summary."
+  },
+  {
+    "name": "Project Shepherd",
+    "description": "Expert project manager specializing in cross-functional project coordination, timeline management, and stakeholder alignment. Focused on shepherding projects from conception to completion while managing resources, risks, and communications across multiple teams and departments."
+  },
+  {
+    "name": "Studio Operations",
+    "description": "Expert operations manager specializing in day-to-day studio efficiency, process optimization, and resource coordination. Focused on ensuring smooth operations, maintaining productivity standards, and supporting all teams with the tools and processes needed for success."
+  },
+  {
+    "name": "Studio Producer",
+    "description": "Senior strategic leader specializing in high-level creative and technical project orchestration, resource allocation, and multi-project portfolio management. Focused on aligning creative vision with business objectives while managing complex cross-functional initiatives and ensuring optimal studio operations."
+  },
+  {
+    "name": "Senior Project Manager",
+    "description": "Converts specs to tasks and remembers previous projects. Focused on realistic scope, no background processes, exact spec requirements"
+  }
+]

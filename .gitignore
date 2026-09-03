@@ -1,0 +1,112 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+.venv/
+.venv_old/
+*.whl
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# szyg — data (user-generated, not tracked)
+data/
+
+# szyg — runtime artifacts
+server/server.log
+server/server_err.log
+*.log
+debug2.log
+/runtime/
+/main.js
+/assets/human_avatar/
+
+# szyg — temp / test
+_tmp/
+_test_output/
+temp_*
+*.tmp
+test_output.*
+.tmp-*/
+.loop-agent/
+session-*.md
+@AutomationLog.txt
+账户*.txt
+stdout.txt
+stderr.txt
+import_err.txt
+import_test.txt
+.~lock.*
+
+# Node / frontend
+web/node_modules/
+web/dist/
+node_modules/
+szyg-frontend/node_modules/
+szyg-frontend/dist/
+
+# Electron
+electron/node_modules/
+electron/out/
+electron/.build/
+electron/dist/
+electron/runtime/
+electron/data/
+electron/providers/cua/*.exe
+electron/providers/cua/*.dll
+
+# Hermes runtime
+.hermes/
+.claude/
+server/.hermes-venv/
+
+# Build output
+build/dist/
+build/*.exe
+
+# Secrets (must never be committed)
+config.yaml
+账号密码.*
+*.key
+*.pem
+*.pfx
+.env
+.env.local
+config.local.yaml
+secrets.yaml
+
+# Local development orchestration state
+.local-dev/
+.stfolder/
+
+# ComfyUI junction (external)
+ComfyUI/
+
+# Large binary data (Ollama, models, etc.)
+*.gguf
+*.safetensors
+*.bin
+nul
+
+# Bundled Chromium — kept out of git, injected at build time
+server/szyg/storage/chromium/
+server/szyg/storage/profiles/
+data/chrome_profile/
+plan.md
+external/
+data/models/
+data/volcengine_output/
+server/szyg/fonts/
+web/test-results/
