@@ -1,8 +1,8 @@
 {
-  "name": "szyg",
+  "name": "xiaoyu-digital-employee",
   "version": "1.1.4",
-  "description": "数字员工 - 超级数字员工",
-  "author": "数字员工",
+  "description": "小妤数字员工 - 超级数字员工",
+  "author": "YuSeTech",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -17,11 +17,12 @@
     "build:dir": "npm run audit:source && npm run build:runtime && electron-builder --win dir && npm run audit:dist",
     "build": "npm run audit:source && npm run build:runtime && electron-builder --win nsis && npm run audit:dist",
     "build:zip": "npm run audit:source && npm run build:runtime && electron-builder --win zip && npm run audit:dist",
-    "build:release": "node scripts/assert-signing.cjs && npm run build"
+    "build:release": "node scripts/assert-signing.cjs && npm run build",
+    "build:store": "npm run build:dir && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-store-msix.ps1"
   },
   "build": {
-    "appId": "com.szyg.app",
-    "productName": "数字员工",
+    "appId": "com.yusetech.xiaoyu",
+    "productName": "小妤数字员工",
     "directories": {
       "output": "dist"
     },
@@ -87,8 +88,8 @@
           ]
         }
       ],
-      "icon": "../assets/szyg.ico",
-      "executableName": "数字员工",
+      "icon": "../assets/xiaoyu.ico",
+      "executableName": "XiaoyuDigitalEmployee",
       "verifyUpdateCodeSignature": true
     },
     "nsis": {
@@ -98,19 +99,19 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "数字员工",
-      "installerIcon": "../assets/szyg.ico",
-      "uninstallerIcon": "../assets/szyg.ico",
-      "installerHeaderIcon": "../assets/szyg.ico",
-      "uninstallDisplayName": "数字员工 ${version}",
+      "shortcutName": "小妤数字员工",
+      "installerIcon": "../assets/xiaoyu.ico",
+      "uninstallerIcon": "../assets/xiaoyu.ico",
+      "installerHeaderIcon": "../assets/xiaoyu.ico",
+      "uninstallDisplayName": "小妤数字员工 ${version}",
       "deleteAppDataOnUninstall": false,
       "installerLanguages": [
         "zh_CN"
       ],
       "language": "2052",
-      "artifactName": "数字员工-${version}-Windows-${arch}-安装包.${ext}"
+      "artifactName": "小妤数字员工-${version}-Windows-${arch}-安装包.${ext}"
     },
-    "artifactName": "数字员工-${version}-Windows-${arch}.${ext}"
+    "artifactName": "小妤数字员工-${version}-Windows-${arch}.${ext}"
   },
   "devDependencies": {
     "7zip-bin": "^5.2.0",
