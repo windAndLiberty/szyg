@@ -64,6 +64,7 @@ from .schemas import (
     LogoutRequest,
     ModelRouteUpdate,
     PaymentOrderCreateRequest,
+    PublicRegisterRequest,
     RefreshRequest,
     UserStatusUpdate,
 )
@@ -727,6 +728,49 @@ def activate(req: ActivateRequest, db: Session = Depends(get_db)):
     device = _ensure_device(db, user, req.device, entitlement)
     invitation.status = "activated"
     invitation.activated_at = utcnow()
+    result = _issue_session(db, user, device)
+    result["license"] = _license_payload(user, device, entitlement)
+    db.commit()
+    return result
+
+
+@app.post("/api/v1/auth/register")
+def public_register(req: PublicRegisterRequest, db: Session = Depends(get_db)):
+    product = db.get(Product, req.product_id)
+    if not product or product.status != "active" or product.registration_mode != "self_service":
+        raise HTTPException(403, "当前产品未开放自助注册")
+    email = req.email.lower().strip()
+    if db.scalar(select(User.id).where(User.product_id == req.product_id, User.email == email)):
+        raise HTTPException(409, "该邮箱已经注册，请直接登录")
+
+    organization = Organization(
+        product_id=req.product_id,
+        name=f"{req.display_name.strip()}的工作空间"[:120],
+    )
+    db.add(organization)
+    db.flush()
+    user = User(
+        product_id=req.product_id,
+        organization_id=organization.id,
+        email=email,
+        display_name=req.display_name.strip(),
+        password_hash=hash_password(req.password),
+        role="user",
+        status="active",
+    )
+    db.add(user)
+    db.flush()
+    ensure_wallet(db, user)
+    entitlement = Entitlement(
+        user_id=user.id,
+        valid_until=utcnow() + timedelta(days=3650),
+        device_limit=2,
+        features={"cloud_models": True, "billing_mode": "credits"},
+        quotas=dict(DEFAULT_QUOTAS),
+    )
+    db.add(entitlement)
+    db.flush()
+    device = _ensure_device(db, user, req.device, entitlement)
     result = _issue_session(db, user, device)
     result["license"] = _license_payload(user, device, entitlement)
     db.commit()
