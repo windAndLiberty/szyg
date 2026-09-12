@@ -435,6 +435,39 @@ def test_same_email_and_wallets_are_isolated_between_products():
         assert cross_product_grant.status_code == 404
 
 
+def test_public_product_self_registration_creates_isolated_zero_balance_wallet():
+    with TestClient(app) as client:
+        payload = {
+            "product_id": "xiaoyu_public",
+            "email": "new-xiaoyu-user@example.com",
+            "display_name": "小妤用户",
+            "password": "public-user-password-123",
+            "device": device("xiaoyu-register-device-0001"),
+        }
+        registered = client.post("/api/v1/auth/register", json=payload)
+        assert registered.status_code == 200, registered.text
+        assert registered.json()["user"]["product_id"] == "xiaoyu_public"
+
+        billing = client.get(
+            "/api/v1/billing/summary",
+            headers=auth(registered.json()["access_token"]),
+        )
+        assert billing.status_code == 200, billing.text
+        assert billing.json()["balance_credits"] == 0
+
+        duplicate = client.post(
+            "/api/v1/auth/register",
+            json={**payload, "device": device("xiaoyu-register-device-0002")},
+        )
+        assert duplicate.status_code == 409
+
+        private_registration = client.post(
+            "/api/v1/auth/register",
+            json={**payload, "product_id": "szyg_private", "email": "private-register@example.com"},
+        )
+        assert private_registration.status_code == 422
+
+
 def test_failed_provider_call_releases_wallet_reservation(monkeypatch):
     async def failing_chat(self, model, payload):
         raise RuntimeError("provider unavailable")

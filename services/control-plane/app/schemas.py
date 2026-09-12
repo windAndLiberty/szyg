@@ -20,6 +20,14 @@ class ActivateRequest(BaseModel):
     device: DeviceInput
 
 
+class PublicRegisterRequest(BaseModel):
+    product_id: str = Field(pattern="^xiaoyu_public$")
+    email: EmailStr
+    display_name: str = Field(min_length=1, max_length=120)
+    password: str = Field(min_length=10, max_length=200)
+    device: DeviceInput
+
+
 class LoginRequest(BaseModel):
     product_id: str = Field(default="szyg_private", pattern="^(szyg_private|xiaoyu_public)$")
     email: str = Field(min_length=3, max_length=320)

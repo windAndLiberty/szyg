@@ -20,6 +20,12 @@ class ActivateBody(BaseModel):
     password: str = Field(min_length=10)
 
 
+class RegisterBody(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    display_name: str = Field(min_length=1, max_length=120)
+    password: str = Field(min_length=10, max_length=200)
+
+
 class FeedbackBody(BaseModel):
     category: str = "general"
     message: str
@@ -67,6 +73,11 @@ def login(body: LoginBody):
 @router.post("/activate")
 def activate(body: ActivateBody):
     return call(cloud_auth.activate, body.invitation_code, body.display_name, body.password)
+
+
+@router.post("/register")
+def register(body: RegisterBody):
+    return call(cloud_auth.register, body.email, body.display_name, body.password)
 
 
 @router.post("/logout")
