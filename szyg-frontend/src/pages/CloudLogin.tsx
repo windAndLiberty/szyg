@@ -3,6 +3,7 @@ import { ArrowLeft, KeyRound, LoaderCircle } from 'lucide-react'
 import { changeCloudPassword, getErrorMessage, loginCloud, logoutCloud, registerCloud } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import loginBackgroundUrl from '@/assets/login-digital-team.png'
 
 export default function CloudLogin({ initialMessage = '', onSuccess }: { initialMessage?: string; onSuccess: () => void | Promise<void> }) {
   const [mode, setMode] = useState<'login' | 'register' | 'change-password'>('login')
@@ -60,7 +61,11 @@ export default function CloudLogin({ initialMessage = '', onSuccess }: { initial
 
   return (
     <main className="relative flex min-h-screen items-center overflow-hidden bg-[#0B0F1A] px-5 py-10 text-[#F8FAFC] md:justify-end md:px-12 xl:px-24">
-      <div aria-hidden="true" className="absolute inset-0 bg-[url('/login-digital-team.png')] bg-cover bg-[position:34%_center] md:bg-center" />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-cover bg-[position:34%_center] md:bg-center"
+        style={{ backgroundImage: `url(${loginBackgroundUrl})` }}
+      />
       <div aria-hidden="true" className="absolute inset-0 bg-black/25 md:bg-black/10" />
       <section className="relative z-10 mx-auto w-full max-w-[420px] md:mx-0">
         <div className="mb-7 flex items-center gap-3 drop-shadow-lg">
