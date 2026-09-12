@@ -54,6 +54,13 @@ function getRuntimeDataDir() {
   return isDev ? path.join(getProjectRoot(), 'data') : path.join(app.getPath('userData'), 'data')
 }
 
+function getBundledFfmpegPath(projectRoot) {
+  const candidate = isDev
+    ? path.join(projectRoot, 'runtime', 'ffmpeg', 'ffmpeg.exe')
+    : path.join(process.resourcesPath, 'runtime', 'ffmpeg', 'ffmpeg.exe')
+  return fs.existsSync(candidate) ? candidate : ''
+}
+
 // ── Single instance lock ──
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) { app.quit() } else {
@@ -125,9 +132,42 @@ function sha256File(file) {
 
 function ensureBackendWatcher(serverDir) {
   if (!isDev || backendWatcher) return
+  // Guard against mtime-only touches (e.g. Syncthing rescans, antivirus,
+  // editor temp-file churn) that would otherwise restart the backend on every
+  // periodic rescan. We only restart when a .py file's content hash actually
+  // changes. The baseline is seeded from every existing .py file at startup so
+  // that the first fs.watch event for each file is compared against its real
+  // content rather than an empty map (which would always look "changed").
+  const fileContentHashes = new Map()
+  function seedFile(filePath) {
+    try {
+      const content = fs.readFileSync(filePath, 'utf8')
+      fileContentHashes.set(filePath, crypto.createHash('sha256').update(content).digest('hex'))
+    } catch (_) { /* ignore: file may be unreadable/locked; will be (re)hashed on next event */ }
+  }
+  function seedRecursive(dir) {
+    let entries
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }) } catch (_) { return }
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name)
+      if (entry.isDirectory() && entry.name !== '__pycache__') seedRecursive(fullPath)
+      else if (entry.isFile() && entry.name.endsWith('.py')) seedFile(fullPath)
+    }
+  }
+  seedRecursive(serverDir)
   backendWatcher = fs.watch(serverDir, { recursive: true }, (_eventType, filename) => {
     const changed = String(filename || '')
     if (!changed.endsWith('.py') || changed.includes('__pycache__')) return
+    const targetPath = path.join(serverDir, changed)
+    let content
+    try {
+      content = fs.readFileSync(targetPath, 'utf8')
+    } catch (_) {
+      return
+    }
+    const hash = crypto.createHash('sha256').update(content).digest('hex')
+    if (fileContentHashes.get(targetPath) === hash) return
+    fileContentHashes.set(targetPath, hash)
     clearTimeout(backendRestartTimer)
     backendRestartTimer = setTimeout(() => {
       if (!backendProcess || isQuitting) return
@@ -175,11 +215,15 @@ async function startBackend() {
   const projectRoot = getProjectRoot()
   const runtimeDataDir = getRuntimeDataDir()
   const serverDir = path.join(projectRoot, 'server')
+  const bundledFfmpegPath = getBundledFfmpegPath(projectRoot)
   const backendExecutable = path.join(process.resourcesPath, 'backend', 'szyg-backend.exe')
   const env = {
     ...process.env,
     PYTHONPATH: serverDir,
     SZYG_DATA_DIR: runtimeDataDir,
+    SZYG_USER_HOME: app.getPath('home'),
+    SZYG_OMNIHUMAN_MAX_CONCURRENCY: process.env.SZYG_OMNIHUMAN_MAX_CONCURRENCY || '1',
+    SZYG_FFMPEG_PATH: process.env.SZYG_FFMPEG_PATH || bundledFfmpegPath,
     SZYG_AUTH_DB: path.join(runtimeDataDir, 'auth.db'),
     SZYG_SAU_RUNTIME_HOME: path.join(runtimeDataDir, 'social_auto_upload'),
     SZYG_CLOUD_ENABLED: process.env.SZYG_CLOUD_ENABLED || 'true',
@@ -419,12 +463,12 @@ async function createWindow() {
 function createTray() {
   const icon = nativeImage.createFromPath(TRAY_ICON_PATH)
   tray = new Tray(icon.resize({ width: 16, height: 16 }))
-  tray.setToolTip('领鹿员工 - 双击打开')
+  tray.setToolTip('数字员工 - 双击打开')
   const menu = Menu.buildFromTemplate([
     { label: '打开主窗口', click: () => { mainWindow?.show(); mainWindow?.focus() } },
     { label: '重新加载', click: () => { mainWindow?.reload() } },
     { type: 'separator' },
-    { label: '退出领鹿员工', click: () => { isQuitting = true; app.quit() } },
+    { label: '退出数字员工', click: () => { isQuitting = true; app.quit() } },
   ])
   tray.setContextMenu(menu)
   tray.on('double-click', () => { mainWindow?.show(); mainWindow?.focus() })

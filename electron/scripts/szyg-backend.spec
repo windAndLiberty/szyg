@@ -93,12 +93,14 @@ binaries = collect_dynamic_libs("uiautomation")
 # executable so customer machines never depend on a system installation.
 _ffmpeg_root = Path(os.environ.get("SZYG_FFMPEG_BUILD_DIR", r"D:\tools\ffmpeg"))
 _ffmpeg_exe = _ffmpeg_root / "bin" / "ffmpeg.exe"
+_ffprobe_exe = _ffmpeg_root / "bin" / "ffprobe.exe"
 _ffmpeg_license = _ffmpeg_root / "LICENSE.txt"
-if not _ffmpeg_exe.is_file() or not _ffmpeg_license.is_file():
+if not _ffmpeg_exe.is_file() or not _ffprobe_exe.is_file() or not _ffmpeg_license.is_file():
     raise SystemExit(
         "Bundled FFmpeg source is missing. Set SZYG_FFMPEG_BUILD_DIR to a licensed FFmpeg distribution."
     )
 binaries.append((str(_ffmpeg_exe), "third_party/ffmpeg"))
+binaries.append((str(_ffprobe_exe), "third_party/ffmpeg"))
 datas.append((str(_ffmpeg_license), "third_party_licenses/ffmpeg"))
 
 hiddenimports = [

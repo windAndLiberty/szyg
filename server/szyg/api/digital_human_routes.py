@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from typing import Any, Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -12,6 +14,7 @@ from szyg.digital_human_service import (
     ASSET_ROLES,
     analyze_inspiration,
     create_render,
+    create_remix,
     delete_asset,
     delete_inspiration,
     delete_profile,
@@ -20,6 +23,8 @@ from szyg.digital_human_service import (
     get_asset,
     get_project,
     get_render,
+    get_remix,
+    list_remixes,
     list_assets,
     list_inspirations,
     list_profiles,
@@ -28,7 +33,10 @@ from szyg.digital_human_service import (
     plan_project,
     public_config,
     refresh_render,
+    refresh_remix,
+    schedule_remix_refresh,
     retry_segment,
+    resume_remix,
     save_asset,
     save_inspiration,
     save_profile,
@@ -44,6 +52,7 @@ class ProfilePayload(BaseModel):
     profile_type: Literal["virtual", "real"] = "virtual"
     avatar_asset_ids: list[str] = Field(min_length=1, max_length=10)
     voice_asset_id: str = ""
+    voice_ark_id: str = Field(default="", max_length=100)
     cover_asset_id: str = ""
     default_style: str = Field(default="自然、可信的商业口播", max_length=500)
     outfit: str = Field(default="", max_length=300)
@@ -99,6 +108,9 @@ def _raise(exc: Exception) -> None:
         raise HTTPException(400, str(exc))
     if isinstance(exc, CloudInferenceError):
         raise HTTPException(exc.status_code, str(exc))
+    logging.getLogger(__name__).exception(
+        "digital-human request failed: %s: %s", type(exc).__name__, exc
+    )
     raise HTTPException(500, "操作未完成，请稍后重试")
 
 
@@ -276,5 +288,65 @@ async def render(render_id: str, refresh: bool = True):
 async def rerun_segment(render_id: str, segment_id: str):
     try:
         return await retry_segment(render_id, segment_id)
+    except Exception as exc:
+        _raise(exc)
+
+
+@router.post("/remix")
+async def start_remix(
+    profile_id: str = Form(...),
+    video: UploadFile = File(...),
+    background_image: UploadFile | None = File(None),
+):
+    if not video.filename:
+        raise HTTPException(400, "请上传源视频")
+    try:
+        # Save source video as inspiration_reference asset
+        source_asset = save_asset(
+            video.filename, video.content_type or "video/mp4", await video.read(),
+            "inspiration_reference", profile_id=profile_id,
+        )
+        background_asset_id = ""
+        background_mode = "auto"
+        if background_image and background_image.filename:
+            background_asset = save_asset(
+                background_image.filename, background_image.content_type or "image/jpeg",
+                await background_image.read(), "background_reference", profile_id=profile_id,
+            )
+            background_asset_id = str(background_asset.get("id") or "")
+            background_mode = "uploaded"
+        job = await create_remix(profile_id, str(source_asset.get("id") or ""), background_asset_id, background_mode)
+        return {"task_id": job["id"], "status": job["status"]}
+    except Exception as exc:
+        _raise(exc)
+
+
+@router.get("/remix")
+def remixes(profile_id: str = ""):
+    """Return durable remix jobs so the desktop can restore interrupted work."""
+    items = list_remixes()
+    if profile_id:
+        items = [item for item in items if str(item.get("profile_id") or "") == profile_id]
+    return {"items": items}
+
+
+@router.get("/remix/{task_id}")
+async def remix(task_id: str, refresh: bool = True):
+    try:
+        item = schedule_remix_refresh(task_id) if refresh else get_remix(task_id)
+        if not item:
+            raise ValueError("复刻任务不存在")
+        return item
+    except Exception as exc:
+        _raise(exc)
+
+
+@router.post("/remix/{task_id}/resume")
+async def resume_remix_task(task_id: str):
+    try:
+        item = resume_remix(task_id)
+        if not item:
+            raise ValueError("复刻任务不存在")
+        return item
     except Exception as exc:
         _raise(exc)

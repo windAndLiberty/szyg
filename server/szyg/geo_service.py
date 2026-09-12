@@ -54,7 +54,7 @@ def _safe_error(exc: Exception) -> str:
     if "timeout" in message or "超时" in str(exc):
         return "该AI平台本次响应超时"
     if "桌面版" in str(exc):
-        return "请使用领鹿开发桌面版进行实际界面检测"
+        return "请使用数字员工桌面版进行实际界面检测"
     if "检测现场" in str(exc):
         return str(exc)
     if "提问框" in str(exc) or "登录" in str(exc) or "验证码" in str(exc):
@@ -236,7 +236,7 @@ class GeoService:
             requested = (["deepseek"] if "deepseek" in available else available[:1])
         requested = list(dict.fromkeys(pid for pid in requested if pid in KNOWN_PROVIDERS))
         if not requested:
-            raise ValueError("请使用领鹿开发桌面版进行实际界面检测")
+            raise ValueError("请使用数字员工桌面版进行实际界面检测")
         default_samples = 3 if mode == "verification" else 1
         samples = max(1, min(int(sample_count or default_samples), 5))
         audit = {
@@ -280,7 +280,7 @@ class GeoService:
                     audit_id,
                     status="failed",
                     finished_at=_now(),
-                    error="侧边栏浏览器当前不可用，请使用领鹿开发桌面版启动检测",
+                    error="侧边栏浏览器当前不可用，请使用数字员工桌面版启动检测",
                 ))
             if audit.get("mode") == "scheduled":
                 from szyg.geo_browser import get_geo_sidebar_browser

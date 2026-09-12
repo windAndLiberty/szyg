@@ -31,6 +31,11 @@ class ChangePasswordBody(BaseModel):
     new_password: str = Field(min_length=10, max_length=200)
 
 
+class PaymentOrderBody(BaseModel):
+    amount_cny: float = Field(ge=0.01, le=100000)
+    idempotency_key: str = Field(min_length=8, max_length=160)
+
+
 def call(fn, *args, **kwargs):
     try:
         return fn(*args, **kwargs)
@@ -47,6 +52,11 @@ def config():
 @router.get("/session")
 def session():
     return cloud_auth.session()
+
+
+@router.post("/session/refresh")
+def session_refresh():
+    return cloud_auth.refresh_status()
 
 
 @router.post("/login")
@@ -93,6 +103,21 @@ def usage():
 @router.get("/billing")
 def billing():
     return call(cloud_auth.proxy, "GET", "/api/v1/billing/summary")
+
+
+@router.get("/payments/config")
+def payment_config():
+    return call(cloud_auth.proxy, "GET", "/api/v1/payments/config")
+
+
+@router.post("/payments/orders")
+def create_payment_order(body: PaymentOrderBody):
+    return call(cloud_auth.proxy, "POST", "/api/v1/payments/orders", body.model_dump())
+
+
+@router.get("/payments/orders/{order_id}")
+def payment_order(order_id: str):
+    return call(cloud_auth.proxy, "GET", f"/api/v1/payments/orders/{order_id}")
 
 
 @router.post("/feedback")

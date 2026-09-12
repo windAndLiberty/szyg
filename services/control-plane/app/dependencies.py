@@ -38,7 +38,7 @@ def current_principal(
         raise HTTPException(401, "登录状态已失效")
     user = db.get(User, claims.get("sub"))
     device = db.get(Device, claims.get("device"))
-    if not user or user.status != "active":
+    if not user or user.status != "active" or claims.get("product") != user.product_id:
         raise HTTPException(403, "账户暂不可用")
     if not device or device.user_id != user.id or device.status != "active":
         raise HTTPException(403, "当前设备授权已失效")

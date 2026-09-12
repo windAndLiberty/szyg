@@ -104,6 +104,7 @@ DEFAULT_ENDPOINTS = {
     "doubao-seedance-2.0": "",
     "doubao-seedance-2.5": "",
     "seaweed": "seaweed",
+    "doubao-omnihuman-1.0": "",
     # 语音模型
     "doubao-tts": "doubao-tts",
     "doubao-voice-clone": "doubao-voice-clone",
@@ -741,6 +742,104 @@ class VolcEngineClient(BaseLLMClient):
             return str(path)
         except Exception as e:
             raise IntegrationError(f"VolcEngine video download failed: {e}")
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # 3.5 OmniHuman 音频驱动数字人
+    # ═══════════════════════════════════════════════════════════════════════
+
+    async def omni_human_image_audio_drive(
+        self,
+        image_url: str,
+        audio_url: str,
+        *,
+        prompt: str = "",
+        background_url: str = "",
+        duration: int = 5,
+        size: str = "720p",
+        ratio: str = "9:16",
+        model: str = "doubao-omnihuman-1.0",
+        idempotency_key: str = "",
+    ) -> dict:
+        """OmniHuman：单图 + 音频 → 对口型数字人视频（方舟原生）。"""
+        try:
+            resolved_model = self._ep(model)
+            if not resolved_model:
+                resolved_model = model
+            content: list[dict] = []
+            if prompt:
+                content.append({"type": "text", "text": prompt})
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": image_url},
+                "role": "reference_image",
+            })
+            content.append({
+                "type": "audio_url",
+                "audio_url": {"url": audio_url},
+                "role": "reference_audio",
+            })
+            if background_url:
+                content.append({
+                    "type": "image_url",
+                    "image_url": {"url": background_url},
+                    "role": "reference_background",
+                })
+            payload = {
+                "model": resolved_model,
+                "content": content,
+                "resolution": size,
+                "ratio": ratio,
+                "duration": duration,
+                "generate_audio": True,
+                "watermark": False,
+            }
+            async with httpx.AsyncClient(timeout=60, trust_env=False) as c:
+                headers = {
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                }
+                if idempotency_key:
+                    headers["X-Idempotency-Key"] = idempotency_key
+                r = await c.post(
+                    f"{self.base_url}/contents/generations/tasks",
+                    headers=headers,
+                    json=payload,
+                )
+                if r.is_error:
+                    raise IntegrationError(f"HTTP {r.status_code}: {r.text[:500]}")
+                r.raise_for_status()
+                data = r.json()
+                return {
+                    "task_id": data.get("id", ""),
+                    "status": "queued",
+                    "model": model,
+                }
+        except IntegrationError:
+            raise
+        except Exception as e:
+            raise IntegrationError(f"OmniHuman task submit failed: {e}")
+
+    async def get_omni_task(self, task_id: str, model: str = "doubao-omnihuman-1.0") -> dict:
+        """查询 OmniHuman 任务状态。"""
+        try:
+            async with httpx.AsyncClient(timeout=30, trust_env=False) as c:
+                headers = {"Authorization": f"Bearer {self.api_key}"}
+                r = await c.get(
+                    f"{self.base_url}/contents/generations/tasks/{task_id}",
+                    headers=headers,
+                )
+                r.raise_for_status()
+                data = r.json()
+                status = data.get("status", "unknown")
+                return {
+                    "task_id": task_id,
+                    "status": status,
+                    "video_url": data.get("content", {}).get("video_url", ""),
+                    "progress": 50 if status == "running" else (100 if status == "succeeded" else 0),
+                    "error": data.get("error", ""),
+                }
+        except Exception as e:
+            raise IntegrationError(f"OmniHuman task query failed: {e}")
 
     # ═══════════════════════════════════════════════════════════════════════
     # 4. 语音合成 (TTS)

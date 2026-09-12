@@ -36,13 +36,14 @@ def token_hash(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def create_access_token(user_id: str, organization_id: str, role: str, device_id: str) -> tuple[str, datetime]:
+def create_access_token(user_id: str, organization_id: str, product_id: str, role: str, device_id: str) -> tuple[str, datetime]:
     settings = get_settings()
     now = datetime.now(timezone.utc)
     expires_at = now + timedelta(minutes=settings.access_token_minutes)
     payload = {
         "sub": user_id,
         "org": organization_id,
+        "product": product_id,
         "role": role,
         "device": device_id,
         "type": "access",
@@ -56,6 +57,7 @@ def create_access_token(user_id: str, organization_id: str, role: str, device_id
 def create_offline_license(
     user_id: str,
     organization_id: str,
+    product_id: str,
     device_id: str,
     valid_until: datetime,
     features: dict,
@@ -67,6 +69,7 @@ def create_offline_license(
     payload = {
         "sub": user_id,
         "org": organization_id,
+        "product": product_id,
         "device": device_id,
         "features": features,
         "type": "offline_license",

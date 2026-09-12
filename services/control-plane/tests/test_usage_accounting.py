@@ -115,3 +115,85 @@ def test_geo_search_uses_real_token_usage_and_can_be_reserved():
     assert credits > 0
     assert snapshot["provider_model"] == "doubao-search"
     assert estimate_credits_micros("geo.search.doubao", {"query": "推荐数字员工"}, {}) > 0
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# OmniHuman1.5（1 CNY/秒）和 ASR（按秒计费）
+# ═══════════════════════════════════════════════════════════════════════
+
+
+def test_omni_human_bills_one_cny_per_second():
+    """OmniHuman 1 元/秒：生成 4 秒视频的成本 = 4 CNY。"""
+    usage, cost_micros, credits, _, _ = settle_usage(
+        "video.omnihuman",
+        {"model": "jimeng_realman_avatar_picture_omni_v15", "usage": {"duration_seconds": 4}},
+        {"duration": 4},
+        {},
+        "jimeng_realman_avatar_picture_omni_v15",
+    )
+    assert usage["video_seconds"] == 4
+    assert cost_micros == 4_000_000  # 4 CNY = 4_000_000 micros
+    # credits = cost / 0.60 * 100 = 4 / 0.6 * 100 = 666.666... → 666_666_667 micros
+    assert credits == 666_666_667
+    # 估算时如果传了 duration，应能提前扣费
+    assert estimate_credits_micros(
+        "video.omnihuman", {"duration": 4}, {}, "jimeng_realman_avatar_picture_omni_v15",
+    ) > 0
+
+
+def test_video_standard_uses_token_pricing_fallback():
+    """video.standard 仍走通用 token 计费（无 seconds_cny 价目）。"""
+    config = {"video_tokens_per_second": 25000}
+    estimated = estimate_credits_micros("video.standard", {"duration": 4}, config)
+    # 4 * 25000 * 46 / 1_000_000 / 0.6 * 100 ≈ 766_666_667
+    assert estimated > 0
+
+
+def test_asr_bills_per_second():
+    """ASR 按 audio_info.duration（毫秒）转秒计费。"""
+    usage, cost_micros, credits, _, _ = settle_usage(
+        "speech.asr",
+        {
+            "model": "volc.seedasr.auc",
+            "audio_info": {"duration": 5000},  # 5 秒
+        },
+        {"audio_url": "x", "format": "mp3"},
+        {},
+        "volc.seedasr.auc",
+    )
+    assert usage["asr_seconds"] == 5
+    # 5 秒 * 0.0001 CNY/秒 = 0.0005 CNY = 500 micros
+    assert cost_micros == 1111
+
+
+def test_seed_audio_bills_original_duration_instead_of_characters():
+    usage, cost, credits, _, _ = settle_usage("speech.tts", {"duration": 3, "original_duration": 6.25}, {"input": "你好"}, {}, "seed-audio-1.0")
+    assert usage["speech_ms"] == 6250
+    assert cost == 104167
+    assert credits > 0
+    assert credits > 0
+
+
+def test_asr_reserve_uses_estimated_seconds():
+    """ASR 提交时不知道音频时长，按 30 秒保守预估。"""
+    est_30 = estimate_credits_micros(
+        "speech.asr", {"audio_url": "x", "format": "mp3"}, {}, "volc.seedasr.auc",
+    )
+    est_custom = estimate_credits_micros(
+        "speech.asr", {"audio_url": "x", "format": "mp3", "estimated_seconds": 120}, {},
+        "volc.seedasr.auc",
+    )
+    assert est_30 > 0
+    assert est_custom > est_30  # 120 秒比 30 秒更贵
+
+
+def test_subject_detection_bills_per_image():
+    usage, cost_micros, _, _, _ = settle_usage(
+        "video.subject_detection",
+        {"model": "jimeng_realman_avatar_object_detection", "usage": {}},
+        {"image_url": "x"},
+        {},
+        "jimeng_realman_avatar_object_detection",
+    )
+    # 默认 image_cny=0.01 → 1 张图 0.01 CNY = 10_000 micros
+    assert cost_micros == 10_000

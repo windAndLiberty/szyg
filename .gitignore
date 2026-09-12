@@ -90,6 +90,9 @@ secrets.yaml
 # Local development orchestration state
 .local-dev/
 .stfolder/
+.kilo/
+szyg-frontend/tsc_err.txt
+szyg-frontend/tsc_out.txt
 
 # ComfyUI junction (external)
 ComfyUI/

@@ -72,6 +72,21 @@ async def _geo_audit_loop() -> None:
     await geo_audit_worker_loop()
 
 
+async def _resume_digital_human_jobs() -> None:
+    """Continue durable remix jobs after a desktop/backend restart."""
+    await asyncio.sleep(3)
+    try:
+        from szyg.digital_human_service import list_remixes, schedule_remix_refresh
+
+        for job in list_remixes():
+            if str(job.get("status") or "") == "rendering" and job.get("segments"):
+                schedule_remix_refresh(str(job.get("id") or ""))
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        logger.warning("Digital human recovery worker failed: %s", exc)
+
+
 def configure_background_workers(app: FastAPI) -> None:
     """Register workers on the app factory so desktop and service modes match."""
 
@@ -84,6 +99,7 @@ def configure_background_workers(app: FastAPI) -> None:
             asyncio.create_task(_comment_retry_loop(), name="comment-retry-worker"),
             asyncio.create_task(_account_profile_sync_loop(), name="account-profile-sync-worker"),
             asyncio.create_task(_geo_audit_loop(), name="geo-audit-worker"),
+            asyncio.create_task(_resume_digital_human_jobs(), name="digital-human-recovery-worker"),
         ]
 
     @app.on_event("shutdown")

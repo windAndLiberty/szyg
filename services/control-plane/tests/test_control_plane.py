@@ -277,21 +277,22 @@ def test_admin_recharge_and_user_billing_summary(monkeypatch):
     with TestClient(app) as client:
         admin = login_admin(client)
         user = invite_and_activate(client, admin["access_token"], "billing@example.com")
-        from app.database import CreditTransaction, ModelRoute, SessionLocal
+        from app.database import ModelRoute, SessionLocal
         with SessionLocal.begin() as db:
             route = db.get(ModelRoute, "text.fast")
             route.provider_model = "test-model"
             route.enabled = True
-            db.add(CreditTransaction(
-                organization_id=user["user"]["organization_id"],
-                user_id=user["user"]["id"],
-                kind="recharge",
-                credits_micros=10_000_000_000,
-                payment_amount_micros=100_000_000,
-                note="内测充值",
-                reference_id="beta-order-0001",
-                created_by=admin["user"]["id"],
-            ))
+        funded = client.post(
+            f"/api/v1/admin/users/{user['user']['id']}/credits",
+            headers=auth(admin["access_token"]),
+            json={
+                "credits": 10000,
+                "payment_amount_micros": 100_000_000,
+                "note": "内测充值",
+                "reference_id": "beta-order-0001",
+            },
+        )
+        assert funded.status_code == 200, funded.text
 
         inference = client.post("/api/v1/inference/chat", headers=auth(user["access_token"]), json={
             "capability": "text.fast",
@@ -350,6 +351,210 @@ def test_admin_recharge_endpoint_grants_credits_and_switches_to_unified_billing(
         users = client.get("/api/v1/admin/users", headers=auth(admin["access_token"])).json()["items"]
         row = next(item for item in users if item["id"] == user["user"]["id"])
         assert row["credits"]["credited"] == 500
+
+
+def test_recharge_reference_is_idempotent_in_the_new_ledger():
+    with TestClient(app) as client:
+        admin = login_admin(client)
+        user = invite_and_activate(client, admin["access_token"], "idempotent-credit@example.com")
+        request = {"credits": 500, "reference_id": "operator-grant-0001"}
+        first = client.post(
+            f"/api/v1/admin/users/{user['user']['id']}/credits",
+            headers=auth(admin["access_token"]),
+            json=request,
+        )
+        second = client.post(
+            f"/api/v1/admin/users/{user['user']['id']}/credits",
+            headers=auth(admin["access_token"]),
+            json=request,
+        )
+        assert first.status_code == 200
+        assert second.status_code == 200
+        assert first.json()["balance"] == second.json()["balance"] == 500
+        assert first.json()["idempotent"] is False
+        assert second.json()["idempotent"] is True
+
+        from app.database import CreditLedgerEntry, SessionLocal
+        from sqlalchemy import func, select
+        with SessionLocal() as db:
+            count = db.scalar(select(func.count(CreditLedgerEntry.id)).where(
+                CreditLedgerEntry.user_id == user["user"]["id"],
+                CreditLedgerEntry.reference_id == "operator-grant-0001",
+            ))
+            assert count == 1
+
+
+def test_same_email_and_wallets_are_isolated_between_products():
+    from datetime import timedelta
+    from app.database import Entitlement, Organization, Product, SessionLocal, User, utcnow
+    from app.security import hash_password
+    from app.wallets import ensure_wallet
+
+    with TestClient(app) as client:
+        with SessionLocal.begin() as db:
+            public_product = db.get(Product, "xiaoyu_public")
+            assert public_product is not None
+            org = Organization(product_id="xiaoyu_public", name="小妤公域测试")
+            db.add(org)
+            db.flush()
+            public_user = User(
+                product_id="xiaoyu_public",
+                organization_id=org.id,
+                email="admin@example.com",
+                display_name="公域同邮箱用户",
+                password_hash=hash_password("public-user-password-123"),
+            )
+            db.add(public_user)
+            db.flush()
+            ensure_wallet(db, public_user)
+            db.add(Entitlement(
+                user_id=public_user.id,
+                valid_until=utcnow() + timedelta(days=3650),
+                device_limit=2,
+                features={"billing_mode": "credits"},
+                quotas={},
+            ))
+            public_user_id = public_user.id
+
+        private_login = login_admin(client)
+        public_login = client.post("/api/v1/auth/login", json={
+            "product_id": "xiaoyu_public",
+            "email": "admin@example.com",
+            "password": "public-user-password-123",
+            "device": device("public-device-0001"),
+        })
+        assert public_login.status_code == 200, public_login.text
+        assert private_login["user"]["product_id"] == "szyg_private"
+        assert public_login.json()["user"]["product_id"] == "xiaoyu_public"
+
+        cross_product_grant = client.post(
+            f"/api/v1/admin/users/{public_user_id}/credits",
+            headers=auth(private_login["access_token"]),
+            json={"credits": 100},
+        )
+        assert cross_product_grant.status_code == 404
+
+
+def test_failed_provider_call_releases_wallet_reservation(monkeypatch):
+    async def failing_chat(self, model, payload):
+        raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr("app.provider.ProviderGateway.chat", failing_chat)
+    with TestClient(app, raise_server_exceptions=False) as client:
+        admin = login_admin(client)
+        user = invite_and_activate(client, admin["access_token"], "release-hold@example.com")
+        client.post(
+            f"/api/v1/admin/users/{user['user']['id']}/credits",
+            headers=auth(admin["access_token"]),
+            json={"credits": 100},
+        )
+        from app.database import CreditWallet, ModelRoute, SessionLocal
+        from sqlalchemy import select
+        with SessionLocal.begin() as db:
+            route = db.get(ModelRoute, "text.fast")
+            route.provider_model = "test-model"
+            route.enabled = True
+        failed = client.post("/api/v1/inference/chat", headers=auth(user["access_token"]), json={
+            "capability": "text.fast",
+            "payload": {"messages": [{"role": "user", "content": "hello"}]},
+            "idempotency_key": "failed-provider-0001",
+        })
+        assert failed.status_code == 500
+        with SessionLocal() as db:
+            wallet = db.scalar(select(CreditWallet).where(CreditWallet.user_id == user["user"]["id"]))
+            assert wallet.balance_micros == 100_000_000
+            assert wallet.reserved_micros == 0
+
+
+def test_alipay_notification_is_verified_and_credited_once(monkeypatch, tmp_path):
+    import base64
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding, rsa
+    from app.alipay import _canonical
+    from app.main import settings
+
+    merchant_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    alipay_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    merchant_path = tmp_path / "merchant.pem"
+    alipay_public_path = tmp_path / "alipay-public.pem"
+    merchant_path.write_bytes(merchant_key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    ))
+    alipay_public_path.write_bytes(alipay_key.public_key().public_bytes(
+        serialization.Encoding.PEM,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    ))
+    monkeypatch.setattr(settings, "alipay_app_id", "2026000000000001")
+    monkeypatch.setattr(settings, "alipay_merchant_private_key_file", str(merchant_path))
+    monkeypatch.setattr(settings, "alipay_public_key_file", str(alipay_public_path))
+    monkeypatch.setattr(settings, "alipay_seller_id", "2088000000000001")
+
+    with TestClient(app) as client:
+        admin = login_admin(client)
+        user = invite_and_activate(client, admin["access_token"], "alipay-user@example.com")
+        config = client.get("/api/v1/payments/config", headers=auth(user["access_token"]))
+        assert config.json()["alipay_enabled"] is True
+        created = client.post("/api/v1/payments/orders", headers=auth(user["access_token"]), json={
+            "amount_cny": "12.34",
+            "idempotency_key": "alipay-create-0001",
+        })
+        assert created.status_code == 200, created.text
+        order = created.json()
+        assert order["credits"] == 1234
+        assert order["merchant_order_no"].startswith("SZY")
+        assert order["payment_url"].startswith("https://openapi.alipay.com/gateway.do?")
+
+        notification = {
+            "app_id": settings.alipay_app_id,
+            "seller_id": settings.alipay_seller_id,
+            "out_trade_no": order["merchant_order_no"],
+            "trade_no": "2026090922000000000001",
+            "trade_status": "TRADE_SUCCESS",
+            "total_amount": "12.34",
+            "sign_type": "RSA2",
+        }
+        rejected = client.post("/api/v1/payments/alipay/notify", data=notification)
+        assert rejected.status_code == 400
+        before_payment = client.get("/api/v1/billing/summary", headers=auth(user["access_token"])).json()
+        assert before_payment["balance_credits"] == 0
+        signature = alipay_key.sign(
+            _canonical(notification).encode("utf-8"),
+            padding.PKCS1v15(),
+            hashes.SHA256(),
+        )
+        notification["sign"] = base64.b64encode(signature).decode("ascii")
+        first = client.post("/api/v1/payments/alipay/notify", data=notification)
+        second = client.post("/api/v1/payments/alipay/notify", data=notification)
+        assert first.text == second.text == "success"
+
+        status = client.get(f"/api/v1/payments/orders/{order['id']}", headers=auth(user["access_token"])).json()
+        assert status["status"] == "paid"
+        assert status["credited_at"]
+        returned = client.get(
+            "/api/v1/payments/alipay/return",
+            params={"out_trade_no": order["merchant_order_no"]},
+        )
+        assert "支付成功" in returned.text
+        assert "数字员工账户充值 1234.0 Credits" in returned.text
+        billing = client.get("/api/v1/billing/summary", headers=auth(user["access_token"])).json()
+        assert billing["balance_credits"] == 1234
+
+        from app.database import CreditLedgerEntry, SessionLocal
+        from sqlalchemy import func, select
+        with SessionLocal() as db:
+            count = db.scalar(select(func.count(CreditLedgerEntry.id)).where(
+                CreditLedgerEntry.payment_order_id == order["id"],
+            ))
+            assert count == 1
+
+
+def test_payment_branding_distinguishes_private_and_public_products():
+    from app.main import _payment_product_brand
+
+    assert _payment_product_brand("szyg_private") == ("SZY", "数字员工")
+    assert _payment_product_brand("xiaoyu_public") == ("XY", "小妤数字员工")
 
 
 def test_regular_user_without_credits_cannot_call_cloud_models():
@@ -416,12 +621,18 @@ def test_inflight_video_reservation_prevents_credit_overspend(monkeypatch):
 
 
 def test_presenter_video_uses_separate_route_and_reference_upload(monkeypatch):
-    async def fake_create_video(self, model, payload):
-        assert model == "doubao-seedance-2-5-260628"
-        assert payload["duration"] == 4
-        return {"id": "provider-presenter-1"}, "provider-request-presenter"
+    """数字人视频现在走专用端点：OmniHuman1.5 走 /omni-human/tasks + CV 平台，
+    不再复用 video.standard 路径。这条测试验证端点分流。
+    """
+    calls = []
+    async def fake_duration(url):
+        return 4
+    monkeypatch.setattr("app.main._uploaded_audio_seconds", fake_duration)
+    async def fake_omni_submit(self, model, payload):
+        calls.append((model, payload))
+        return {"task_id": "provider-presenter-1", "model": model}, "provider-request-presenter"
 
-    monkeypatch.setattr("app.provider.ProviderGateway.create_video", fake_create_video)
+    monkeypatch.setattr("app.provider.ProviderGateway.omni_human_submit", fake_omni_submit)
     with TestClient(app) as client:
         admin = login_admin(client)
         user = invite_and_activate(client, admin["access_token"], "presenter@example.com")
@@ -442,21 +653,76 @@ def test_presenter_video_uses_separate_route_and_reference_upload(monkeypatch):
         assert fetched.status_code == 200
         assert fetched.content == b"virtual-avatar"
 
+        # 启用 video.omnihuman 路由（默认 disabled，因为测试环境无 CV 凭据）
+        from app.database import ModelRoute, SessionLocal
+        with SessionLocal.begin() as db:
+            route = db.get(ModelRoute, "video.omnihuman")
+            route.provider_model = "jimeng_realman_avatar_picture_omni_v15"
+            route.enabled = True
+
         created = client.post(
-            "/api/v1/inference/video/tasks",
+            "/api/v1/inference/omni-human/tasks",
             headers=auth(user["access_token"]),
             json={
-                "capability": "video.presenter",
-                "payload": {"duration": 4, "resolution": "720p", "content": []},
+                "capability": "video.omnihuman",
+                "payload": {
+                    "image_url": "https://example.com/avatar.png",
+                    "audio_url": "https://example.com/speech.mp3",
+                    "duration": 4,
+                    "output_resolution": 720,
+                },
                 "idempotency_key": "presenter-video-request-0001",
                 "app_version": "1.1.3-test",
             },
         )
+        assert calls, f"Mock not called; got {created.status_code} {created.text}"
         assert created.status_code == 200, created.text
         from app.database import SessionLocal, VideoTask
         with SessionLocal() as db:
             task = db.get(VideoTask, created.json()["task_id"])
-            assert task.model_alias == "video.presenter"
+            assert task.model_alias == "video.omnihuman"
+
+        async def fake_done(self, task_id, **kwargs):
+            return {"status": "done", "video_url": "https://media.test/result.mp4"}, "omni-query"
+        monkeypatch.setattr("app.provider.ProviderGateway.omni_human_get", fake_done)
+        result_url = "/api/v1/inference/omni-human/tasks/" + created.json()["task_id"]
+        assert client.get(result_url, headers=auth(user["access_token"])).json()["status"] == "done"
+        from app.database import UsageEvent
+        with SessionLocal() as db:
+            event = db.get(UsageEvent, created.json()["request_id"])
+            assert event.status == "succeeded"
+            assert event.provider_cost_micros == 4_000_000
+            charged = event.credits_charged_micros
+        async def fake_expired(self, task_id, **kwargs):
+            return {"status": "expired", "video_url": ""}, "omni-query-later"
+        monkeypatch.setattr("app.provider.ProviderGateway.omni_human_get", fake_expired)
+        client.get(result_url, headers=auth(user["access_token"]))
+        with SessionLocal() as db:
+            event = db.get(UsageEvent, created.json()["request_id"])
+            assert event.status == "succeeded"
+            assert event.credits_charged_micros == charged
+
+
+def test_asr_success_persists_settlement(monkeypatch):
+    async def fake_asr(self, model, payload):
+        return {"text": "识别结果", "duration_ms": 6312}, "asr-smoke"
+    monkeypatch.setattr("app.provider.ProviderGateway.asr_transcribe", fake_asr)
+    with TestClient(app) as client:
+        admin = login_admin(client)
+        user = invite_and_activate(client, admin["access_token"], "asr-settlement@example.com")
+        client.post(f"/api/v1/admin/users/{user['user']['id']}/credits", headers=auth(admin["access_token"]), json={"credits": 10})
+        from app.database import ModelRoute, SessionLocal, UsageEvent
+        with SessionLocal.begin() as db:
+            route = db.get(ModelRoute, "speech.asr")
+            route.provider_model = "volc.seedasr.auc"
+            route.enabled = True
+        res = client.post("/api/v1/inference/asr", headers=auth(user["access_token"]), json={"capability": "speech.asr", "payload": {"audio_url": "https://media.test/a.wav"}, "idempotency_key": "asr-settlement-check"})
+        assert res.status_code == 200, res.text
+        with SessionLocal() as db:
+            event = db.get(UsageEvent, res.json()["request_id"])
+            assert event.status == "succeeded"
+            assert event.provider_cost_micros == 1403
+            assert event.credits_charged_micros > 0
 
 
 def test_admin_recharge_endpoint_validates_inputs():
@@ -571,3 +837,84 @@ def settle_credits_for_payload() -> float:
         {},
     )
     return credits_micros / 1_000_000
+
+
+def test_expired_entitlement_is_renewed_instead_of_blocking():
+    """授权到期机制已取消：过期授权在登录时自动续期，不再返回 403。"""
+    from datetime import timedelta
+
+    from sqlalchemy import select
+
+    from app.database import Entitlement, SessionLocal, User
+    from app.main import utcnow
+
+    with TestClient(app) as client:
+        admin = login_admin(client)
+        created = client.post("/api/v1/admin/users", headers=auth(admin["access_token"]), json={
+            "email": "expired-user@example.com",
+            "display_name": "过期续期用户",
+            "password": "expired-user-password-123",
+            "organization_name": "过期续期企业",
+            "entitlement_days": 1,
+            "device_limit": 2,
+        })
+        assert created.status_code == 200, created.text
+
+        # 人为把授权改为已过期
+        with SessionLocal.begin() as db:
+            user = db.scalar(select(User).where(User.email == "expired-user@example.com"))
+            entitlement = db.scalar(select(Entitlement).where(Entitlement.user_id == user.id))
+            entitlement.valid_until = utcnow() - timedelta(days=1)
+
+        # 登录不再因授权到期被拦截（旧逻辑返回 403 服务授权已到期）
+        logged_in = client.post("/api/v1/auth/login", json={
+            "email": "expired-user@example.com",
+            "password": "expired-user-password-123",
+            "device": device("expired-user-device-0001"),
+        })
+        assert logged_in.status_code == 200, logged_in.text
+
+        # 授权被自动续期为长期有效
+        view = client.get("/api/v1/entitlements", headers=auth(logged_in.json()["access_token"]))
+        assert view.status_code == 200, view.text
+        assert view.json()["status"] == "active"
+        assert str(view.json()["valid_until"]) > str(logged_in.json()["license"]["offline_valid_until"])
+
+def test_entitlements_endpoint_renews_expired_entitlement():
+    """GET /api/v1/entitlements 也应自动续期过期授权（刷新授权状态按钮不再显示过期）。"""
+    from datetime import timedelta
+
+    from sqlalchemy import select
+
+    from app.database import Entitlement, SessionLocal, User
+    from app.main import utcnow
+
+    with TestClient(app) as client:
+        admin = login_admin(client)
+        created = client.post("/api/v1/admin/users", headers=auth(admin["access_token"]), json={
+            "email": "refresh-expired@example.com",
+            "display_name": "刷新续期用户",
+            "password": "refresh-expired-password-123",
+            "organization_name": "刷新续期企业",
+            "entitlement_days": 1,
+            "device_limit": 2,
+        })
+        assert created.status_code == 200, created.text
+
+        # 先正常登录拿 token，再把授权人为改为已过期
+        logged_in = client.post("/api/v1/auth/login", json={
+            "email": "refresh-expired@example.com",
+            "password": "refresh-expired-password-123",
+            "device": device("refresh-expired-device-0001"),
+        })
+        assert logged_in.status_code == 200, logged_in.text
+        with SessionLocal.begin() as db:
+            user = db.scalar(select(User).where(User.email == "refresh-expired@example.com"))
+            entitlement = db.scalar(select(Entitlement).where(Entitlement.user_id == user.id))
+            entitlement.valid_until = utcnow() - timedelta(days=1)
+
+        # 直接查 entitlements（模拟桌面端「刷新授权状态」），应自动续期返回 200
+        view = client.get("/api/v1/entitlements", headers=auth(logged_in.json()["access_token"]))
+        assert view.status_code == 200, view.text
+        assert view.json()["status"] == "active"
+        assert str(view.json()["valid_until"]) > str(logged_in.json()["license"]["offline_valid_until"])

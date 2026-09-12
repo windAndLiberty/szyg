@@ -71,6 +71,7 @@ class CloudInferenceClient:
                 raise CloudInferenceError("登录状态已失效，请重新登录", status_code=401) from None
             raise CloudInferenceError("账户服务暂时不可用，请稍后重试", status_code=503) from None
         except httpx.HTTPError as exc:
+            logger.warning("Cloud inference network error: path=%s error=%s", path, exc)
             raise CloudInferenceError("智能服务暂时不可用，请稍后重试", status_code=503) from exc
         if response.is_error:
             detail: object = ""
@@ -81,9 +82,10 @@ class CloudInferenceClient:
             except Exception:
                 request_id, detail_message = "", ""
             logger.warning(
-                "Cloud inference request failed: status=%s path=%s request_id=%s",
+                "Cloud inference request failed: status=%s path=%s detail=%r request_id=%s",
                 response.status_code,
                 path,
+                detail_message[:200] if detail_message else "",
                 request_id or "-",
             )
             suffix = f"（请求编号：{request_id}）" if request_id else ""
@@ -91,6 +93,7 @@ class CloudInferenceClient:
                 raise CloudInferenceError("登录状态已失效，请重新登录", status_code=401, request_id=request_id)
             if response.status_code == 403:
                 message = "服务授权已到期，请联系管理员" if "到期" in detail_message else "当前账户暂时无法使用此能力，请联系管理员"
+                cloud_auth.note_auth_error(message)
                 raise CloudInferenceError(message, status_code=403, request_id=request_id)
             if response.status_code == 429:
                 message = "Credits 余额不足，请联系管理员" if any(word in detail_message.lower() for word in ("credit", "余额", "额度")) else "请求较多，请稍后重试"
@@ -129,6 +132,37 @@ class CloudInferenceClient:
                 if content.get("type") == "output_text":
                     parts.append(str(content.get("text") or ""))
         return {"message": {"role": "assistant", "content": "".join(parts)}, "model": "text.vision", "usage": data.get("usage"), "raw": data}
+
+    async def asr_transcribe(
+        self,
+        audio_url: str,
+        *,
+        audio_format: str = "mp3",
+        language: str = "",
+        enable_punc: bool = True,
+        enable_itn: bool = True,
+        model: str = "",
+        idempotency_key: str = "",
+    ) -> dict:
+        """大模型录音文件识别（同步转写）。返回 {text, utterances, duration_ms}。"""
+        del model
+        payload: dict = {
+            "audio_url": audio_url,
+            "format": audio_format,
+        }
+        if language:
+            payload["language"] = language
+        payload["enable_punc"] = bool(enable_punc)
+        payload["enable_itn"] = bool(enable_itn)
+        body = self._body("speech.asr", payload)
+        if idempotency_key:
+            body["idempotency_key"] = idempotency_key
+        result = await self._request("POST", "/api/v1/inference/asr", body)
+        return {
+            "text": str(result.get("text") or ""),
+            "utterances": list(result.get("utterances") or []),
+            "duration_ms": int(result.get("duration_ms") or 0),
+        }
 
     async def geo_search(
         self,
@@ -313,6 +347,67 @@ class CloudInferenceClient:
         status = data.get("status", "unknown")
         return {"task_id": task_id, "status": status, "video_url": (data.get("content") or {}).get("video_url", ""), "progress": 100 if status == "succeeded" else (50 if status in {"running", "processing"} else 0), "error": data.get("error", "")}
 
+    async def omni_human_image_audio_drive(
+        self,
+        image_url: str,
+        audio_url: str,
+        *,
+        prompt: str = "",
+        background_url: str = "",
+        duration: int = 5,
+        size: str = "720p",
+        ratio: str = "9:16",
+        model: str = "doubao-omnihuman-1.0",
+        idempotency_key: str = "",
+    ) -> dict:
+        """OmniHuman via cloud inference gateway (control-plane 专用 omni-human 端点)。
+
+        control-plane 现在为 OmniHuman1.5 提供了专用端点：直接接受 image_url/audio_url/mask_url/prompt，
+        由 control-plane 用 V4 鉴权调用火山视觉 CV 平台，不再走 Ark content 数组。
+        """
+        del model
+        # control-plane OmniHuman 端点只接受 image_url + audio_url + (mask_url/prompt/output_resolution/pe_fast_mode/seed)
+        forward_payload: dict = {
+            "image_url": image_url,
+            "audio_url": audio_url,
+        }
+        if prompt:
+            forward_payload["prompt"] = prompt
+        # 720p → 720, 1080p → 1080；其它默认 1080
+        forward_payload["output_resolution"] = 720 if size == "720p" else 1080
+        forward_payload["duration"] = int(duration)
+        body = self._body("video.omnihuman", forward_payload)
+        if idempotency_key:
+            body["idempotency_key"] = idempotency_key
+        result = await self._request("POST", "/api/v1/inference/omni-human/tasks", body)
+        return {
+            "task_id": str(result.get("task_id") or ""),
+            "status": str(result.get("status") or "queued"),
+            "model": "video.omnihuman",
+        }
+
+    async def get_omni_task(self, task_id: str, model: str = "") -> dict:
+        """Query OmniHuman task submitted through the gateway."""
+        del model
+        data = await self._request("GET", f"/api/v1/inference/omni-human/tasks/{task_id}")
+        status = data.get("status", "unknown")
+        # control-plane OmniHuman 状态：processing/in_queue/generating/done/failed/not_found/expired
+        if status == "done":
+            normalized = "succeeded"
+        elif status in {"processing", "in_queue", "generating"}:
+            normalized = "running"
+        elif status in {"failed", "expired", "not_found"}:
+            normalized = "failed"
+        else:
+            normalized = status
+        return {
+            "task_id": task_id,
+            "status": normalized,
+            "video_url": str(data.get("video_url") or ""),
+            "progress": 100 if normalized == "succeeded" else (50 if normalized == "running" else 0),
+            "error": data.get("error") or "",
+        }
+
     async def download_video(self, video_url: str, output_name: str = "", output_dir: str | None = None) -> str:
         async with httpx.AsyncClient(timeout=180, trust_env=False) as client:
             response = await client.get(video_url)
@@ -326,9 +421,13 @@ class CloudInferenceClient:
         path.write_bytes(response.content)
         return str(path)
 
-    async def text_to_speech(self, text: str, voice_id: str = "zh_female_xiaoyi", emotion: str = "neutral", speed: float = 1.0, pitch: int = 0, output_name: str = "", output_dir: str | None = None) -> str:
-        del emotion, pitch
-        result = await self._request("POST", "/api/v1/inference/tts", self._body("speech.tts", {"input": text, "voice": voice_id, "speed": speed, "response_format": "mp3"}))
+    async def text_to_speech(self, text: str, voice_id: str = "zh_female_xiaoyi", emotion: str = "neutral", speed: float = 1.0, pitch: int = 0, output_name: str = "", output_dir: str | None = None, *, reference_audio_url: str = "") -> str:
+        del emotion
+        payload = {"input": text, "voice": voice_id, "speed": speed, "pitch": pitch, "response_format": "mp3"}
+        if reference_audio_url:
+            payload["reference_audio_url"] = reference_audio_url
+            payload.pop("voice")
+        result = await self._request("POST", "/api/v1/inference/tts", self._body("speech.tts", payload))
         audio = base64.b64decode((result.get("data") or {}).get("audio_base64", ""))
         if not audio:
             raise IntegrationError("语音生成未返回结果")
@@ -341,8 +440,8 @@ class CloudInferenceClient:
         path.write_bytes(audio)
         return str(path)
 
-    async def seed_audio_text_to_speech(self, text: str, voice_id: str = "zh_female_xiaoyi", emotion: str = "neutral", speed: float = 1.0, pitch: int = 0, output_name: str = "", output_dir: str | None = None, **_: object) -> tuple[str, float]:
-        path = await self.text_to_speech(text, voice_id, emotion, speed, pitch, output_name, output_dir)
+    async def seed_audio_text_to_speech(self, text: str, voice_id: str = "zh_female_xiaoyi", emotion: str = "neutral", speed: float = 1.0, pitch: int = 0, output_name: str = "", output_dir: str | None = None, reference_audio_url: str = "", **_: object) -> tuple[str, float]:
+        path = await self.text_to_speech(text, voice_id, emotion, speed, pitch, output_name, output_dir, reference_audio_url=reference_audio_url)
         return path, max(1.0, len(text) / 4.2)
 
     async def create_embedding(self, texts: list[str] | str, model: str = "") -> dict:

@@ -16,7 +16,7 @@ async def _browser_action(payload: dict[str, Any]) -> dict[str, Any]:
     base_url = os.environ.get("SZYG_BROWSER_CONTROL_URL", "").rstrip("/")
     token = os.environ.get("SZYG_BROWSER_CONTROL_TOKEN", "")
     if not base_url or not token:
-        raise RuntimeError("浏览器操作仅可在领鹿员工桌面版中使用")
+        raise RuntimeError("浏览器操作仅可在数字员工桌面版中使用")
     async with httpx.AsyncClient(timeout=90, trust_env=False) as client:
         response = await client.post(
             base_url + "/v1/action",
@@ -65,7 +65,7 @@ def register_browser_tool(approval_callback: ApprovalCallback | None = None) -> 
     schema = {
         "name": "szyg_browser",
         "description": (
-            "在领鹿员工右侧的可见浏览器中操作网页。所有网页任务都使用此工具，"
+            "在数字员工右侧的可见浏览器中操作网页。所有网页任务都使用此工具，"
             "先 navigate 打开页面，再 observe 获取元素 ref，之后 click、type、press 或 scroll；"
             "需要读取长回答和引用时使用 read。"
             "不要使用电脑桌面工具。"

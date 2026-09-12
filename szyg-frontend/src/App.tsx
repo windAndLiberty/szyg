@@ -7,6 +7,7 @@ import { legacyRedirects } from './lib/navConfig'
 import { useLayout } from './lib/layout'
 import { useI18n } from './lib/i18n'
 import CloudAuthGate from './components/CloudAuthGate'
+import CloudAuthExpiredBanner from './components/CloudAuthExpiredBanner'
 
 // 已实现的真实页面
 import SuperAgent from './pages/SuperAgent'
@@ -192,6 +193,7 @@ export default function App() {
         const active = key === slotKey
         return <div key={key} style={{ display: active ? undefined : 'none' }} aria-hidden={!active}><AppRoutes location={slotLocation} /></div>
       })}
+      <CloudAuthExpiredBanner />
     </CloudAuthGate>
   )
 }

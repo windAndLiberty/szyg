@@ -79,13 +79,28 @@ Write-Host "  Frontend build done."
 
 # ── 4. Start backend ────────────────────────────────────────────────────────
 Write-Host "[szyg] Step 4: Start backend" -ForegroundColor Cyan
+$logDir = Join-Path $root "data\logs"
+New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$backendOutLog = Join-Path $logDir "backend-$stamp.out.log"
+$backendErrLog = Join-Path $logDir "backend-$stamp.err.log"
 $env:PYTHONPATH = "$root\server"
 $env:SZYG_DATA_DIR = "$root\data"
-$proc = Start-Process -FilePath "$root\.venv\Scripts\python.exe" `
-    -ArgumentList "-m", "uvicorn", "szyg.api.app:create_app", "--host", "127.0.0.1", "--port", "$BackendPort", "--factory" `
-    -WindowStyle Minimized `
-    -PassThru
-Write-Host "  Backend PID: $($proc.Id)"
+$env:PYTHONUNBUFFERED = "1"
+# Bundled ffmpeg (with ffprobe) shipped inside the Electron runtime —
+# dev machines may not have ffmpeg on PATH; probe_duration/extract_audio need it.
+$bundledFfmpeg = Join-Path $root "electron\runtime\candidate-1.1.4\backend\szyg-backend\_internal\third_party\ffmpeg\ffmpeg.exe"
+if (-not $env:SZYG_FFMPEG_PATH -and (Test-Path $bundledFfmpeg)) {
+    $env:SZYG_FFMPEG_PATH = $bundledFfmpeg
+    Write-Host "  Using bundled ffmpeg: $bundledFfmpeg"
+}
+# Note: Start-Process cannot combine -WindowStyle with -RedirectStandardOutput,
+# so wrap the command in cmd.exe and let cmd do the file redirection.
+$cmdLine = "`"`"$root\.venv\Scripts\python.exe`" -m uvicorn szyg.api.app:create_app --host 127.0.0.1 --port $BackendPort --factory > `"$backendOutLog`" 2> `"$backendErrLog`"`""
+$proc = Start-Process -FilePath "cmd.exe" -ArgumentList "/c", $cmdLine -WindowStyle Minimized -PassThru
+Write-Host "  Backend wrapper PID: $($proc.Id)"
+Write-Host "  Backend stdout log: $backendOutLog"
+Write-Host "  Backend stderr log: $backendErrLog"
 
 Write-Host "[szyg] Step 5: Wait for backend" -ForegroundColor Cyan
 Wait-For-Port -Port $BackendPort -Name "Backend" -TimeoutSeconds 30

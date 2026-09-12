@@ -14,6 +14,38 @@ _CORS_ORIGINS_ENV = os.environ.get("SZYG_CORS_ORIGINS", "")
 logger = logging.getLogger(__name__)
 
 
+def _configure_file_logging() -> None:
+    """Persist szyg.* logs (INFO+) to <data>/logs/szyg-backend.log (rotating, 5MB x 5).
+
+    Level can be tuned via the SZYG_LOG_LEVEL env var (default: INFO).
+    """
+    import logging.handlers
+
+    root_logger = logging.getLogger("szyg")
+    if getattr(root_logger, "_szyg_file_logging", False):
+        return
+    from szyg.data_path import DATA_DIR
+
+    log_dir = DATA_DIR / "logs"
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+        handler = logging.handlers.RotatingFileHandler(
+            log_dir / "szyg-backend.log",
+            maxBytes=5 * 1024 * 1024,
+            backupCount=5,
+            encoding="utf-8",
+        )
+    except OSError:
+        return
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+    root_logger.addHandler(handler)
+    try:
+        root_logger.setLevel(os.environ.get("SZYG_LOG_LEVEL", "INFO").upper())
+    except ValueError:
+        root_logger.setLevel(logging.INFO)
+    root_logger._szyg_file_logging = True
+
+
 def _try_include(app: FastAPI, module_path: str, prefix: str = "") -> bool:
     """Safely include a router — returns False if deps missing"""
     try:
@@ -27,6 +59,7 @@ def _try_include(app: FastAPI, module_path: str, prefix: str = "") -> bool:
 
 
 def create_app() -> FastAPI:
+    _configure_file_logging()
     production = os.environ.get("SZYG_PRODUCTION", "").lower() in {"1", "true", "yes"}
     app = FastAPI(
         title="szyg API",

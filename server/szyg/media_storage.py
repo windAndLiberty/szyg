@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
 import threading
+import uuid
 from pathlib import Path
 from typing import Any, Literal
 
@@ -31,7 +33,8 @@ _LABELS: dict[MediaKind, str] = {
 
 
 def _default_dir(kind: MediaKind) -> Path:
-    home = Path.home()
+    configured_home = str(os.environ.get("SZYG_USER_HOME") or "").strip()
+    home = Path(configured_home).expanduser() if configured_home else Path.home()
     if kind == "image":
         return home / "Pictures" / "SZYG"
     if kind == "video":
@@ -79,11 +82,13 @@ def get_media_storage_config() -> dict[str, Any]:
     with _LOCK:
         config = _read_config_unlocked()
         normalized = {}
+        kind_by_key = {key: kind for kind, key in _KEYS.items()}
         for key, value in config.items():
             try:
                 normalized[key] = _normalize_dir(value)
-            except ValueError:
-                normalized[key] = value
+            except (ValueError, OSError):
+                fallback = DATA_DIR / "generated_media" / kind_by_key[key]
+                normalized[key] = _normalize_dir(str(fallback))
         if normalized != config:
             _write_config_unlocked(normalized)
         config = normalized
@@ -120,7 +125,16 @@ def get_media_output_dir(kind: MediaKind) -> Path:
     config = get_media_storage_config()
     path = Path(config[key])
     path.mkdir(parents=True, exist_ok=True)
-    return path
+    probe = path / f".szyg-write-{uuid.uuid4().hex}.tmp"
+    try:
+        probe.write_bytes(b"")
+        probe.unlink(missing_ok=True)
+        return path
+    except OSError:
+        probe.unlink(missing_ok=True)
+        fallback = DATA_DIR / "generated_media" / kind
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback
 
 
 def infer_media_kind(path: str | Path) -> MediaKind:

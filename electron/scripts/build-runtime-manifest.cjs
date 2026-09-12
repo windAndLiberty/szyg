@@ -3,18 +3,23 @@ const fs = require('fs')
 const path = require('path')
 
 const electronDir = path.resolve(__dirname, '..')
+const backendDir = process.env.SZYG_BACKEND_RUNTIME_DIR || path.join(electronDir, 'runtime', 'backend', 'szyg-backend')
 const files = [
   {
-    source: path.join(electronDir, 'runtime', 'backend', 'szyg-backend', 'szyg-backend.exe'),
+    source: path.join(backendDir, 'szyg-backend.exe'),
     target: 'backend/szyg-backend.exe',
   },
   {
-    source: path.join(electronDir, 'runtime', 'backend', 'szyg-backend', 'sau-cli.exe'),
+    source: path.join(backendDir, 'sau-cli.exe'),
     target: 'backend/sau-cli.exe',
   },
   {
-    source: path.join(electronDir, 'runtime', 'backend', 'szyg-backend', '_internal', 'third_party', 'ffmpeg', 'ffmpeg.exe'),
+    source: path.join(backendDir, '_internal', 'third_party', 'ffmpeg', 'ffmpeg.exe'),
     target: 'backend/_internal/third_party/ffmpeg/ffmpeg.exe',
+  },
+  {
+    source: path.join(backendDir, '_internal', 'third_party', 'ffmpeg', 'ffprobe.exe'),
+    target: 'backend/_internal/third_party/ffmpeg/ffprobe.exe',
   },
   {
     source: path.join(electronDir, 'runtime', 'hermes', 'hermes-runtime', 'hermes-runtime.exe'),
@@ -45,7 +50,7 @@ const files = [
     target: 'runtime/hermes/upstream.lock.json',
   },
   {
-    source: path.join(electronDir, 'runtime', 'config.yaml'),
+    source: process.env.SZYG_RELEASE_CONFIG || path.join(electronDir, 'runtime', 'config.yaml'),
     target: 'config.yaml',
   },
 ]
@@ -62,7 +67,10 @@ function digest(file) {
 
 async function main() {
   const entries = []
-  for (const { source, target } of files) {
+  const packagedResources = process.env.SZYG_PACKAGED_RESOURCES_DIR
+  for (const item of files) {
+    const { target } = item
+    const source = packagedResources ? path.join(packagedResources, target) : item.source
     if (!fs.existsSync(source)) throw new Error(`Runtime file is missing: ${source}`)
     entries.push({
       path: target,
@@ -71,7 +79,7 @@ async function main() {
     })
   }
 
-  const output = path.join(electronDir, 'runtime', 'runtime-integrity.json')
+  const output = process.env.SZYG_RUNTIME_MANIFEST || (packagedResources ? path.join(packagedResources, 'runtime-integrity.json') : path.join(electronDir, 'runtime', 'runtime-integrity.json'))
   fs.writeFileSync(output, `${JSON.stringify({ algorithm: 'sha256', entries }, null, 2)}\n`)
   console.log(`Runtime integrity manifest ready: ${output}`)
 }

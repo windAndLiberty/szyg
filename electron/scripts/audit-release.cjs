@@ -33,6 +33,7 @@ const secretPatterns = [
 ]
 
 const requiredRuntimeEntries = [
+  'resources/backend/_internal/third_party/ffmpeg/ffprobe.exe',
   'resources/runtime/hermes/hermes-runtime.exe',
   'resources/runtime/hermes/upstream.lock.json',
   'resources/runtime/hermes/_internal/vendor/hermes_agent/LICENSE',
@@ -200,8 +201,8 @@ function auditSource() {
 }
 
 function auditDist() {
-  const distDir = path.join(electronDir, 'dist')
-  const unpacked = path.join(electronDir, 'dist', 'win-unpacked')
+  const distDir = process.env.SZYG_RELEASE_DIST_DIR ? path.resolve(process.env.SZYG_RELEASE_DIST_DIR) : path.join(electronDir, 'dist')
+  const unpacked = path.join(distDir, 'win-unpacked')
   const packageConfig = JSON.parse(fs.readFileSync(path.join(electronDir, 'package.json'), 'utf8'))
   const currentVersion = String(packageConfig.version || '')
   if (fs.existsSync(unpacked)) {

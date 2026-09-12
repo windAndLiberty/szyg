@@ -26,6 +26,10 @@ services:
     secrets:
       - offline_license_private_key
       - offline_license_public_key
+      - source: alipay_merchant_private_key
+        target: alipay_merchant_private_key.pem
+      - source: alipay_public_key
+        target: alipay_public_key.pem
     ports:
       - "127.0.0.1:18080:18080"
     healthcheck:
@@ -67,6 +71,10 @@ secrets:
     file: ./secrets/offline_license_private.pem
   offline_license_public_key:
     file: ./secrets/offline_license_public.pem
+  alipay_merchant_private_key:
+    file: ./secrets/alipay_merchant_private_key.pem
+  alipay_public_key:
+    file: ./secrets/alipay_public_key.pem
 
 volumes:
   postgres_data:

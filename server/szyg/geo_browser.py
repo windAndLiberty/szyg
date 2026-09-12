@@ -267,7 +267,7 @@ class GeoSidebarBrowser:
         if not provider:
             raise GeoBrowserError("暂不支持这个AI平台", code="unsupported_provider")
         if not await self.available():
-            raise GeoBrowserError("请使用领鹿开发桌面版进行实际界面检测", code="desktop_required")
+            raise GeoBrowserError("请使用数字员工桌面版进行实际界面检测", code="desktop_required")
 
         await self._wait_until_visible()
         await _browser_action({"action": "navigate", "url": provider["url"]})

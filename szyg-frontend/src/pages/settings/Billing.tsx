@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Activity,
@@ -8,11 +9,20 @@ import {
   Image as ImageIcon,
   MessageSquareText,
   Mic2,
+  RefreshCw,
   Search,
   Sparkles,
   Video,
 } from 'lucide-react'
-import { fetchCloudBilling, type CloudBilling } from '@/lib/api'
+import {
+  createCloudPaymentOrder,
+  fetchCloudBilling,
+  fetchCloudPaymentConfig,
+  fetchCloudPaymentOrder,
+  type CloudBilling,
+  type CloudPaymentConfig,
+  type CloudPaymentOrder,
+} from '@/lib/api'
 import { useAsync } from '@/lib/hooks'
 
 const capabilityMeta: Record<string, { label: string; icon: typeof Sparkles; color: string }> = {
@@ -56,7 +66,58 @@ function LoadingState() {
 }
 
 export default function Billing() {
-  const { data, loading, error } = useAsync<CloudBilling>(fetchCloudBilling)
+  const { data, loading, error, reload } = useAsync<CloudBilling>(fetchCloudBilling)
+  const [paymentConfig, setPaymentConfig] = useState<CloudPaymentConfig | null>(null)
+  const [paymentOrder, setPaymentOrder] = useState<CloudPaymentOrder | null>(null)
+  const [amount, setAmount] = useState(1)
+  const [paying, setPaying] = useState(false)
+  const [paymentError, setPaymentError] = useState('')
+
+  useEffect(() => {
+    const refreshOnFocus = () => reload()
+    window.addEventListener('focus', refreshOnFocus)
+    return () => window.removeEventListener('focus', refreshOnFocus)
+  }, [reload])
+
+  useEffect(() => {
+    fetchCloudPaymentConfig().then(setPaymentConfig).catch(() => setPaymentConfig(null))
+  }, [])
+
+  useEffect(() => {
+    if (!paymentOrder || paymentOrder.status !== 'pending') return
+    const timer = window.setInterval(async () => {
+      try {
+        const current = await fetchCloudPaymentOrder(paymentOrder.id)
+        setPaymentOrder(current)
+        if (current.status === 'paid') reload()
+      } catch {
+        // A temporary polling failure must not replace the payment page.
+      }
+    }, 3000)
+    return () => window.clearInterval(timer)
+  }, [paymentOrder?.id, paymentOrder?.status, reload])
+
+  const startAlipay = async () => {
+    if (!paymentConfig || !Number.isFinite(amount)
+      || amount < paymentConfig.minimum_amount_cny
+      || amount > paymentConfig.maximum_amount_cny
+      || Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-8) {
+      setPaymentError(`请输入 ${paymentConfig?.minimum_amount_cny ?? 0.01} 至 ${paymentConfig?.maximum_amount_cny ?? 100000} 元之间的金额，最多两位小数`)
+      return
+    }
+    setPaying(true)
+    setPaymentError('')
+    try {
+      const idempotency = `desktop-${Date.now()}-${crypto.randomUUID?.() || Math.random().toString(16).slice(2)}`
+      const order = await createCloudPaymentOrder(amount, idempotency)
+      setPaymentOrder(order)
+      if (order.payment_url) window.open(order.payment_url, '_blank', 'noopener,noreferrer')
+    } catch (err) {
+      setPaymentError(err instanceof Error ? err.message : '支付宝订单创建失败')
+    } finally {
+      setPaying(false)
+    }
+  }
 
   if (loading) return <LoadingState />
 
@@ -79,8 +140,75 @@ export default function Billing() {
     >
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="text-sm text-[#94A3B8]">清楚了解 Credits 余额、充值记录与智能服务消耗。</p>
-        <p className="text-xs text-[#64748B]">更新于 {formatTime(data.as_of)}</p>
+        <div className="flex items-center gap-3">
+          <p className="text-xs text-[#64748B]">更新于 {formatTime(data.as_of)}</p>
+          <button
+            type="button"
+            onClick={reload}
+            disabled={loading}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#334155] px-2.5 text-xs text-[#CBD5E1] transition hover:border-[#6366F1] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            刷新余额
+          </button>
+        </div>
       </div>
+
+      {paymentConfig?.alipay_enabled && (
+        <section className="rounded-lg border border-[#1677FF]/35 bg-[#111827] p-5">
+          <div className="flex flex-wrap items-end justify-between gap-5">
+            <div>
+              <h2 className="text-base font-semibold text-[#F1F5F9]">支付宝充值</h2>
+              <p className="mt-1 text-xs text-[#64748B]">
+                1 元 = {paymentConfig.credits_per_cny} Credits。支付确认后余额会自动刷新。
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {[1, 50, 100, 200, 500].map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setAmount(value)}
+                    className={`rounded-md border px-3 py-1.5 text-sm ${amount === value ? 'border-[#1677FF] bg-[#1677FF]/15 text-white' : 'border-[#334155] text-[#94A3B8]'}`}
+                  >
+                    ¥{value}
+                  </button>
+                ))}
+                <label className="ml-1 flex h-8 items-center rounded-md border border-[#334155] bg-[#0B1220] px-2 text-sm text-[#94A3B8] focus-within:border-[#1677FF]">
+                  ¥
+                  <input
+                    type="number"
+                    min={paymentConfig.minimum_amount_cny}
+                    max={paymentConfig.maximum_amount_cny}
+                    step="0.01"
+                    value={Number.isFinite(amount) ? amount : ''}
+                    onChange={(event) => setAmount(event.target.value === '' ? Number.NaN : Number(event.target.value))}
+                    aria-label="自定义充值金额"
+                    className="ml-1 w-24 bg-transparent text-white outline-none"
+                  />
+                </label>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={startAlipay}
+              disabled={paying || !Number.isFinite(amount)}
+              className="h-10 rounded-md bg-[#1677FF] px-5 text-sm font-medium text-white transition hover:bg-[#0F6FE8] disabled:opacity-60"
+            >
+              {paying ? '正在创建订单…' : `支付宝支付 ¥${Number.isFinite(amount) ? amount : '—'}`}
+            </button>
+          </div>
+          {paymentError && <p className="mt-3 text-sm text-[#FCA5A5]">{paymentError}</p>}
+          {paymentOrder && (
+            <p className={`mt-3 text-sm ${paymentOrder.status === 'paid' ? 'text-[#6EE7B7]' : 'text-[#94A3B8]'}`}>
+              {paymentOrder.status === 'paid'
+                ? `支付成功，已到账 ${formatCredits(paymentOrder.credits)} Credits`
+                : paymentOrder.status === 'pending'
+                  ? '等待支付宝确认，请在浏览器完成支付…'
+                  : '订单未完成，请重新发起充值'}
+            </p>
+          )}
+        </section>
+      )}
 
       <section className="grid gap-4 md:grid-cols-3">
         <div className="relative overflow-hidden rounded-lg border border-[#6366F1]/35 bg-[#111827] p-5">

@@ -464,10 +464,10 @@ _DESKTOP_APP_ALIASES = {
 _PREVIEW_FEEDBACK_PROCESSES = {
     "chatgpt.exe",
     "szyg.exe",
-    "领鹿员工.exe",
+    "数字员工.exe",
 }
 _PREVIEW_FEEDBACK_TITLES = (
-    "领鹿员工 - 超级数字员工",
+    "数字员工 - 超级数字员工",
     "员工工作视窗",
     "工作现场",
 )

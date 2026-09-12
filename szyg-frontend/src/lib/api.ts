@@ -95,17 +95,21 @@ async function request<T>(method: string, url: string, body?: unknown, _retry = 
     } catch {
       /* ignore */
     }
+    const rawDetailString =
+      detail && typeof detail === 'object' && 'message' in detail
+        ? String((detail as { message: unknown }).message)
+        : String(detail)
     if (res.status === 401 && !url.startsWith('/api/cloud/login')) {
-      window.dispatchEvent(new Event('szyg:cloud-session-expired'))
+      dispatchCloudSessionExpired()
+    } else if (res.status === 403 && isCloudAuthExpiredMessage(rawDetailString)) {
+      dispatchCloudAuthExpired(toUserFacingMessage(rawDetailString, rawDetailString))
     }
     if (detail && typeof detail === 'object' && 'message' in detail) {
-      const rawMessage = String((detail as { message: unknown }).message)
-      console.error(`[API] ${method} ${url}:`, rawMessage)
-      throw new Error(toUserFacingMessage(rawMessage))
+      console.error(`[API] ${method} ${url}:`, rawDetailString)
+      throw new Error(toUserFacingMessage(rawDetailString))
     }
-    const rawMessage = String(detail)
-    console.error(`[API] ${method} ${url}:`, rawMessage)
-    throw new Error(toUserFacingMessage(rawMessage))
+    console.error(`[API] ${method} ${url}:`, rawDetailString)
+    throw new Error(toUserFacingMessage(rawDetailString))
   }
   if (res.status === 204) return undefined as T
   const text = await res.text()
@@ -132,8 +136,27 @@ export interface CloudSession {
   authenticated: boolean
   offline?: boolean
   message?: string
+  authorization_error?: string
   user?: { id: string; email: string; display_name: string; role: string; organization_id: string; password_changed_at?: string | null }
   device?: { id: string; name: string; status: string; last_seen_at?: string }
+}
+
+export interface CloudAuthorization {
+  configured: boolean
+  expired: boolean
+  status?: string
+  valid_until?: string
+  authorization_error?: string
+}
+
+function dispatchCloudAuthExpired(detail: string) {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent('szyg:cloud-auth-expired', { detail }))
+}
+
+function dispatchCloudSessionExpired() {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event('szyg:cloud-session-expired'))
 }
 
 export interface CloudUsage {
@@ -185,7 +208,30 @@ export interface CloudBilling {
   recent_usage: CloudUsageRecord[]
 }
 
+export interface CloudPaymentConfig {
+  alipay_enabled: boolean
+  credits_per_cny: number
+  minimum_amount_cny: number
+  maximum_amount_cny: number
+}
+
+export interface CloudPaymentOrder {
+  id: string
+  channel: 'alipay'
+  merchant_order_no: string
+  status: 'pending' | 'paid' | 'closed' | 'expired' | 'failed'
+  amount_cny: number
+  credits: number
+  currency: string
+  payment_url: string
+  expires_at: string
+  paid_at?: string | null
+  credited_at?: string | null
+  created_at: string
+}
+
 export const fetchCloudSession = () => apiGet<CloudSession>('/api/cloud/session')
+export const refreshCloudSession = () => apiPost<CloudAuthorization>('/api/cloud/session/refresh')
 export const loginCloud = (account: string, password: string) =>
   apiPost<CloudSession>('/api/cloud/login', { email: account, password })
 export const activateCloud = (invitation_code: string, display_name: string, password: string) =>
@@ -197,6 +243,19 @@ export const fetchCloudDevices = () => apiGet<{ items: Array<Record<string, unkn
 export const fetchCloudEntitlements = () => apiGet<Record<string, unknown>>('/api/cloud/entitlements')
 export const fetchCloudUsage = () => apiGet<CloudUsage>('/api/cloud/usage')
 export const fetchCloudBilling = () => apiGet<CloudBilling>('/api/cloud/billing')
+export const fetchCloudPaymentConfig = () => apiGet<CloudPaymentConfig>('/api/cloud/payments/config')
+export const createCloudPaymentOrder = (amount_cny: number, idempotency_key: string) =>
+  apiPost<CloudPaymentOrder>('/api/cloud/payments/orders', { amount_cny, idempotency_key })
+export const fetchCloudPaymentOrder = (orderId: string) =>
+  apiGet<CloudPaymentOrder>(`/api/cloud/payments/orders/${encodeURIComponent(orderId)}`)
+
+// 服务授权到期 / 账户不可用：前端据此提示「重新登录 / 刷新授权」入口。
+// 仅与服务授权相关，设备被移除/限流/余额不足等不在此列。
+const CLOUD_AUTH_EXPIRED_PATTERN = /(?:服务授权|授权已到期|账户暂不可用|账户已被禁用|账户不可用)/
+export function isCloudAuthExpiredMessage(detail: string | undefined | null): boolean {
+  if (!detail) return false
+  return CLOUD_AUTH_EXPIRED_PATTERN.test(detail)
+}
 
 export interface CompetitorAccount {
   id: string
@@ -1052,7 +1111,11 @@ export async function uploadDigitalHumanAsset(
     if (res.status === 401 && !retry && await autoLogin()) return send(true)
     if (!res.ok) {
       const data = await res.json().catch(() => ({})) as { detail?: string }
-      throw new Error(data.detail || `素材上传失败：${res.status}`)
+      const detail = data.detail || `素材上传失败：${res.status}`
+      if (res.status === 403 && isCloudAuthExpiredMessage(detail)) {
+        dispatchCloudAuthExpired(detail)
+      }
+      throw new Error(detail)
     }
     const data = await res.json() as { asset: DigitalHumanAsset }
     return data.asset
@@ -1186,6 +1249,95 @@ export const generateDigitalHumanSceneImage = (id: string, sceneId: string, prom
 export const createDigitalHumanRender = (projectId: string) => apiPost<DigitalHumanRender>(`/api/digital-human/projects/${encodeURIComponent(projectId)}/renders`)
 export const fetchDigitalHumanRender = (renderId: string) => apiGet<DigitalHumanRender>(`/api/digital-human/renders/${encodeURIComponent(renderId)}`)
 export const retryDigitalHumanRenderSegment = (renderId: string, segmentId: string) => apiPost<DigitalHumanRender>(`/api/digital-human/renders/${encodeURIComponent(renderId)}/segments/${encodeURIComponent(segmentId)}/retry`)
+
+export type DigitalHumanRemixStatus =
+  | 'queued'
+  | 'analyzing'
+  | 'tts_synthesizing'
+  | 'rendering'
+  | 'post_processing'
+  | 'waiting_credits'
+  | 'succeeded'
+  | 'failed'
+
+export interface DigitalHumanRemixSegment {
+  index: number
+  start: number
+  duration: number
+  task_id: string
+  status: string
+  video_path: string
+  error: string
+}
+
+export interface DigitalHumanRemixJob {
+  id: string
+  owner_id: string
+  profile_id: string
+  source_asset_id: string
+  background_asset_id: string
+  background_mode: 'auto' | 'uploaded'
+  source_duration: number
+  transcript: string
+  tts_audio_path: string
+  tts_duration: number
+  segments: DigitalHumanRemixSegment[]
+  output_path: string
+  output_url: string
+  material: { id: string; name: string; type: 'video'; url: string; path: string; size: number; created_at: string } | null
+  status: DigitalHumanRemixStatus
+  progress: number
+  error: string
+  created_at: string
+  updated_at: string
+}
+
+export interface DigitalHumanRemixCreateResult {
+  task_id: string
+  status: string
+}
+
+export async function createDigitalHumanRemix(
+  profileId: string,
+  video: File,
+  background?: File,
+): Promise<DigitalHumanRemixCreateResult> {
+  const formData = new FormData()
+  formData.append('profile_id', profileId)
+  formData.append('video', video)
+  if (background) formData.append('background_image', background)
+  const send = async (retry = false): Promise<DigitalHumanRemixCreateResult> => {
+    const token = getToken()
+    const res = await fetch('/api/digital-human/remix', {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      body: formData,
+    })
+    if (res.status === 401 && !retry && await autoLogin()) return send(true)
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({})) as { detail?: string }
+      const detail = data.detail || `高仿复刻提交失败：${res.status}`
+      if (res.status === 403 && isCloudAuthExpiredMessage(detail)) {
+        dispatchCloudAuthExpired(detail)
+      }
+      throw new Error(detail)
+    }
+    return res.json() as Promise<DigitalHumanRemixCreateResult>
+  }
+  return send()
+}
+
+export async function fetchDigitalHumanRemix(taskId: string): Promise<DigitalHumanRemixJob> {
+  return apiGet<DigitalHumanRemixJob>(`/api/digital-human/remix/${encodeURIComponent(taskId)}`)
+}
+
+export const fetchDigitalHumanRemixes = (profileId = '') => apiGet<{ items: DigitalHumanRemixJob[] }>(
+  `/api/digital-human/remix${profileId ? `?profile_id=${encodeURIComponent(profileId)}` : ''}`,
+)
+
+export async function resumeDigitalHumanRemix(taskId: string): Promise<DigitalHumanRemixJob> {
+  return apiPost<DigitalHumanRemixJob>(`/api/digital-human/remix/${encodeURIComponent(taskId)}/resume`, {})
+}
 
 export interface ComposeAssetRef {
   id: string

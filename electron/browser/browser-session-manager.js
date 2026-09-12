@@ -96,7 +96,7 @@ class BrowserSessionManager {
     const hostname = parsed.hostname.toLowerCase()
     const isLoopback = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
     if (isLoopback || this.blockedOrigins.has(parsed.origin)) {
-      throw new Error('不能在操作浏览器中打开领鹿员工自身页面')
+      throw new Error('不能在操作浏览器中打开数字员工自身页面')
     }
     return url
   }

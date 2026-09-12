@@ -150,8 +150,8 @@ export default function GeoWorkbench() {
         {activeAudit && !browserOpen && <button onClick={() => setBrowserOpen(true)} className={secondaryButton}><Globe2 className="h-4 w-4" />查看检测现场</button>}
         <button onClick={() => setEditing((value) => !value)} className={secondaryButton}>{editing ? '收起设置' : '检查体检范围'}</button>
       </div>
-      <p className="mt-3 text-xs leading-5 text-[#64748B]">本次默认检测 1 个平台 × {selectedQuestions.length} 个已选问题。不会消耗领鹿或 Dolphin 的模型推理 Token；但会像你正常提问一样，占用所选 AI 平台账号的对话次数或使用配额。</p>
-      {!consumerProviders.length && <p className="mt-3 text-xs text-[#FBBF24]">当前无法使用真实AI界面检测。请从开发桌面版启动领鹿员工，并确认右侧工作现场可用。</p>}
+      <p className="mt-3 text-xs leading-5 text-[#64748B]">本次默认检测 1 个平台 × {selectedQuestions.length} 个已选问题。不会消耗数字员工或 Dolphin 的模型推理 Token；但会像你正常提问一样，占用所选 AI 平台账号的对话次数或使用配额。</p>
+      {!consumerProviders.length && <p className="mt-3 text-xs text-[#FBBF24]">当前无法使用真实AI界面检测。请从开发桌面版启动数字员工，并确认右侧工作现场可用。</p>}
     </section>
 
     <div className="grid gap-4 md:grid-cols-3">

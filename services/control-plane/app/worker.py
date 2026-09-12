@@ -8,11 +8,12 @@ from decimal import Decimal
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, select
 
 from .config import get_settings
 from .database import ProviderBillingDaily, RefreshSession, SessionLocal, UsageEvent, utcnow
 from .provider_billing import ProviderBillingClient
+from .wallets import release as release_wallet_reservation
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("szyg-control-worker")
@@ -97,21 +98,22 @@ def main() -> None:
                 result = db.execute(delete(RefreshSession).where(
                     RefreshSession.expires_at < cutoff,
                 ))
-                stale = db.execute(update(UsageEvent).where(
+                stale_events = db.scalars(select(UsageEvent).where(
                     UsageEvent.status == "reserved",
                     UsageEvent.created_at < stale_usage_cutoff,
-                ).values(
-                    status="failed",
-                    units=0,
-                    credits_charged_micros=0,
-                    error_code="reservation_expired",
-                    error_message="智能服务任务已超时",
-                    completed_at=utcnow(),
-                ))
+                ).with_for_update()).all()
+                for event in stale_events:
+                    release_wallet_reservation(db, event)
+                    event.status = "failed"
+                    event.units = 0
+                    event.credits_charged_micros = 0
+                    event.error_code = "reservation_expired"
+                    event.error_message = "智能服务任务已超时"
+                    event.completed_at = utcnow()
             if result.rowcount:
                 logger.info("Removed %s expired sessions", result.rowcount)
-            if stale.rowcount:
-                logger.warning("Released %s stale usage reservations", stale.rowcount)
+            if stale_events:
+                logger.warning("Released %s stale usage reservations", len(stale_events))
             removed_references = _cleanup_reference_uploads()
             if removed_references:
                 logger.info("Removed %s expired inference references", removed_references)

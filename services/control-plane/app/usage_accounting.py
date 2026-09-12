@@ -27,8 +27,13 @@ DEFAULT_PRICING: dict[str, dict[str, Decimal]] = {
     },
     "image.standard": {"image_cny": Decimal("0.25")},
     "video.standard": {"token_million_cny": Decimal("46")},
+    # OmniHuman1.5 火山方舟定价：1 元/秒
     "video.presenter": {"token_million_cny": Decimal("46")},
+    "video.omnihuman": {"seconds_cny": Decimal("1")},
+    "video.subject_detection": {"image_cny": Decimal("0.01")},
     "speech.tts": {"characters_10k_cny": Decimal("5")},
+    # Seed ASR 2.0 official pay-as-you-go price, verified 2026-09-04.
+    "speech.asr": {"hour_cny": Decimal("0.8")},
     "geo.search.doubao": {
         "input_million_cny": Decimal("0.6"),
         "output_million_cny": Decimal("3.6"),
@@ -49,6 +54,7 @@ DEFAULT_PRICING: dict[str, dict[str, Decimal]] = {
 
 
 MODEL_PRICING: tuple[tuple[str, dict[str, Decimal], str], ...] = (
+    ("seed-audio-1.0", {"minute_cny": Decimal("1")}, "volc-seed-audio-2026-09"),
     (
         "deepseek-v4-flash",
         {
@@ -105,14 +111,38 @@ def normalize_provider_usage(capability: str, data: dict, payload: dict) -> dict
     if capability == "speech.tts" and not speech_characters:
         speech_characters = len(str(payload.get("input") or payload.get("text") or ""))
 
+    # OmniHuman1.5 与 ASR 的"按秒计费"在 response 中体现为 duration_ms（毫秒）。
+    duration_seconds = _integer(raw.get("duration_seconds"))
+    if not duration_seconds:
+        duration_ms = _integer(raw.get("duration_ms"))
+        if duration_ms:
+            duration_seconds = max(1, (duration_ms + 999) // 1000)
+    if capability == "video.omnihuman" and not duration_seconds:
+        # OmniHuman 不返回 usage.duration，但提交时已携带 duration；
+        # 由调用方在 settle_usage 时把 event.units 作为兜底。
+        duration_seconds = 0
+    if capability == "speech.asr" and not duration_seconds:
+        # 走 audio_info.duration（毫秒）
+        ai = data.get("audio_info") if isinstance(data, dict) else None
+        if isinstance(ai, dict):
+            ms = _integer(ai.get("duration"))
+            if ms:
+                duration_seconds = max(1, (ms + 999) // 1000)
+    if not duration_seconds:
+        duration_seconds = _integer(raw.get("duration"))
+
     return {
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
         "total_tokens": total_tokens,
         "cached_tokens": cached_tokens,
         "image_count": image_count,
-        "video_tokens": total_tokens if capability in {"video.standard", "video.presenter"} else 0,
+        "video_tokens": total_tokens if capability in {"video.standard", "video.presenter", "video.omnihuman"} else 0,
+        "video_seconds": duration_seconds if capability in {"video.standard", "video.presenter", "video.omnihuman"} else 0,
         "speech_characters": speech_characters,
+        "asr_seconds": duration_seconds if capability == "speech.asr" else 0,
+        "asr_ms": _integer(raw.get("duration_ms") or (data.get("audio_info") or {}).get("duration")) if capability == "speech.asr" else 0,
+        "speech_ms": _integer(Decimal(str(data.get("original_duration") or data.get("duration") or 0)) * 1000) if capability == "speech.tts" else 0,
     }
 
 
@@ -173,10 +203,27 @@ def settle_usage(
         cost_cny += Decimal(usage["output_tokens"]) * pricing.get("output_million_cny", Decimal("0")) / Decimal("1000000")
     elif capability == "image.standard":
         cost_cny = Decimal(usage["image_count"]) * pricing.get("image_cny", Decimal("0"))
-    elif capability in {"video.standard", "video.presenter"}:
-        cost_cny = Decimal(usage["video_tokens"]) * pricing.get("token_million_cny", Decimal("0")) / Decimal("1000000")
+    elif capability == "video.subject_detection":
+        cost_cny = Decimal(usage["image_count"] or 1) * pricing.get("image_cny", Decimal("0"))
+    elif capability in {"video.standard", "video.presenter", "video.omnihuman"}:
+        # OmniHuman1.5 按秒计费（1 CNY/秒）；视频通用模型按 token 计费。
+        seconds = usage.get("video_seconds") or 0
+        if pricing.get("seconds_cny") is not None and seconds > 0:
+            cost_cny = Decimal(seconds) * pricing["seconds_cny"]
+        else:
+            cost_cny = Decimal(usage["video_tokens"]) * pricing.get("token_million_cny", Decimal("0")) / Decimal("1000000")
     elif capability == "speech.tts":
-        cost_cny = Decimal(usage["speech_characters"]) * pricing.get("characters_10k_cny", Decimal("0")) / Decimal("10000")
+        if "minute_cny" in pricing:
+            if not usage["speech_ms"]:
+                raise ValueError("Seed Audio response has no billable duration")
+            cost_cny = Decimal(usage["speech_ms"]) * pricing["minute_cny"] / Decimal("60000")
+        else:
+            cost_cny = Decimal(usage["speech_characters"]) * pricing.get("characters_10k_cny", Decimal("0")) / Decimal("10000")
+    elif capability == "speech.asr":
+        if "hour_cny" in pricing:
+            cost_cny = Decimal(usage["asr_ms"]) * pricing["hour_cny"] / Decimal("3600000")
+        else:
+            cost_cny = Decimal(usage["asr_seconds"] or 0) * pricing.get("seconds_cny", Decimal("0"))
 
     provider_cost_micros = int((cost_cny * MICROS).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
     credits = cost_cny / PROVIDER_COST_SHARE * CREDITS_PER_CNY
@@ -212,16 +259,30 @@ def estimate_credits_micros(
     elif capability == "image.standard":
         count = max(1, int(payload.get("n") or 1))
         cost_cny = Decimal(count) * pricing.get("image_cny", Decimal("0"))
-    elif capability in {"video.standard", "video.presenter"}:
+    elif capability in {"video.standard", "video.presenter", "video.omnihuman"}:
         duration = max(1, int(payload.get("duration") or 5))
-        # Video token usage is materially higher than text token estimates.
-        # Production observations are around 21.7k tokens/second for 720p;
-        # reserve conservatively so settlement cannot push a prepaid account
-        # negative after the provider task has already completed.
-        tokens_per_second = Decimal(str((route_config or {}).get("video_tokens_per_second", 25000)))
-        cost_cny = Decimal(duration) * tokens_per_second * pricing.get("token_million_cny", Decimal("0")) / Decimal("1000000")
+        # OmniHuman1.5 按秒计费（1 CNY/秒）
+        if pricing.get("seconds_cny") is not None:
+            cost_cny = Decimal(duration) * pricing["seconds_cny"]
+        else:
+            # Video token usage is materially higher than text token estimates.
+            # Production observations are around 21.7k tokens/second for 720p;
+            # reserve conservatively so settlement cannot push a prepaid account
+            # negative after the provider task has already completed.
+            tokens_per_second = Decimal(str((route_config or {}).get("video_tokens_per_second", 25000)))
+            cost_cny = Decimal(duration) * tokens_per_second * pricing.get("token_million_cny", Decimal("0")) / Decimal("1000000")
+    elif capability == "video.subject_detection":
+        cost_cny = pricing.get("image_cny", Decimal("0"))
     elif capability == "speech.tts":
         chars = max(1, len(str(payload.get("input") or payload.get("text") or "")))
-        cost_cny = Decimal(chars) * pricing.get("characters_10k_cny", Decimal("0")) / Decimal("10000")
+        if "minute_cny" in pricing:
+            # Seed Audio can generate up to two minutes; reserve the maximum
+            # so generation cannot overdraw a prepaid balance.
+            cost_cny = Decimal("2") * pricing["minute_cny"]
+        else:
+            cost_cny = Decimal(chars) * pricing.get("characters_10k_cny", Decimal("0")) / Decimal("10000")
+    elif capability == "speech.asr":
+        seconds = max(1, int(payload.get("estimated_seconds") or 30))
+        cost_cny = Decimal(seconds) * (pricing["hour_cny"] / Decimal("3600") if "hour_cny" in pricing else pricing.get("seconds_cny", Decimal("0")))
     credits = cost_cny / PROVIDER_COST_SHARE * CREDITS_PER_CNY
     return max(1, int((credits * MICROS).quantize(Decimal("1"), rounding=ROUND_HALF_UP)))

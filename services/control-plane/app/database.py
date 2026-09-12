@@ -25,9 +25,23 @@ def new_id(prefix: str) -> str:
     return f"{prefix}_{uuid4().hex}"
 
 
+PRIVATE_PRODUCT_ID = "szyg_private"
+PUBLIC_PRODUCT_ID = "xiaoyu_public"
+
+
+class Product(Base):
+    __tablename__ = "products"
+    id: Mapped[str] = mapped_column(String(48), primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    registration_mode: Mapped[str] = mapped_column(String(24), default="invite_only")
+    status: Mapped[str] = mapped_column(String(24), default="active", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class Organization(Base):
     __tablename__ = "organizations"
     id: Mapped[str] = mapped_column(String(48), primary_key=True, default=lambda: new_id("org"))
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id"), default=PRIVATE_PRODUCT_ID, index=True)
     name: Mapped[str] = mapped_column(String(120))
     status: Mapped[str] = mapped_column(String(24), default="active", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -35,9 +49,11 @@ class Organization(Base):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (UniqueConstraint("product_id", "email", name="uq_users_product_email"),)
     id: Mapped[str] = mapped_column(String(48), primary_key=True, default=lambda: new_id("usr"))
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id"), default=PRIVATE_PRODUCT_ID, index=True)
     organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
-    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    email: Mapped[str] = mapped_column(String(320), index=True)
     display_name: Mapped[str] = mapped_column(String(120), default="")
     password_hash: Mapped[str] = mapped_column(Text)
     role: Mapped[str] = mapped_column(String(24), default="user", index=True)
@@ -53,6 +69,7 @@ class User(Base):
 class Invitation(Base):
     __tablename__ = "invitations"
     id: Mapped[str] = mapped_column(String(48), primary_key=True, default=lambda: new_id("inv"))
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id"), default=PRIVATE_PRODUCT_ID, index=True)
     organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
     email: Mapped[str] = mapped_column(String(320), index=True)
     code_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
@@ -83,8 +100,10 @@ class Device(Base):
 
 class LoginDeviceBlock(Base):
     __tablename__ = "login_device_blocks"
+    __table_args__ = (UniqueConstraint("product_id", "identity_key", name="uq_login_block_product_identity"),)
     id: Mapped[str] = mapped_column(String(48), primary_key=True, default=lambda: new_id("ldb"))
-    identity_key: Mapped[str] = mapped_column(String(160), unique=True, index=True)
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id"), default=PRIVATE_PRODUCT_ID, index=True)
+    identity_key: Mapped[str] = mapped_column(String(160), index=True)
     installation_id: Mapped[str] = mapped_column(String(160), default="", index=True)
     fingerprint_hash: Mapped[str] = mapped_column(String(128), default="", index=True)
     device_name: Mapped[str] = mapped_column(String(160), default="Windows PC")
@@ -135,8 +154,10 @@ class UsageEvent(Base):
     __tablename__ = "usage_events"
     __table_args__ = (UniqueConstraint("user_id", "idempotency_key", name="uq_usage_idempotency"),)
     id: Mapped[str] = mapped_column(String(48), primary_key=True, default=lambda: new_id("use"))
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id"), default=PRIVATE_PRODUCT_ID, index=True)
     organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    wallet_id: Mapped[str | None] = mapped_column(ForeignKey("credit_wallets.id"), nullable=True, index=True)
     device_id: Mapped[str] = mapped_column(ForeignKey("devices.id"), index=True)
     idempotency_key: Mapped[str] = mapped_column(String(160))
     capability: Mapped[str] = mapped_column(String(80), index=True)
@@ -149,6 +170,7 @@ class UsageEvent(Base):
     provider_model: Mapped[str] = mapped_column(String(180), default="")
     provider_cost_micros: Mapped[int] = mapped_column(BigInteger, default=0)
     credits_charged_micros: Mapped[int] = mapped_column(BigInteger, default=0)
+    reserved_credits_micros: Mapped[int] = mapped_column(BigInteger, default=0)
     pricing_version: Mapped[str] = mapped_column(String(40), default="")
     pricing_snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
     provider_request_id: Mapped[str] = mapped_column(String(160), default="")
@@ -162,8 +184,10 @@ class UsageEvent(Base):
 class CreditTransaction(Base):
     __tablename__ = "credit_transactions"
     id: Mapped[str] = mapped_column(String(48), primary_key=True, default=lambda: new_id("crd"))
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id"), default=PRIVATE_PRODUCT_ID, index=True)
     organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    wallet_id: Mapped[str | None] = mapped_column(ForeignKey("credit_wallets.id"), nullable=True, index=True)
     kind: Mapped[str] = mapped_column(String(24), default="recharge", index=True)
     credits_micros: Mapped[int] = mapped_column(BigInteger)
     payment_amount_micros: Mapped[int] = mapped_column(BigInteger, default=0)
@@ -172,6 +196,76 @@ class CreditTransaction(Base):
     reference_id: Mapped[str] = mapped_column(String(120), default="", index=True)
     created_by: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class CreditWallet(Base):
+    __tablename__ = "credit_wallets"
+    __table_args__ = (
+        UniqueConstraint("product_id", "user_id", name="uq_credit_wallet_product_user"),
+    )
+    id: Mapped[str] = mapped_column(String(48), primary_key=True, default=lambda: new_id("wal"))
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id"), index=True)
+    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    balance_micros: Mapped[int] = mapped_column(BigInteger, default=0)
+    reserved_micros: Mapped[int] = mapped_column(BigInteger, default=0)
+    status: Mapped[str] = mapped_column(String(24), default="active", index=True)
+    version: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class CreditLedgerEntry(Base):
+    __tablename__ = "credit_ledger_entries"
+    __table_args__ = (
+        UniqueConstraint("wallet_id", "idempotency_key", name="uq_credit_ledger_wallet_idempotency"),
+    )
+    id: Mapped[str] = mapped_column(String(48), primary_key=True, default=lambda: new_id("led"))
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id"), index=True)
+    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    wallet_id: Mapped[str] = mapped_column(ForeignKey("credit_wallets.id"), index=True)
+    entry_type: Mapped[str] = mapped_column(String(32), index=True)
+    credits_delta_micros: Mapped[int] = mapped_column(BigInteger)
+    balance_after_micros: Mapped[int] = mapped_column(BigInteger)
+    payment_amount_micros: Mapped[int] = mapped_column(BigInteger, default=0)
+    currency: Mapped[str] = mapped_column(String(8), default="CNY")
+    payment_order_id: Mapped[str] = mapped_column(String(80), default="", index=True)
+    reference_id: Mapped[str] = mapped_column(String(120), default="", index=True)
+    usage_event_id: Mapped[str | None] = mapped_column(ForeignKey("usage_events.id"), nullable=True, index=True)
+    operator_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(160))
+    note: Mapped[str] = mapped_column(String(240), default="")
+    detail: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class PaymentOrder(Base):
+    __tablename__ = "payment_orders"
+    __table_args__ = (
+        UniqueConstraint("product_id", "merchant_order_no", name="uq_payment_product_merchant_order"),
+        UniqueConstraint("user_id", "idempotency_key", name="uq_payment_user_idempotency"),
+    )
+    id: Mapped[str] = mapped_column(String(48), primary_key=True, default=lambda: new_id("pay"))
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id"), index=True)
+    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    wallet_id: Mapped[str] = mapped_column(ForeignKey("credit_wallets.id"), index=True)
+    channel: Mapped[str] = mapped_column(String(24), default="alipay", index=True)
+    merchant_order_no: Mapped[str] = mapped_column(String(64), index=True)
+    provider_trade_no: Mapped[str] = mapped_column(String(80), default="", index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(160))
+    status: Mapped[str] = mapped_column(String(24), default="pending", index=True)
+    amount_micros: Mapped[int] = mapped_column(BigInteger)
+    credits_micros: Mapped[int] = mapped_column(BigInteger)
+    currency: Mapped[str] = mapped_column(String(8), default="CNY")
+    subject: Mapped[str] = mapped_column(String(120), default="数字员工 Credits 充值")
+    notification: Mapped[dict] = mapped_column(JSON, default=dict)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    credited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
 class ProviderBillingDaily(Base):

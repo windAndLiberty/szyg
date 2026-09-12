@@ -54,7 +54,7 @@ export default function GeoMonitoring() {
     if (!question) { setError('请先在品牌体检中确认客户问题'); return }
     const available = providers.filter((item) => item.configured && item.mode === 'consumer_surface')
     const selectedProvider = available.find((item) => item.id === provider) || available.find((item) => item.id === 'deepseek') || available[0]
-    if (!selectedProvider) { setError('请使用领鹿开发桌面版进行真实AI界面检测'); return }
+    if (!selectedProvider) { setError('请使用数字员工桌面版进行真实AI界面检测'); return }
     setAuditWorking(true); setError(''); setNotice('')
     try {
       let next = await createGeoAudit({ provider_ids: [selectedProvider.id], question_ids: [question.id], sample_count: 1, mode: 'diagnostic' })

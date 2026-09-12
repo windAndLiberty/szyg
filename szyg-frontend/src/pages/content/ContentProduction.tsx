@@ -2301,7 +2301,7 @@ const FALLBACK_TTS_VOICES: TtsVoice[] = [
     tags: ['温柔', '自然', '小红书'],
     scene: '短视频种草、品牌介绍',
     description: '亲和自然的女声，适合产品介绍和生活方式内容。',
-    demo_text: '您好，我是领鹿员工，很高兴为您服务。',
+    demo_text: '您好，我是数字员工，很高兴为您服务。',
   },
   {
     id: 'pro_male',
@@ -2311,7 +2311,7 @@ const FALLBACK_TTS_VOICES: TtsVoice[] = [
     tags: ['专业', '清晰', '商务'],
     scene: '企业宣传、知识讲解',
     description: '清晰稳重的男声，适合企业宣传和专业讲解。',
-    demo_text: '您好，我是领鹿员工，很高兴为您服务。',
+    demo_text: '您好，我是数字员工，很高兴为您服务。',
   },
 ]
 

@@ -70,6 +70,22 @@ def _ffmpeg_run(args: list, timeout: int = 300) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
 
 
+def probe_duration(input_path: str) -> float:
+    """Resolve ffprobe next to the bundled ffmpeg on customer machines."""
+    ffmpeg = Path(shutil.which(_get_ffmpeg()) or _get_ffmpeg())
+    ffprobe = ffmpeg.with_name("ffprobe.exe" if ffmpeg.suffix == ".exe" else "ffprobe")
+    executable = str(ffprobe) if ffprobe.is_file() else shutil.which("ffprobe")
+    if not executable:
+        raise FileNotFoundError("音频分析工具 ffprobe 缺失，请重新安装客户端")
+    result = subprocess.run(
+        [executable, "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", input_path],
+        capture_output=True, text=True, timeout=60,
+    )
+    if result.returncode != 0:
+        raise RuntimeError("无法读取素材时长，请检查音视频文件")
+    return float(result.stdout.strip())
+
+
 # ── Video Templates ────────────────────────────────────
 
 TEMPLATES_DIR = Path(__file__).parent / "video_templates"
@@ -192,6 +208,27 @@ def add_text_overlay(
         "-i", input_path,
         "-vf", drawtext,
         "-codec:a", "copy", output_path
+    ])
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr[:500])
+    return output_path
+
+
+def extract_audio(input_path: str, output_path: str, sample_rate: int = 16000, channels: int = 1, *, max_duration: float | None = None) -> str:
+    """Extract audio track from video to WAV (mono, 16kHz by default)."""
+    duration_args = []
+    if max_duration is not None:
+        if max_duration <= 0:
+            raise ValueError("max_duration must be positive")
+        duration_args = ["-t", str(max_duration)]
+    result = _ffmpeg_run([
+        "-i", input_path,
+        "-vn",
+        "-ar", str(sample_rate),
+        "-ac", str(channels),
+        "-c:a", "pcm_s16le",
+        *duration_args,
+        output_path,
     ])
     if result.returncode != 0:
         raise RuntimeError(result.stderr[:500])

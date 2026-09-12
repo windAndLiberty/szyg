@@ -34,7 +34,7 @@ async def brain_status():
 
 @router.get("/prompt")
 async def brain_prompt():
-    return {"prompt": "领鹿员工会结合已授权能力理解目标、执行任务并给出可核验结果。"}
+    return {"prompt": "数字员工会结合已授权能力理解目标、执行任务并给出可核验结果。"}
 
 
 @router.get("/mcp")

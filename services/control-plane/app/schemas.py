@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Any
 
 from pydantic import BaseModel, EmailStr, Field
@@ -20,6 +21,7 @@ class ActivateRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
+    product_id: str = Field(default="szyg_private", pattern="^(szyg_private|xiaoyu_public)$")
     email: str = Field(min_length=3, max_length=320)
     password: str
     device: DeviceInput
@@ -72,11 +74,19 @@ class EntitlementUpdate(BaseModel):
 
 class AdminCreditRechargeRequest(BaseModel):
     credits: float = Field(gt=0)
-    kind: str = Field(default="recharge", pattern="^(recharge|adjust|grant|refund)$")
+    kind: str = Field(
+        default="admin_grant",
+        pattern="^(recharge|adjust|grant|refund|admin_grant|contract_credit|test_credit)$",
+    )
     payment_amount_micros: int = Field(default=0, ge=0)
     currency: str = Field(default="CNY", max_length=8)
     note: str = Field(default="", max_length=240)
     reference_id: str = Field(default="", max_length=120)
+
+
+class PaymentOrderCreateRequest(BaseModel):
+    amount_cny: Decimal = Field(ge=Decimal("0.01"), le=Decimal("100000"), multiple_of=Decimal("0.01"))
+    idempotency_key: str = Field(min_length=8, max_length=160)
 
 
 class UserStatusUpdate(BaseModel):
