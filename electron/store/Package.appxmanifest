@@ -12,13 +12,13 @@
   IgnorableNamespaces="uap uap2 uap3 uap10 desktop desktop6 rescap">
 
   <Identity
-    Name="YuSeTech.965800DE7617"
+    Name="YuSeTech.AI"
     Publisher="CN=5E86A6E9-6F90-4E5A-A9DA-086C3BF2C80C"
-    Version="1.1.4.0"
+    Version="1.1.5.0"
     ProcessorArchitecture="x64" />
 
   <Properties>
-    <DisplayName>小妤数字员工</DisplayName>
+    <DisplayName>小妤AI</DisplayName>
     <PublisherDisplayName>YuSeTech</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
     <uap10:PackageIntegrity>
@@ -36,12 +36,12 @@
   </Resources>
 
   <Applications>
-    <Application Id="XiaoyuDigitalEmployee"
-      Executable="XiaoyuDigitalEmployee.exe"
+    <Application Id="XiaoyuAI"
+      Executable="XiaoyuAI.exe"
       EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        DisplayName="小妤数字员工"
-        Description="小妤数字员工"
+        DisplayName="小妤AI"
+        Description="小妤AI"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\MedTile.png"
         Square44x44Logo="Assets\AppList.png">

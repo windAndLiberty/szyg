@@ -24,7 +24,7 @@ const enableDevTools = isDev || process.env.SZYG_DEBUG === '1'
 
 // Keep the public Store product fully isolated from the private desktop product.
 app.setPath('userData', path.join(app.getPath('appData'), 'xiaoyu-digital-employee'))
-app.setAppUserModelId('YuSeTech.965800DE7617')
+app.setAppUserModelId('YuSeTech.AI')
 
 let PORT = 8000
 const FRONTEND_PORT = 5173
@@ -465,12 +465,12 @@ async function createWindow() {
 function createTray() {
   const icon = nativeImage.createFromPath(TRAY_ICON_PATH)
   tray = new Tray(icon.resize({ width: 16, height: 16 }))
-  tray.setToolTip('小妤数字员工 - 双击打开')
+  tray.setToolTip('小妤AI - 双击打开')
   const menu = Menu.buildFromTemplate([
     { label: '打开主窗口', click: () => { mainWindow?.show(); mainWindow?.focus() } },
     { label: '重新加载', click: () => { mainWindow?.reload() } },
     { type: 'separator' },
-    { label: '退出小妤数字员工', click: () => { isQuitting = true; app.quit() } },
+    { label: '退出小妤AI', click: () => { isQuitting = true; app.quit() } },
   ])
   tray.setContextMenu(menu)
   tray.on('double-click', () => { mainWindow?.show(); mainWindow?.focus() })

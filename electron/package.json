@@ -1,7 +1,7 @@
 {
-  "name": "xiaoyu-digital-employee",
-  "version": "1.1.4",
-  "description": "小妤数字员工 - 超级数字员工",
+  "name": "xiaoyu-ai",
+  "version": "1.1.5",
+  "description": "小妤AI - 超级数字员工",
   "author": "YuSeTech",
   "main": "main.js",
   "scripts": {
@@ -21,8 +21,9 @@
     "build:store": "npm run build:dir && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-store-msix.ps1"
   },
   "build": {
-    "appId": "com.yusetech.xiaoyu",
-    "productName": "小妤数字员工",
+    "appId": "com.yusetech.xiaoyuai",
+    "productName": "小妤AI",
+    "electronDist": "node_modules/electron/dist",
     "directories": {
       "output": "dist"
     },
@@ -89,7 +90,7 @@
         }
       ],
       "icon": "../assets/xiaoyu.ico",
-      "executableName": "XiaoyuDigitalEmployee",
+      "executableName": "XiaoyuAI",
       "verifyUpdateCodeSignature": true
     },
     "nsis": {
@@ -99,19 +100,19 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "小妤数字员工",
+      "shortcutName": "小妤AI",
       "installerIcon": "../assets/xiaoyu.ico",
       "uninstallerIcon": "../assets/xiaoyu.ico",
       "installerHeaderIcon": "../assets/xiaoyu.ico",
-      "uninstallDisplayName": "小妤数字员工 ${version}",
+      "uninstallDisplayName": "小妤AI ${version}",
       "deleteAppDataOnUninstall": false,
       "installerLanguages": [
         "zh_CN"
       ],
       "language": "2052",
-      "artifactName": "小妤数字员工-${version}-Windows-${arch}-安装包.${ext}"
+      "artifactName": "小妤AI-${version}-Windows-${arch}-安装包.${ext}"
     },
-    "artifactName": "小妤数字员工-${version}-Windows-${arch}.${ext}"
+    "artifactName": "小妤AI-${version}-Windows-${arch}.${ext}"
   },
   "devDependencies": {
     "7zip-bin": "^5.2.0",

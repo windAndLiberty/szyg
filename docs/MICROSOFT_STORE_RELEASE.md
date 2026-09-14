@@ -1,11 +1,11 @@
-# 小妤数字员工 Microsoft Store 发布
+# 小妤AI Microsoft Store 发布
 
 ## 产品身份
 
-- Package name: `YuSeTech.965800DE7617`
+- Package name: `YuSeTech.AI`
 - Publisher: `CN=5E86A6E9-6F90-4E5A-A9DA-086C3BF2C80C`
 - Publisher display name: `YuSeTech`
-- Application id: `XiaoyuDigitalEmployee`
+- Application id: `XiaoyuAI`
 - Product id: `xiaoyu_public`
 
 这些值来自 Partner Center，大小写必须保持一致。MSIX 版本使用四段格式，最后一段固定为 `0`。
@@ -21,7 +21,7 @@ npm run build:store
 该命令会完成源码隐私检查、前端构建、本地后端与 Hermes 打包、运行时完整性清单、Electron x64 布局和 MSIX 生成。Store 包输出到：
 
 ```text
-electron/dist/store/XiaoyuDigitalEmployee-1.1.4.0-x64-Store.msix
+electron/dist/store/XiaoyuAI-1.1.5.0-x64-Store.msix
 ```
 
 提交给 Microsoft Store 的 MSIX 无需开发者自行购买 CA 代码签名证书，Store 会在认证流程中签名。直接在本机侧载时，另行生成并信任仅用于本地测试的开发证书。

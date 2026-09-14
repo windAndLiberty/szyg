@@ -105,8 +105,8 @@ export default function CloudLogin({ initialMessage = '', onSuccess }: { initial
       <div aria-hidden="true" className="absolute inset-0 bg-black/25 md:bg-black/10" />
       <section className="relative z-10 mx-auto w-full max-w-[420px] md:mx-0">
         <div className="mb-7 flex items-center gap-3 drop-shadow-lg">
-          <div className="grid h-11 w-11 place-items-center overflow-hidden rounded-lg border border-white/15 bg-[#0B1220]/80"><img src="/logo1.png" alt="小妤数字员工" className="h-full w-full object-cover" /></div>
-          <div><h1 className="text-xl font-semibold">小妤数字员工</h1><p className="mt-1 text-sm text-[#CBD5E1]">{mode === 'login' ? '登录后继续使用智能服务' : mode === 'register' ? '注册账号后按需充值 Credits' : '验证当前密码后设置新密码'}</p></div>
+          <div className="grid h-11 w-11 place-items-center overflow-hidden rounded-lg border border-white/15 bg-[#0B1220]/80"><img src="/logo1.png" alt="小妤AI" className="h-full w-full object-cover" /></div>
+          <div><h1 className="text-xl font-semibold">小妤AI</h1><p className="mt-1 text-sm text-[#CBD5E1]">{mode === 'login' ? '登录后继续使用智能服务' : mode === 'register' ? '注册账号后按需充值 Credits' : '验证当前密码后设置新密码'}</p></div>
         </div>
         <form className="rounded-lg border border-white/15 bg-[#0B1220]/90 p-6 shadow-2xl backdrop-blur-md" onSubmit={(event) => { event.preventDefault(); void submit() }}>
             <div className="space-y-4">

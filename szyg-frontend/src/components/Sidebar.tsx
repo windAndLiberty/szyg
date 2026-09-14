@@ -72,9 +72,9 @@ export default function Sidebar() {
     style={{ width: collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED }}
   >
     <div className={cn('flex h-16 shrink-0 items-center border-b border-[#1E293B]', collapsed ? 'justify-center px-2' : 'px-4')}>
-      <Link to="/" className="flex min-w-0 items-center gap-3" title={collapsed ? '小妤数字员工' : undefined}>
-        <img src="/logo1.png" alt="小妤数字员工" className="h-8 w-8 shrink-0 rounded-md object-cover" />
-        {!collapsed && <div className="min-w-0"><p className="whitespace-nowrap font-display text-xl font-bold text-[#F1F5F9]">小妤数字员工</p><p className="-mt-0.5 whitespace-nowrap text-[10px] text-[#64748B]">{t('超级数字员工')}</p></div>}
+      <Link to="/" className="flex min-w-0 items-center gap-3" title={collapsed ? '小妤AI' : undefined}>
+        <img src="/logo1.png" alt="小妤AI" className="h-8 w-8 shrink-0 rounded-md object-cover" />
+        {!collapsed && <div className="min-w-0"><p className="whitespace-nowrap font-display text-xl font-bold text-[#F1F5F9]">小妤AI</p><p className="-mt-0.5 whitespace-nowrap text-[10px] text-[#64748B]">{t('超级数字员工')}</p></div>}
       </Link>
     </div>
 
