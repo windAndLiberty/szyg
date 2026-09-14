@@ -84,6 +84,23 @@ class Invitation(Base):
     activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class EmailVerificationChallenge(Base):
+    __tablename__ = "email_verification_challenges"
+    id: Mapped[str] = mapped_column(String(48), primary_key=True, default=lambda: new_id("evc"))
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id"), index=True)
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    code_hash: Mapped[str] = mapped_column(String(64))
+    purpose: Mapped[str] = mapped_column(String(32), default="register", index=True)
+    status: Mapped[str] = mapped_column(String(24), default="pending", index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    ip_hash: Mapped[str] = mapped_column(String(64), default="", index=True)
+    device_fingerprint_hash: Mapped[str] = mapped_column(String(64), default="", index=True)
+    installation_id_hash: Mapped[str] = mapped_column(String(64), default="", index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
 class Device(Base):
     __tablename__ = "devices"
     __table_args__ = (UniqueConstraint("user_id", "installation_id", name="uq_user_installation"),)

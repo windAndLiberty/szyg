@@ -24,6 +24,12 @@ class RegisterBody(BaseModel):
     email: str = Field(min_length=3, max_length=320)
     display_name: str = Field(min_length=1, max_length=120)
     password: str = Field(min_length=10, max_length=200)
+    verification_id: str = Field(min_length=8, max_length=80)
+    verification_code: str = Field(pattern="^[0-9]{6}$")
+
+
+class RegisterCodeBody(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
 
 
 class FeedbackBody(BaseModel):
@@ -77,7 +83,19 @@ def activate(body: ActivateBody):
 
 @router.post("/register")
 def register(body: RegisterBody):
-    return call(cloud_auth.register, body.email, body.display_name, body.password)
+    return call(
+        cloud_auth.register,
+        body.email,
+        body.display_name,
+        body.password,
+        body.verification_id,
+        body.verification_code,
+    )
+
+
+@router.post("/register/code")
+def register_code(body: RegisterCodeBody):
+    return call(cloud_auth.request_registration_code, body.email)
 
 
 @router.post("/logout")

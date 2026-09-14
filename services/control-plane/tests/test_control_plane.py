@@ -444,7 +444,17 @@ def test_public_product_self_registration_creates_isolated_zero_balance_wallet()
             "password": "public-user-password-123",
             "device": device("xiaoyu-register-device-0001"),
         }
-        registered = client.post("/api/v1/auth/register", json=payload)
+        challenge = client.post("/api/v1/auth/register/code", json={
+            "product_id": payload["product_id"],
+            "email": payload["email"],
+            "device": payload["device"],
+        })
+        assert challenge.status_code == 200, challenge.text
+        registered = client.post("/api/v1/auth/register", json={
+            **payload,
+            "verification_id": challenge.json()["verification_id"],
+            "verification_code": challenge.json()["test_code"],
+        })
         assert registered.status_code == 200, registered.text
         assert registered.json()["user"]["product_id"] == "xiaoyu_public"
 
@@ -457,15 +467,59 @@ def test_public_product_self_registration_creates_isolated_zero_balance_wallet()
 
         duplicate = client.post(
             "/api/v1/auth/register",
-            json={**payload, "device": device("xiaoyu-register-device-0002")},
+            json={
+                **payload,
+                "device": device("xiaoyu-register-device-0002"),
+                "verification_id": challenge.json()["verification_id"],
+                "verification_code": challenge.json()["test_code"],
+            },
         )
         assert duplicate.status_code == 409
 
         private_registration = client.post(
             "/api/v1/auth/register",
-            json={**payload, "product_id": "szyg_private", "email": "private-register@example.com"},
+            json={
+                **payload,
+                "product_id": "szyg_private",
+                "email": "private-register@example.com",
+                "verification_id": challenge.json()["verification_id"],
+                "verification_code": challenge.json()["test_code"],
+            },
         )
         assert private_registration.status_code == 422
+
+
+def test_public_registration_code_is_rate_limited_and_required():
+    with TestClient(app) as client:
+        device_payload = device("xiaoyu-register-rate-device-0001")
+        request_payload = {
+            "product_id": "xiaoyu_public",
+            "email": "rate-limited-xiaoyu@example.com",
+            "device": device_payload,
+        }
+        first = client.post("/api/v1/auth/register/code", json=request_payload)
+        assert first.status_code == 200, first.text
+        second = client.post("/api/v1/auth/register/code", json=request_payload)
+        assert second.status_code == 429
+
+        wrong = client.post("/api/v1/auth/register", json={
+            **request_payload,
+            "display_name": "验证码测试",
+            "password": "public-user-password-123",
+            "verification_id": first.json()["verification_id"],
+            "verification_code": "000000" if first.json()["test_code"] != "000000" else "000001",
+        })
+        assert wrong.status_code == 400
+        assert "验证码不正确" in wrong.text
+
+        missing = client.post("/api/v1/auth/register", json={
+            "product_id": "xiaoyu_public",
+            "email": "missing-code@example.com",
+            "display_name": "缺少验证码",
+            "password": "public-user-password-123",
+            "device": device("xiaoyu-register-missing-code"),
+        })
+        assert missing.status_code == 422
 
 
 def test_failed_provider_call_releases_wallet_reservation(monkeypatch):

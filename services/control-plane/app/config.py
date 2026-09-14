@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -47,6 +48,13 @@ class Settings(BaseSettings):
     alipay_gateway_url: str = "https://openapi.alipay.com/gateway.do"
     alipay_notify_url: str = ""
     alipay_return_url: str = ""
+    ses_region: str = "ap-hongkong"
+    ses_secret_id: str = ""
+    ses_secret_key: str = ""
+    ses_secret_id_file: str = ""
+    ses_secret_key_file: str = ""
+    ses_from_email: str = ""
+    ses_template_id: int = 0
     reference_temp_dir: str = "./data/reference_uploads"
     reference_ttl_hours: int = 24
     reference_max_mb: int = 200
@@ -72,6 +80,35 @@ class Settings(BaseSettings):
             self.alipay_app_id
             and self.alipay_merchant_private_key_file
             and self.alipay_public_key_file
+        )
+
+    @staticmethod
+    def _secret_value(value: str, file_name: str) -> str:
+        if value:
+            return value.strip()
+        if file_name:
+            try:
+                return Path(file_name).read_text(encoding="utf-8").strip()
+            except OSError:
+                return ""
+        return ""
+
+    @property
+    def ses_secret_id_value(self) -> str:
+        return self._secret_value(self.ses_secret_id, self.ses_secret_id_file)
+
+    @property
+    def ses_secret_key_value(self) -> str:
+        return self._secret_value(self.ses_secret_key, self.ses_secret_key_file)
+
+    @property
+    def ses_enabled(self) -> bool:
+        return bool(
+            self.ses_region
+            and self.ses_secret_id_value
+            and self.ses_secret_key_value
+            and self.ses_from_email
+            and self.ses_template_id
         )
 
     model_text_fast: str = Field(default="", validation_alias="MODEL_TEXT_FAST")

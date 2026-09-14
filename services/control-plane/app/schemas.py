@@ -26,6 +26,14 @@ class PublicRegisterRequest(BaseModel):
     display_name: str = Field(min_length=1, max_length=120)
     password: str = Field(min_length=10, max_length=200)
     device: DeviceInput
+    verification_id: str = Field(min_length=8, max_length=80)
+    verification_code: str = Field(pattern="^[0-9]{6}$")
+
+
+class PublicRegisterCodeRequest(BaseModel):
+    product_id: str = Field(pattern="^xiaoyu_public$")
+    email: EmailStr
+    device: DeviceInput
 
 
 class LoginRequest(BaseModel):

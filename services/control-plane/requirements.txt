@@ -12,3 +12,4 @@ volcengine==1.0.222
 python-multipart==0.0.20
 email-validator==2.2.0
 alipay-sdk-python==3.7.1360
+tencentcloud-sdk-python==3.1.175
