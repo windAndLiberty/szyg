@@ -37,7 +37,9 @@ class TencentSesSender:
             request.Subject = "小妤数字员工注册验证码"
             template = models.Template()
             template.TemplateID = int(self.settings.ses_template_id)
-            template.TemplateData = json.dumps({"code": code}, ensure_ascii=False)
+            # The approved Tencent SES template uses {{xxx}} as its single
+            # variable. TemplateData keys must match the placeholder exactly.
+            template.TemplateData = json.dumps({"xxx": code}, ensure_ascii=False)
             request.Template = template
             response = client.SendEmail(request)
             return str(response.MessageId or "")
