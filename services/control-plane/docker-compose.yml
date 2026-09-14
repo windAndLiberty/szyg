@@ -30,6 +30,10 @@ services:
         target: alipay_merchant_private_key.pem
       - source: alipay_public_key
         target: alipay_public_key.pem
+      - source: tencent_ses_secret_id
+        target: tencent_ses_secret_id
+      - source: tencent_ses_secret_key
+        target: tencent_ses_secret_key
     ports:
       - "127.0.0.1:18080:18080"
     healthcheck:
@@ -58,6 +62,8 @@ services:
       CONTROL_DOMAIN: ${CONTROL_DOMAIN:-control.example.com}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./downloads/szyg:/srv/downloads/szyg:ro
+      - ./public/xiaoyu:/srv/xiaoyu:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
@@ -75,6 +81,10 @@ secrets:
     file: ./secrets/alipay_merchant_private_key.pem
   alipay_public_key:
     file: ./secrets/alipay_public_key.pem
+  tencent_ses_secret_id:
+    file: ./secrets/tencent_ses_secret_id.txt
+  tencent_ses_secret_key:
+    file: ./secrets/tencent_ses_secret_key.txt
 
 volumes:
   postgres_data:

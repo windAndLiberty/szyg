@@ -30,6 +30,7 @@ from .database import (
     CreditLedgerEntry,
     CreditWallet,
     Device,
+    EmailVerificationChallenge,
     Entitlement,
     Feedback,
     Invitation,
@@ -65,6 +66,7 @@ from .schemas import (
     ModelRouteUpdate,
     PaymentOrderCreateRequest,
     PublicRegisterRequest,
+    PublicRegisterCodeRequest,
     RefreshRequest,
     UserStatusUpdate,
 )
@@ -80,6 +82,7 @@ from .security import (
 )
 from .usage_accounting import CREDITS_PER_CNY, estimate_credits_micros, settle_usage
 from .alipay import AlipayGateway
+from .ses import SesDeliveryError, TencentSesSender
 from .wallets import (
     credit as credit_wallet,
     ensure_wallet,
@@ -734,6 +737,104 @@ def activate(req: ActivateRequest, db: Session = Depends(get_db)):
     return result
 
 
+def _registration_hash(value: str) -> str:
+    return hmac.new(
+        settings.jwt_secret.encode("utf-8"),
+        value.strip().encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _masked_email(email: str) -> str:
+    local, _, domain = email.partition("@")
+    return f"{local[:1]}***@{domain}" if domain else "***"
+
+
+@app.post("/api/v1/auth/register/code")
+def public_register_code(
+    req: PublicRegisterCodeRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    product = db.get(Product, req.product_id)
+    if not product or product.status != "active" or product.registration_mode != "self_service":
+        raise HTTPException(403, "当前产品未开放自助注册")
+    email = req.email.lower().strip()
+    if db.scalar(select(User.id).where(User.product_id == req.product_id, User.email == email)):
+        raise HTTPException(409, "该邮箱已经注册，请直接登录")
+
+    now = utcnow()
+    hour_ago = now - timedelta(hours=1)
+    day_ago = now - timedelta(days=1)
+    ip_hash = _registration_hash(request.client.host if request.client else "unknown")
+    fingerprint_hash = _registration_hash(req.device.fingerprint or req.device.installation_id)
+    installation_hash = _registration_hash(req.device.installation_id)
+    latest = db.scalar(
+        select(EmailVerificationChallenge)
+        .where(
+            EmailVerificationChallenge.product_id == req.product_id,
+            EmailVerificationChallenge.email == email,
+            EmailVerificationChallenge.status != "send_failed",
+        )
+        .order_by(EmailVerificationChallenge.created_at.desc())
+    )
+    if latest and as_utc(latest.created_at) > now - timedelta(seconds=60):
+        raise HTTPException(429, "验证码发送过于频繁，请60秒后再试")
+
+    def challenge_count(*conditions) -> int:
+        return int(db.scalar(
+            select(func.count(EmailVerificationChallenge.id)).where(*conditions)
+        ) or 0)
+
+    common = (
+        EmailVerificationChallenge.product_id == req.product_id,
+        EmailVerificationChallenge.status != "send_failed",
+    )
+    if challenge_count(*common, EmailVerificationChallenge.email == email, EmailVerificationChallenge.created_at >= hour_ago) >= 5:
+        raise HTTPException(429, "该邮箱验证码发送次数过多，请稍后再试")
+    if challenge_count(*common, EmailVerificationChallenge.ip_hash == ip_hash, EmailVerificationChallenge.created_at >= hour_ago) >= 20:
+        raise HTTPException(429, "当前网络注册请求过多，请稍后再试")
+    if challenge_count(*common, EmailVerificationChallenge.device_fingerprint_hash == fingerprint_hash, EmailVerificationChallenge.created_at >= day_ago) >= 10:
+        raise HTTPException(429, "当前设备验证码发送次数过多，请明天再试")
+
+    for previous in db.scalars(select(EmailVerificationChallenge).where(
+        EmailVerificationChallenge.product_id == req.product_id,
+        EmailVerificationChallenge.email == email,
+        EmailVerificationChallenge.status == "pending",
+    )):
+        previous.status = "superseded"
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    challenge = EmailVerificationChallenge(
+        product_id=req.product_id,
+        email=email,
+        code_hash=token_hash(code),
+        ip_hash=ip_hash,
+        device_fingerprint_hash=fingerprint_hash,
+        installation_id_hash=installation_hash,
+        expires_at=now + timedelta(minutes=10),
+    )
+    db.add(challenge)
+    db.commit()
+    try:
+        if settings.environment != "test":
+            TencentSesSender(settings).send_registration_code(email, code)
+    except SesDeliveryError as exc:
+        challenge.status = "send_failed"
+        db.commit()
+        logger.warning("Registration email delivery failed: %s", exc)
+        raise HTTPException(503, "验证码邮件发送失败，请稍后再试") from exc
+
+    result = {
+        "verification_id": challenge.id,
+        "email": _masked_email(email),
+        "expires_in_seconds": 600,
+        "retry_after_seconds": 60,
+    }
+    if settings.environment == "test":
+        result["test_code"] = code
+    return result
+
+
 @app.post("/api/v1/auth/register")
 def public_register(req: PublicRegisterRequest, db: Session = Depends(get_db)):
     product = db.get(Product, req.product_id)
@@ -742,6 +843,43 @@ def public_register(req: PublicRegisterRequest, db: Session = Depends(get_db)):
     email = req.email.lower().strip()
     if db.scalar(select(User.id).where(User.product_id == req.product_id, User.email == email)):
         raise HTTPException(409, "该邮箱已经注册，请直接登录")
+
+    now = utcnow()
+    challenge = db.scalar(
+        select(EmailVerificationChallenge)
+        .where(EmailVerificationChallenge.id == req.verification_id)
+        .with_for_update()
+    )
+    if not challenge or challenge.product_id != req.product_id or challenge.email != email:
+        raise HTTPException(400, "验证码记录无效，请重新获取")
+    if challenge.status != "pending":
+        raise HTTPException(400, "验证码已经失效，请重新获取")
+    if as_utc(challenge.expires_at) <= now:
+        challenge.status = "expired"
+        db.commit()
+        raise HTTPException(400, "验证码已经过期，请重新获取")
+    if challenge.attempts >= 5:
+        challenge.status = "locked"
+        db.commit()
+        raise HTTPException(429, "验证码尝试次数过多，请重新获取")
+    challenge.attempts += 1
+    if not hmac.compare_digest(challenge.code_hash, token_hash(req.verification_code)):
+        if challenge.attempts >= 5:
+            challenge.status = "locked"
+        db.commit()
+        raise HTTPException(400, "验证码不正确")
+
+    day_ago = now - timedelta(days=1)
+    successful_from_device = int(db.scalar(
+        select(func.count(EmailVerificationChallenge.id)).where(
+            EmailVerificationChallenge.product_id == req.product_id,
+            EmailVerificationChallenge.device_fingerprint_hash == challenge.device_fingerprint_hash,
+            EmailVerificationChallenge.status == "consumed",
+            EmailVerificationChallenge.consumed_at >= day_ago,
+        )
+    ) or 0)
+    if successful_from_device >= 3:
+        raise HTTPException(429, "当前设备今天注册账号数量已达上限")
 
     organization = Organization(
         product_id=req.product_id,
@@ -771,6 +909,8 @@ def public_register(req: PublicRegisterRequest, db: Session = Depends(get_db)):
     db.add(entitlement)
     db.flush()
     device = _ensure_device(db, user, req.device, entitlement)
+    challenge.status = "consumed"
+    challenge.consumed_at = now
     result = _issue_session(db, user, device)
     result["license"] = _license_payload(user, device, entitlement)
     db.commit()

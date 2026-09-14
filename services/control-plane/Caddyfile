@@ -9,3 +9,37 @@
         -Server
     }
 }
+
+www.qdtracing.com {
+    redir https://qdtracing.com{uri} permanent
+}
+
+qdtracing.com {
+    handle_path /xiaoyu/* {
+        root * /srv/xiaoyu
+        try_files {path} {path}.html /index.html
+        file_server
+    }
+
+    @szyg_download_root path /download/szyg
+    redir @szyg_download_root /download/szyg/ 308
+
+    handle_path /download/szyg/* {
+        root * /srv/downloads/szyg
+        header Cache-Control "public, max-age=300"
+        file_server
+    }
+
+    handle {
+        encode zstd gzip
+        reverse_proxy qdtracing:3000
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+}

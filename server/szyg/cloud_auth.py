@@ -295,7 +295,24 @@ class CloudAuthManager:
                 return self._accept_session(data)
             return self._bind_with_rotation(attempt)
 
-    def register(self, email: str, display_name: str, password: str) -> dict:
+    def request_registration_code(self, email: str) -> dict:
+        with self._lock:
+            if self.config["product_id"] != "xiaoyu_public":
+                raise CloudAuthError("当前产品未开放自助注册")
+            return self._request("POST", "/api/v1/auth/register/code", json_body={
+                "product_id": self.config["product_id"],
+                "email": email,
+                "device": self.device(),
+            })
+
+    def register(
+        self,
+        email: str,
+        display_name: str,
+        password: str,
+        verification_id: str,
+        verification_code: str,
+    ) -> dict:
         with self._lock:
             if self.config["product_id"] != "xiaoyu_public":
                 raise CloudAuthError("当前产品未开放自助注册")
@@ -307,6 +324,8 @@ class CloudAuthManager:
                     "display_name": display_name,
                     "password": password,
                     "device": self.device(),
+                    "verification_id": verification_id,
+                    "verification_code": verification_code,
                 })
                 return self._accept_session(data)
             return self._bind_with_rotation(attempt)
