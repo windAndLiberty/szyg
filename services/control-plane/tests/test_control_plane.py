@@ -641,7 +641,7 @@ def test_payment_branding_distinguishes_private_and_public_products():
     from app.main import _payment_product_brand
 
     assert _payment_product_brand("szyg_private") == ("SZY", "数字员工")
-    assert _payment_product_brand("xiaoyu_public") == ("XY", "小妤数字员工")
+    assert _payment_product_brand("xiaoyu_public") == ("XY", "小妤AI")
 
 
 def test_regular_user_without_credits_cannot_call_cloud_models():

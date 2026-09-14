@@ -243,7 +243,7 @@ def _payment_json(order: PaymentOrder, *, payment_url: str = "") -> dict:
 
 def _payment_product_brand(product_id: str) -> tuple[str, str]:
     if product_id == "xiaoyu_public":
-        return "XY", "小妤数字员工"
+        return "XY", "小妤AI"
     return "SZY", "数字员工"
 
 
@@ -641,9 +641,9 @@ def startup() -> None:
         private_product.registration_mode = "invite_only"
         public_product = db.get(Product, "xiaoyu_public")
         if not public_product:
-            public_product = Product(id="xiaoyu_public", name="小妤数字员工", registration_mode="self_service")
+            public_product = Product(id="xiaoyu_public", name="小妤AI", registration_mode="self_service")
             db.add(public_product)
-        public_product.name = "小妤数字员工"
+        public_product.name = "小妤AI"
         public_product.registration_mode = "self_service"
         db.flush()
         for alias, model in settings.capability_models.items():
