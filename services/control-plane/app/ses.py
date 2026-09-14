@@ -32,9 +32,9 @@ class TencentSesSender:
             client_profile = ClientProfile(httpProfile=http_profile)
             client = ses_client.SesClient(cred, self.settings.ses_region, client_profile)
             request = models.SendEmailRequest()
-            request.FromEmailAddress = f"小妤数字员工 <{self.settings.ses_from_email}>"
+            request.FromEmailAddress = f"小妤AI <{self.settings.ses_from_email}>"
             request.Destination = [destination]
-            request.Subject = "小妤数字员工注册验证码"
+            request.Subject = "小妤AI注册验证码"
             template = models.Template()
             template.TemplateID = int(self.settings.ses_template_id)
             # The approved Tencent SES template uses {{xxx}} as its single

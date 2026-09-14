@@ -5,7 +5,7 @@
 ## 当前状态
 
 - 私域产品 `szyg_private` 显示名为“数字员工”，注册模式为 `invite_only`。
-- 公域产品 `xiaoyu_public` 显示名为“小妤数字员工”，注册模式为 `self_service`。
+- 公域产品 `xiaoyu_public` 显示名为“小妤AI”，注册模式为 `self_service`。
 - 两个产品共用统一计费规则，钱包和账本按产品、组织、用户隔离。
 - 充值换算固定为 `1 CNY = 100 Credits`。
 - 支付订单迁移 `b27f840a6c19` 已部署到生产环境。
