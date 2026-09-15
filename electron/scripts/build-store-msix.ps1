@@ -3,11 +3,12 @@ $ErrorActionPreference = 'Stop'
 $electronDir = Split-Path -Parent $PSScriptRoot
 $layoutDir = Join-Path $electronDir 'dist\win-unpacked'
 $storeDir = Join-Path $electronDir 'store'
+$version = (Get-Content (Join-Path $electronDir 'package.json') -Raw | ConvertFrom-Json).version
 $outputDir = Join-Path $electronDir 'dist\store'
-$outputFile = Join-Path $outputDir 'XiaoyuAI-1.1.5.0-x64-Store.msix'
+$outputFile = Join-Path $outputDir ("XiaoyuAI-$version.0-x64-Store.msix")
 
 if (-not (Test-Path -LiteralPath (Join-Path $layoutDir 'XiaoyuAI.exe'))) {
-    throw 'Store package layout is missing. Run npm run build:dir first.'
+    throw 'Store package layout is missing. Run npm run build:public:dir first.'
 }
 
 $layoutAssets = Join-Path $layoutDir 'Assets'

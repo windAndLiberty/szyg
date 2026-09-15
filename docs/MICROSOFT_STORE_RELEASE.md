@@ -21,7 +21,7 @@ npm run build:store
 该命令会完成源码隐私检查、前端构建、本地后端与 Hermes 打包、运行时完整性清单、Electron x64 布局和 MSIX 生成。Store 包输出到：
 
 ```text
-electron/dist/store/XiaoyuAI-1.1.5.0-x64-Store.msix
+electron/dist/store/XiaoyuAI-1.1.6.0-x64-Store.msix
 ```
 
 提交给 Microsoft Store 的 MSIX 无需开发者自行购买 CA 代码签名证书，Store 会在认证流程中签名。直接在本机侧载时，另行生成并信任仅用于本地测试的开发证书。

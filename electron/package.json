@@ -19,9 +19,12 @@
     "build:zip": "npm run audit:source && npm run build:runtime && electron-builder --win zip --config electron-builder.config.cjs && npm run audit:dist",
     "build:release": "node scripts/assert-signing.cjs && npm run build",
     "prepare:product": "node scripts/prepare-product.cjs",
-    "build:private": "node scripts/build-product.cjs private",
-    "build:public": "node scripts/build-product.cjs public",
-    "build:public:dir": "node scripts/build-product.cjs public dir"
+    "build:private": "set \"SZYG_PRODUCT_EDITION=private\" && set \"VITE_PRODUCT_EDITION=private\" && npm run build",
+    "build:public": "set \"SZYG_PRODUCT_EDITION=public\" && set \"VITE_PRODUCT_EDITION=public\" && npm run build",
+    "build:public:dir": "set \"SZYG_PRODUCT_EDITION=public\" && set \"VITE_PRODUCT_EDITION=public\" && npm run build:dir",
+    "build:public:msix": "npm run build:public:dir && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-store-msix.ps1",
+    "build:store": "npm run build:public:msix",
+    "build:private:dir": "set \"SZYG_PRODUCT_EDITION=private\" && set \"VITE_PRODUCT_EDITION=private\" && npm run build:dir"
   },
   "build": {
     "appId": "com.szyg.app",
