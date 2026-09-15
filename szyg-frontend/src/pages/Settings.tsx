@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Settings,
-  Plug,
   User,
   Sun,
   Moon,
@@ -12,9 +11,6 @@ import {
   RotateCcw,
   Check,
   ChevronDown,
-  Plus,
-  Trash2,
-  Database,
   Info,
   LogOut,
   Laptop,
@@ -32,8 +28,6 @@ import { useAsync } from '@/lib/hooks'
 import { useTheme } from '@/lib/theme'
 import { useI18n } from '@/lib/i18n'
 import {
-  apiGet,
-  apiDel,
   getCurrentUser,
   fetchCloudSession,
   changeCloudPassword,
@@ -46,15 +40,7 @@ import {
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-type SettingsTab = 'general' | 'integrations' | 'account'
-
-interface TeamMember {
-  id: string
-  name: string
-  email: string
-  role: string
-  status: 'active' | 'pending'
-}
+type SettingsTab = 'general' | 'account'
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number]
 
@@ -64,7 +50,6 @@ const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number]
 
 const settingsTabs: { id: SettingsTab; label: string; icon: typeof Settings }[] = [
   { id: 'general', label: '通用设置', icon: Settings },
-  { id: 'integrations', label: '集成配置', icon: Plug },
   { id: 'account', label: '账户管理', icon: User },
 ]
 
@@ -72,7 +57,6 @@ const notificationEvents = [
   { id: 'task_complete', label: '任务执行完成', checked: true },
   { id: 'agent_error', label: '数字员工执行出错', checked: true },
   { id: 'report_ready', label: '报告生成完毕', checked: true },
-  { id: 'team_update', label: '团队成员更新配置', checked: false },
   { id: 'daily_summary', label: '每日执行摘要', checked: true },
 ]
 
@@ -104,13 +88,6 @@ const [activeTab, setActiveTab] = useState<SettingsTab>('general')
   const [browserNotifs, setBrowserNotifs] = useState(true)
   const [notifEvents, setNotifEvents] = useState(notificationEvents)
 
-  /* Integrations */
-  const [supabaseUrl, setSupabaseUrl] = useState('')
-  const [supabaseKey, setSupabaseKey] = useState('')
-  const supabaseConnected = false
-  const [webSearchEnabled, setWebSearchEnabled] = useState(false)
-  const [webSearchProvider, setWebSearchProvider] = useState('Serper.dev')
-  const [webSearchKey, setWebSearchKey] = useState('')
   /* Account */
   const currentUser = getCurrentUser()
   const [profileName, setProfileName] = useState(currentUser?.username ?? 'admin')
@@ -129,22 +106,6 @@ const [activeTab, setActiveTab] = useState<SettingsTab>('general')
       setProfileRole(cloudSession.user.role === 'admin' ? '系统管理员' : '内测用户')
     }
   }, [cloudSession])
-  const { data: teamData, reload: reloadTeam } = useAsync<{ data: { id: number | string; username?: string | null; name?: string | null; role?: string | null; email?: string | null; status?: string | null }[] }>(
-    () => apiGet('/api/data/team/list'),
-  )
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
-  useEffect(() => {
-    if (Array.isArray(teamData?.data)) {
-      setTeamMembers(teamData.data.map((m) => ({
-        id: String(m.id),
-        name: String(m.name || m.username || '未命名成员').trim() || '未命名成员',
-        email: String(m.email || '未设置邮箱'),
-        role: m.role === 'admin' ? '系统管理员' : '普通成员',
-        status: m.status === 'active' ? 'active' : 'pending',
-      })))
-    }
-  }, [teamData])
-
   /* -- handlers -- */
   const handleNotifEventToggle = (id: string) => {
     setNotifEvents((prev) =>
@@ -400,126 +361,7 @@ const [activeTab, setActiveTab] = useState<SettingsTab>('general')
           </motion.div>
         )}
 
-        {/* ==================== TAB 2: 集成配置 ==================== */}
-        {activeTab === 'integrations' && (
-          <motion.div
-            key="integrations"
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            exit={{ opacity: 0 }}
-            className="space-y-6"
-          >
-            {/* Supabase */}
-            <motion.div variants={cardVariant}>
-              <h2 className="text-heading-sm text-[#F1F5F9] mb-1">Supabase</h2>
-              <p className="text-body-sm text-[#64748B] mb-4">{t('数据库与存储后端连接配置。')}</p>
-              <div className="glass-card rounded-[16px] border border-[#1E293B] p-5 space-y-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Database className="w-5 h-5 text-[#3ECF8E]" />
-                    <span className="text-heading-sm text-[#F1F5F9]">{t('Supabase 连接')}</span>
-                  </div>
-                  {supabaseConnected ? (
-                    <Badge className="bg-[rgba(16,185,129,0.15)] text-[#10B981] border-[#10B981]">
-                      <Check className="w-3 h-3 mr-1" /> {t('已连接')}
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-[#64748B] border-[#334155]">
-                      {t('未连接')}
-                    </Badge>
-                  )}
-                </div>
-
-                <div>
-                  <Label className="text-body-sm text-[#94A3B8] mb-1.5 block">Project URL</Label>
-                  <Input
-                    value={supabaseUrl}
-                    onChange={(e) => { setSupabaseUrl(e.target.value); setUnsaved(true) }}
-                    placeholder="https://your-project.supabase.co"
-                    className="bg-[#0D1321] border-[#1E293B] text-[#F1F5F9] placeholder:text-[#64748B]/50"
-                  />
-                </div>
-                <div>
-                  <Label className="text-body-sm text-[#94A3B8] mb-1.5 block">Anon Key</Label>
-                  <Input
-                    type="password"
-                    value={supabaseKey}
-                    onChange={(e) => { setSupabaseKey(e.target.value); setUnsaved(true) }}
-                    placeholder="eyJhbGciOiJIUzI1NiIs..."
-                    className="bg-[#0D1321] border-[#1E293B] text-[#F1F5F9] placeholder:text-[#64748B]/50"
-                  />
-                </div>
-                <Button
-                  onClick={() => showNotice(t('Supabase 连接配置尚未开放'))}
-                  className="bg-[#3ECF8E] hover:bg-[#4EE99D] text-black font-medium"
-                >
-                  {t('测试连接')}
-                </Button>
-              </div>
-            </motion.div>
-
-            {/* Web Search */}
-            <motion.div variants={cardVariant}>
-              <h2 className="text-heading-sm text-[#F1F5F9] mb-1">联网搜索</h2>
-              <p className="text-body-sm text-[#64748B] mb-4">{t('网络搜索集成，增强数字员工的信息获取能力。')}</p>
-              <div className="glass-card rounded-[16px] border border-[#1E293B] p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-heading-sm text-[#F1F5F9] block mb-0.5">
-                      {t('联网搜索服务')}
-                    </Label>
-                    <p className="text-body-sm text-[#64748B]">
-                      {t('允许数字员工实时搜索网络信息')}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={webSearchEnabled}
-                    onCheckedChange={(v) => { setWebSearchEnabled(v); setUnsaved(true) }}
-                    className="data-[state=checked]:bg-[#6366F1]"
-                  />
-                </div>
-
-                {webSearchEnabled && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    className="space-y-3 pt-2"
-                  >
-                    <div>
-                      <Label className="text-body-sm text-[#94A3B8] mb-1.5 block">搜索服务</Label>
-                      <div className="relative max-w-[240px]">
-                        <select
-                          value={webSearchProvider}
-                          onChange={(e) => { setWebSearchProvider(e.target.value); setUnsaved(true) }}
-                          className="w-full h-10 px-3 pr-8 rounded-[10px] bg-[#0D1321] border border-[#1E293B] text-sm text-[#F1F5F9] focus:outline-none focus:border-[#6366F1] appearance-none"
-                        >
-                          <option value="Serper.dev">标准搜索</option>
-                          <option value="Exa.ai">深度搜索</option>
-                          <option value="Custom">企业自定义</option>
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B] pointer-events-none" />
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="text-body-sm text-[#94A3B8] mb-1.5 block">服务凭证</Label>
-                      <Input
-                        type="password"
-                        value={webSearchKey}
-                        onChange={(e) => { setWebSearchKey(e.target.value); setUnsaved(true) }}
-                        placeholder="输入服务凭证"
-                        className="bg-[#0D1321] border-[#1E293B] text-[#F1F5F9]"
-                      />
-                    </div>
-                  </motion.div>
-                )}
-              </div>
-            </motion.div>
-
-          </motion.div>
-        )}
-
-        {/* ==================== TAB 3: 账户管理 ==================== */}
+        {/* ==================== TAB 2: 账户管理 ==================== */}
         {activeTab === 'account' && (
           <motion.div
             key="account"
@@ -640,67 +482,6 @@ const [activeTab, setActiveTab] = useState<SettingsTab>('general')
               </motion.div>
             )}
 
-            {/* Team */}
-            <motion.div variants={cardVariant}>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-heading-sm text-[#F1F5F9] mb-1">{t('团队成员')}</h2>
-                  <p className="text-body-sm text-[#64748B]">{t('管理团队成员与访问权限。')}</p>
-                </div>
-                <Button
-                  size="sm"
-                  className="bg-[#6366F1] hover:bg-[#818CF8] text-white"
-                  onClick={() => showNotice(t('团队成员邀请功能尚未开放'))}
-                >
-                  <Plus className="w-4 h-4 mr-1.5" />
-                  {t('添加成员')}
-                </Button>
-              </div>
-              <div className="glass-card rounded-[16px] border border-[#1E293B] overflow-hidden">
-                <div className="divide-y divide-[#1E293B]">
-                  {teamMembers.map((member) => (
-                    <div
-                      key={member.id}
-                      className="flex items-center justify-between px-5 py-4 hover:bg-[rgba(255,255,255,0.02)] transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#6366F1] to-[#8B5CF6] flex items-center justify-center text-sm font-semibold text-white">
-                          {(member.name || '成员').trim().charAt(0) || '成'}
-                        </div>
-                        <div>
-                          <p className="text-body-md font-medium text-[#F1F5F9]">{t(member.name)}</p>
-                          <p className="text-body-sm text-[#64748B]">{member.email}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            'text-xs',
-                            member.status === 'active'
-                              ? 'border-[#10B981] text-[#10B981] bg-[rgba(16,185,129,0.1)]'
-                              : 'border-[#F59E0B] text-[#F59E0B] bg-[rgba(245,158,11,0.1)]'
-                          )}
-                        >
-                          {t(member.status === 'active' ? '活跃' : '待激活')}
-                        </Badge>
-                        <span className="text-body-sm text-[#94A3B8]">{t(member.role)}</span>
-                        <button
-                          onClick={async () => {
-                            setTeamMembers((prev) => prev.filter((m) => m.id !== member.id))
-                            setUnsaved(true)
-                            try { await apiDel(`/api/data/team/${member.id}`) } catch { reloadTeam() }
-                          }}
-                          className="p-1.5 rounded-lg text-[#64748B] hover:text-[#EF4444] hover:bg-[rgba(239,68,68,0.1)] transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
           </motion.div>
         )}
           </AnimatePresence>

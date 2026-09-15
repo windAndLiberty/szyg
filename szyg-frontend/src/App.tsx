@@ -39,10 +39,7 @@ import AutomationHistory from './pages/workflow/AutomationHistory'
 // 占位页面 — 知识库
 import KnowledgeBase from './pages/knowledge/KnowledgeBase'
 import Skills from './pages/knowledge/Skills'
-import Academy from './pages/knowledge/Academy'
 // 占位页面 — 系统设置
-import Brand from './pages/settings/Brand'
-import Team from './pages/settings/Team'
 import Billing from './pages/settings/Billing'
 
 // === LAYOUT WRAPPERS ===
@@ -142,14 +139,11 @@ function AppRoutes({ location }: { location: Location }) {
         {/* 知识库 */}
         <Route path="/knowledge/base" element={<KnowledgeBase />} />
         <Route path="/knowledge/skills" element={<Skills />} />
-        <Route path="/knowledge/academy" element={<Academy />} />
 
         {/* 系统设置 */}
         <Route path="/settings" element={<Settings />} />
         <Route path="/settings/risk-control" element={<Navigate to="/settings" replace />} />
         <Route path="/settings/tools" element={<Navigate to="/knowledge/skills" replace />} />
-        <Route path="/settings/brand" element={<Brand />} />
-        <Route path="/settings/team" element={<Team />} />
         <Route path="/settings/billing" element={<Billing />} />
 
         {/* 404 兜底 */}

@@ -8,6 +8,7 @@ from szyg.api.oem_routes import router as oem_router
 from szyg.version import VERSION
 import hmac
 import os, logging
+from pathlib import Path
 
 _CORS_ORIGINS_ENV = os.environ.get("SZYG_CORS_ORIGINS", "")
 
@@ -398,6 +399,7 @@ def create_app() -> FastAPI:
         os.path.dirname(__file__), "..", "..", "..", "szyg-frontend", "dist"
     )
     if os.path.isdir(spa_dir):
+        spa_root = Path(spa_dir).resolve()
         app.mount("/assets", StaticFiles(directory=os.path.join(spa_dir, "assets")), name="assets")
         avatars_dir = os.path.join(spa_dir, "avatars")
         if os.path.isdir(avatars_dir):
@@ -431,6 +433,10 @@ def create_app() -> FastAPI:
             # which clients then report as an invalid response format.
             if full_path == "api" or full_path.startswith(("api/", "v1/")):
                 return JSONResponse(status_code=404, content={"detail": "API endpoint not found"})
+
+            requested_path = (spa_root / full_path).resolve()
+            if requested_path.is_relative_to(spa_root) and requested_path.is_file():
+                return FileResponse(requested_path)
 
             # Non-API paths are React Router routes and should load the SPA shell.
             index_path = os.path.join(spa_dir, "index.html")
