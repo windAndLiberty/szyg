@@ -234,8 +234,16 @@ export const fetchCloudSession = () => apiGet<CloudSession>('/api/cloud/session'
 export const refreshCloudSession = () => apiPost<CloudAuthorization>('/api/cloud/session/refresh')
 export const loginCloud = (account: string, password: string) =>
   apiPost<CloudSession>('/api/cloud/login', { email: account, password })
-export const registerCloud = (email: string, display_name: string, password: string) =>
-  apiPost<CloudSession>('/api/cloud/register', { email, display_name, password })
+export type RegistrationCodeChallenge = {
+  verification_id: string
+  email: string
+  expires_in_seconds: number
+  retry_after_seconds: number
+}
+export const requestRegistrationCode = (email: string) =>
+  apiPost<RegistrationCodeChallenge>('/api/cloud/register/code', { email })
+export const registerCloud = (email: string, display_name: string, password: string, verification_id: string, verification_code: string) =>
+  apiPost<CloudSession>('/api/cloud/register', { email, display_name, password, verification_id, verification_code })
 export const activateCloud = (invitation_code: string, display_name: string, password: string) =>
   apiPost<CloudSession>('/api/cloud/activate', { invitation_code, display_name, password })
 export const logoutCloud = () => apiPost<{ ok: boolean }>('/api/cloud/logout')

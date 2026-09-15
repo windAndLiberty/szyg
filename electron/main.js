@@ -7,9 +7,10 @@ const http = require('http')
 const net = require('net')
 const { BrowserSessionManager } = require('./browser/browser-session-manager')
 const { startBrowserControlServer } = require('./browser/browser-control-server')
+const product = require('./product')
 
-const APP_ICON_PATH = path.join(__dirname, 'assets', 'app-icon.png')
-const TRAY_ICON_PATH = path.join(__dirname, 'assets', 'tray-icon.png')
+const APP_ICON_PATH = path.join(__dirname, 'assets', product.icon)
+const TRAY_ICON_PATH = path.join(__dirname, 'assets', product.trayIcon)
 
 // Chromium can select the appropriate GPU/software backend by itself. Disabling
 // acceleration globally also disables compositor rendering, which can turn the
@@ -22,8 +23,9 @@ if (process.env.SZYG_DISABLE_GPU === '1') {
 const isDev = process.env.NODE_ENV === 'development'
 const enableDevTools = isDev || process.env.SZYG_DEBUG === '1'
 
-// Keep local user data compatible with earlier SZYG builds after the product rename.
-app.setPath('userData', path.join(app.getPath('appData'), 'szyg'))
+// The two products share runtime code while keeping local sessions and data isolated.
+app.setPath('userData', path.join(app.getPath('appData'), product.userDataDirectory))
+app.setAppUserModelId(product.appUserModelId)
 
 let PORT = 8000
 const FRONTEND_PORT = 5173
@@ -228,6 +230,7 @@ async function startBackend() {
     SZYG_SAU_RUNTIME_HOME: path.join(runtimeDataDir, 'social_auto_upload'),
     SZYG_CLOUD_ENABLED: process.env.SZYG_CLOUD_ENABLED || 'true',
     SZYG_CONTROL_URL: process.env.SZYG_CONTROL_URL || PRODUCTION_CONTROL_URL,
+    SZYG_PRODUCT_ID: product.id,
     SZYG_APP_VERSION: app.getVersion(),
     SZYG_LOCAL_AUTH_ENABLED: isDev ? (process.env.SZYG_LOCAL_AUTH_ENABLED || 'false') : 'false',
     SZYG_PRODUCTION: isDev ? 'false' : 'true',
@@ -463,12 +466,12 @@ async function createWindow() {
 function createTray() {
   const icon = nativeImage.createFromPath(TRAY_ICON_PATH)
   tray = new Tray(icon.resize({ width: 16, height: 16 }))
-  tray.setToolTip('数字员工 - 双击打开')
+  tray.setToolTip(`${product.name} - 双击打开`)
   const menu = Menu.buildFromTemplate([
     { label: '打开主窗口', click: () => { mainWindow?.show(); mainWindow?.focus() } },
     { label: '重新加载', click: () => { mainWindow?.reload() } },
     { type: 'separator' },
-    { label: '退出数字员工', click: () => { isQuitting = true; app.quit() } },
+    { label: `退出${product.name}`, click: () => { isQuitting = true; app.quit() } },
   ])
   tray.setContextMenu(menu)
   tray.on('double-click', () => { mainWindow?.show(); mainWindow?.focus() })

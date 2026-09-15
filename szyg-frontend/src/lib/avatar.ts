@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { product } from '@/lib/product'
 
 const AVATAR_KEY = 'szyg:user-avatar'
 const AVATAR_CHANGED_EVENT = 'szyg:avatar-changed'
@@ -17,7 +18,7 @@ export const AVATAR_PRESETS: string[] = Object.entries(builtinModules)
   .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
   .map(([, module]) => module.default)
 
-export const DEFAULT_AVATAR_SRC = AVATAR_PRESETS[0] ?? '/logo1.png'
+export const DEFAULT_AVATAR_SRC = AVATAR_PRESETS[0] ?? product.logoUrl
 
 export type AvatarSource = { kind: 'default' } | { kind: 'preset'; index: number } | { kind: 'custom'; dataUrl: string }
 

@@ -12,6 +12,7 @@ import {
 import UserAvatar from '@/components/ui/UserAvatar'
 import type { ChatMessage } from '@/types'
 import { cn } from '@/lib/utils'
+import { product } from '@/lib/product'
 
 type ChatMessageViewProps = {
   message: ChatMessage
@@ -87,7 +88,7 @@ const Avatar: React.FC<{ role: string; userName?: string }> = ({ role, userName 
   }
   return (
     <div className="w-8 h-8 rounded-full bg-[#0B1020] flex items-center justify-center shrink-0 shadow-glow overflow-hidden p-0.5">
-      <img src="/logo1.png" alt="超级员工" className="w-full h-full object-contain" />
+      <img src={product.logoUrl} alt="超级员工" className="w-full h-full object-contain" />
     </div>
   )
 }

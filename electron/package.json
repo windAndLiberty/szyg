@@ -11,13 +11,17 @@
     "build:hermes": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-hermes-runtime.ps1",
     "build:config": "..\\.venv\\Scripts\\python.exe scripts/build-release-config.py ../config.yaml runtime/config.yaml",
     "build:integrity": "node scripts/build-runtime-manifest.cjs",
-    "build:runtime": "npm run build:frontend && npm run build:backend && npm run build:hermes && npm run build:config && npm run build:integrity",
+    "build:runtime": "npm run prepare:product && npm run build:frontend && npm run build:backend && npm run build:hermes && npm run build:config && npm run build:integrity",
     "audit:source": "node scripts/audit-release.cjs source",
     "audit:dist": "node scripts/audit-release.cjs dist",
-    "build:dir": "npm run audit:source && npm run build:runtime && electron-builder --win dir && npm run audit:dist",
-    "build": "npm run audit:source && npm run build:runtime && electron-builder --win nsis && npm run audit:dist",
-    "build:zip": "npm run audit:source && npm run build:runtime && electron-builder --win zip && npm run audit:dist",
-    "build:release": "node scripts/assert-signing.cjs && npm run build"
+    "build:dir": "npm run audit:source && npm run build:runtime && electron-builder --win dir --config electron-builder.config.cjs && npm run audit:dist",
+    "build": "npm run audit:source && npm run build:runtime && electron-builder --win nsis --config electron-builder.config.cjs && npm run audit:dist",
+    "build:zip": "npm run audit:source && npm run build:runtime && electron-builder --win zip --config electron-builder.config.cjs && npm run audit:dist",
+    "build:release": "node scripts/assert-signing.cjs && npm run build",
+    "prepare:product": "node scripts/prepare-product.cjs",
+    "build:private": "node scripts/build-product.cjs private",
+    "build:public": "node scripts/build-product.cjs public",
+    "build:public:dir": "node scripts/build-product.cjs public dir"
   },
   "build": {
     "appId": "com.szyg.app",

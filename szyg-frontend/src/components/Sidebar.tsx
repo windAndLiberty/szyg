@@ -6,6 +6,7 @@ import { SIDEBAR_WIDTH_COLLAPSED, SIDEBAR_WIDTH_EXPANDED, useLayout } from '@/li
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
 import { WORK_DONE_CHANGE_EVENT, clearWorkDone, getWorkDoneNotices } from '@/lib/workNotifications'
+import { product } from '@/lib/product'
 
 const EXPANDED_GROUPS_KEY = 'szyg:sidebar-expanded-groups'
 
@@ -72,9 +73,9 @@ export default function Sidebar() {
     style={{ width: collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED }}
   >
     <div className={cn('flex h-16 shrink-0 items-center border-b border-[#1E293B]', collapsed ? 'justify-center px-2' : 'px-4')}>
-      <Link to="/" className="flex min-w-0 items-center gap-3" title={collapsed ? t('数字员工') : undefined}>
-        <img src="/logo1.png" alt="数字员工" className="h-8 w-8 shrink-0 object-contain" />
-        {!collapsed && <div className="min-w-0"><p className="whitespace-nowrap font-display text-xl font-bold text-[#F1F5F9]">{t('数字员工')}</p><p className="-mt-0.5 whitespace-nowrap text-[10px] text-[#64748B]">{t('超级数字员工')}</p></div>}
+      <Link to="/" className="flex min-w-0 items-center gap-3" title={collapsed ? product.name : undefined}>
+        <img src={product.logoUrl} alt={product.name} className="h-8 w-8 shrink-0 rounded-md object-cover" />
+        {!collapsed && <div className="min-w-0"><p className="whitespace-nowrap font-display text-xl font-bold text-[#F1F5F9]">{product.name}</p><p className="-mt-0.5 whitespace-nowrap text-[10px] text-[#64748B]">{t('超级数字员工')}</p></div>}
       </Link>
     </div>
 
