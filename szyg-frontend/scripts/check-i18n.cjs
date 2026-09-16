@@ -3,8 +3,13 @@ const path = require('path')
 
 const root = path.resolve(__dirname, '..')
 const sourceRoot = path.join(root, 'src')
-const catalogSource = fs.readFileSync(path.join(sourceRoot, 'locales', 'core.ts'), 'utf8')
-const catalogKeys = new Set([...catalogSource.matchAll(/^\s*'([a-z][A-Za-z0-9.-]+)':/gm)].map((match) => match[1]))
+const localeRoot = path.join(sourceRoot, 'locales')
+const catalogKeys = new Set()
+for (const name of fs.readdirSync(localeRoot)) {
+  if (!name.endsWith('.ts')) continue
+  const catalogSource = fs.readFileSync(path.join(localeRoot, name), 'utf8')
+  for (const match of catalogSource.matchAll(/^\s*'([a-z][A-Za-z0-9.-]+)':/gm)) catalogKeys.add(match[1])
+}
 const missing = []
 
 function visit(directory) {
@@ -14,7 +19,7 @@ function visit(directory) {
       visit(fullPath)
       continue
     }
-    if (!/\.(ts|tsx)$/.test(entry.name) || fullPath.endsWith(path.join('locales', 'core.ts'))) continue
+    if (!/\.(ts|tsx)$/.test(entry.name) || fullPath.startsWith(localeRoot)) continue
     const source = fs.readFileSync(fullPath, 'utf8')
     for (const match of source.matchAll(/\bt\(\s*['"]([a-z][A-Za-z0-9.-]+)['"]/g)) {
       if (!catalogKeys.has(match[1])) {
@@ -31,4 +36,3 @@ if (missing.length) {
   process.exit(1)
 }
 console.log(`i18n catalog check passed (${catalogKeys.size} semantic keys).`)
-

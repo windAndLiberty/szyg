@@ -38,15 +38,17 @@ import ProfileLibrary, { type ProfileDraft, EMPTY_DRAFT } from './digital-human/
 import ScriptBoard from './digital-human/ScriptBoard'
 import DeliverStep from './digital-human/DeliverStep'
 import { freshScene, inferSceneReferenceRole, normalizeSceneOrder, reOrder } from './digital-human/studioUtils'
+import { useI18n } from '@/lib/i18n'
 
 const STEPS: StepDescriptor[] = [
-  { id: 1, label: '灵感视频素材' },
-  { id: 2, label: '数字人形象' },
-  { id: 3, label: '文案与画面' },
-  { id: 4, label: '生成与发布' },
+  { id: 1, label: 'digitalHuman.step.inspiration' },
+  { id: 2, label: 'digitalHuman.step.profile' },
+  { id: 3, label: 'digitalHuman.step.script' },
+  { id: 4, label: 'digitalHuman.step.publish' },
 ]
 
 export default function DigitalHumanStudio() {
+  const { t } = useI18n()
   const [step, setStep] = useState(1)
   const [config, setConfig] = useState<DigitalHumanConfig | null>(null)
   const [assets, setAssets] = useState<DigitalHumanAsset[]>([])
@@ -131,6 +133,7 @@ export default function DigitalHumanStudio() {
   }, [render])
 
   const assetById = useMemo(() => new Map(assets.map((item) => [item.id, item])), [assets])
+  const localizedSteps = useMemo(() => STEPS.map((item) => ({ ...item, label: t(item.label) })), [t])
   const selectedProfile = profiles.find((item) => item.id === project?.profile_id)
   const totalDuration = project?.scenes.reduce((sum, scene) => sum + Number(scene.duration || 0), 0) || 0
   const canGenerate = Boolean(
@@ -427,7 +430,7 @@ export default function DigitalHumanStudio() {
   if (loading) {
     return (
       <div className="flex min-h-[520px] items-center justify-center text-[#93A3BB]">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin" />正在打开创作区
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" />{t('digitalHuman.loading')}
       </div>
     )
   }
@@ -437,8 +440,8 @@ export default function DigitalHumanStudio() {
       <div className="border-b border-[#1D2636] px-5 py-5 lg:px-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-xl font-semibold">数字人创作</h1>
-            <p className="mt-1 text-sm text-[#8492A8]">从灵感到成片，在每一步保留你的创作自由。</p>
+            <h1 className="text-xl font-semibold">{t('digitalHuman.title')}</h1>
+            <p className="mt-1 text-sm text-[#8492A8]">{t('digitalHuman.subtitle')}</p>
           </div>
           <div className="flex items-center gap-2">
             <select
@@ -455,13 +458,13 @@ export default function DigitalHumanStudio() {
               onClick={() => void createNewProject()}
               className="inline-flex h-9 items-center gap-1.5 bg-[#5965E8] px-3 text-sm hover:bg-[#6873EE]"
             >
-              <Plus className="h-4 w-4" />新作品
+              <Plus className="h-4 w-4" />{t('digitalHuman.newProject')}
             </button>
           </div>
         </div>
       </div>
 
-      <StepsBar steps={STEPS} current={step} onChange={setStep} />
+      <StepsBar steps={localizedSteps} current={step} onChange={setStep} />
 
       {(error || notice) && (
         <div
@@ -473,7 +476,7 @@ export default function DigitalHumanStudio() {
             {error ? <CircleAlert className="h-4 w-4" /> : <Check className="h-4 w-4" />}
             {error || notice}
           </span>
-          <button type="button" onClick={() => { setError(''); setNotice('') }} aria-label="关闭提示">
+          <button type="button" onClick={() => { setError(''); setNotice('') }} aria-label={t('digitalHuman.closeNotice')}>
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -564,16 +567,16 @@ export default function DigitalHumanStudio() {
             disabled={step === 1}
             className="inline-flex h-9 items-center gap-2 border border-[#2F3A4E] px-3 text-sm disabled:opacity-30"
           >
-            <ArrowLeft className="h-4 w-4" />上一步
+            <ArrowLeft className="h-4 w-4" />{t('digitalHuman.previous')}
           </button>
-          <div className="text-xs text-[#687790]">项目自动保存</div>
+          <div className="text-xs text-[#687790]">{t('digitalHuman.autoSave')}</div>
           <button
             type="button"
             onClick={() => setStep((value) => Math.min(4, value + 1))}
             disabled={step === 4}
             className="inline-flex h-9 items-center gap-2 bg-[#202842] px-3 text-sm disabled:opacity-30"
           >
-            下一步<ArrowRight className="h-4 w-4" />
+            {t('digitalHuman.next')}<ArrowRight className="h-4 w-4" />
           </button>
         </div>
       </main>

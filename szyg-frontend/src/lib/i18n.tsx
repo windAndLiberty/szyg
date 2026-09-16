@@ -1,5 +1,6 @@
 import { createContext, useContext, useLayoutEffect, useMemo, useState, type ReactNode } from 'react'
 import { enUS as coreEnUS, zhCN as coreZhCN } from '@/locales/core'
+import { digitalHumanEnUS, digitalHumanZhCN } from '@/locales/digitalHuman'
 
 export type AppLocale = 'zh-CN' | 'en-US'
 type InterpolationValues = Record<string, string | number>
@@ -83,7 +84,9 @@ function interpolate(template: string, values?: InterpolationValues) {
 }
 
 function translate(locale: AppLocale, key: string, values?: InterpolationValues) {
-  const coreMessages = locale === 'en-US' ? coreEnUS : coreZhCN
+  const coreMessages: Record<string, string> = locale === 'en-US'
+    ? { ...coreEnUS, ...digitalHumanEnUS }
+    : { ...coreZhCN, ...digitalHumanZhCN }
   const coreMessage = coreMessages[key as keyof typeof coreMessages]
   if (coreMessage) return interpolate(coreMessage, values)
   if (locale === 'en-US' && legacyEnUS[key]) return interpolate(legacyEnUS[key], values)

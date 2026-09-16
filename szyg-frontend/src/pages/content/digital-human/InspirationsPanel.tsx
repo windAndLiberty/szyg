@@ -3,6 +3,7 @@ import { ArrowRight, ClipboardPaste, FileVideo, Link2, Loader2, RefreshCw, Trash
 import type { DigitalHumanAsset, DigitalHumanInspiration, InspirationAnalysis } from '@/lib/api'
 import DropZone from './DropZone'
 import { acceptForInspiration } from './studioUtils'
+import { useI18n } from '@/lib/i18n'
 
 interface InspirationsPanelProps {
   inspirations: DigitalHumanInspiration[]
@@ -25,6 +26,7 @@ export default function InspirationsPanel({
   onRemove,
   onApply,
 }: InspirationsPanelProps) {
+  const { t } = useI18n()
   const [sourceUrl, setSourceUrl] = useState('')
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [importing, setImporting] = useState(false)
@@ -38,7 +40,7 @@ export default function InspirationsPanel({
       await onImportUrl(sourceUrl.trim())
       setSourceUrl('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : '链接导入失败')
+      setError(err instanceof Error ? err.message : t('digitalHuman.importFailed'))
     } finally {
       setImporting(false)
     }
@@ -58,9 +60,9 @@ export default function InspirationsPanel({
   return (
     <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
       <section>
-        <h2 className="text-base font-semibold">添加灵感</h2>
+        <h2 className="text-base font-semibold">{t('digitalHuman.inspiration.add')}</h2>
         <p className="mt-1 text-xs leading-5 text-[#7F8DA5]">
-          用于理解表达方式与画面结构，不会复制素材中的人物或声音。
+          {t('digitalHuman.inspiration.description')}
         </p>
         <div className="mt-4">
           <DropZone
@@ -69,9 +71,9 @@ export default function InspirationsPanel({
             busy={busyKey === 'inspiration-upload'}
             size="lg"
             icon={<Upload className="mb-2 h-6 w-6" />}
-            title={busyKey === 'inspiration-upload' ? '正在上传' : '拖入或点击上传'}
-            hint="支持图片、mp4、mov，可一次添加多个"
-            overlayLabel="松开即可加入灵感"
+            title={t(busyKey === 'inspiration-upload' ? 'digitalHuman.inspiration.uploading' : 'digitalHuman.inspiration.upload')}
+            hint={t('digitalHuman.inspiration.formats')}
+            overlayLabel={t('digitalHuman.inspiration.drop')}
           />
         </div>
         <div className="mt-4 flex gap-2">
@@ -81,7 +83,7 @@ export default function InspirationsPanel({
               value={sourceUrl}
               onChange={(event) => setSourceUrl(event.target.value)}
               onContextMenu={onContextMenu}
-              placeholder="粘贴公开素材链接"
+              placeholder={t('digitalHuman.inspiration.url')}
               className="h-9 w-full border border-[#2A3548] bg-[#0D1320] pl-9 pr-3 text-sm outline-none focus:border-[#6571EE]"
             />
           </div>
@@ -91,7 +93,7 @@ export default function InspirationsPanel({
             disabled={!sourceUrl.trim() || importing}
             className="h-9 border border-[#34425A] px-3 text-sm text-[#CED6E3] disabled:opacity-40"
           >
-            {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '导入'}
+            {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t('digitalHuman.inspiration.import')}
           </button>
         </div>
         {error && (
@@ -101,19 +103,19 @@ export default function InspirationsPanel({
       <section>
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold">视频洞察</h2>
+            <h2 className="text-base font-semibold">{t('digitalHuman.insight.title')}</h2>
             <p className="mt-1 text-xs text-[#7F8DA5]">
-              提取文案、卖点、镜头节奏与可复用场景。
+              {t('digitalHuman.insight.description')}
             </p>
           </div>
-          <span className="text-xs text-[#687790]">{inspirations.length} 项</span>
+          <span className="text-xs text-[#687790]">{t('digitalHuman.insight.count', { count: inspirations.length })}</span>
         </div>
         {inspirations.length === 0 ? (
           <div className="flex min-h-[200px] flex-col items-center justify-center border border-dashed border-[#2B3850] bg-[#0B101B]/40 px-6 text-center">
             <FileVideo className="mb-3 h-7 w-7 text-[#7184A3]" />
-            <p className="text-sm font-medium text-[#E7ECF5]">还没有灵感素材</p>
+            <p className="text-sm font-medium text-[#E7ECF5]">{t('digitalHuman.insight.empty')}</p>
             <p className="mt-1 max-w-sm text-xs leading-5 text-[#7F8DA5]">
-              添加一段你欣赏的内容，系统会把可复用的表达结构整理出来。
+              {t('digitalHuman.insight.emptyDescription')}
             </p>
           </div>
         ) : (
@@ -151,7 +153,7 @@ export default function InspirationsPanel({
             } catch {
               /* fall through */
             }
-            setError('剪贴板中没有可粘贴的内容')
+            setError(t('digitalHuman.clipboardEmpty'))
           }}
         />
       )}
@@ -169,6 +171,7 @@ interface InspirationItemProps {
 }
 
 function InspirationItem({ item, asset, busy, onAnalyze, onRemove, onApply }: InspirationItemProps) {
+  const { t } = useI18n()
   const analysis = item.analysis
   return (
     <article className="border border-[#222D40] bg-[#0C111D] p-4">
@@ -190,7 +193,7 @@ function InspirationItem({ item, asset, busy, onAnalyze, onRemove, onApply }: In
           <p className="truncate text-sm font-medium">{item.name}</p>
           <p className="mt-1 truncate text-xs text-[#718098]">{item.source_url || asset?.name}</p>
         </div>
-        <button type="button" onClick={onRemove} aria-label="移除灵感" className="p-1 text-[#6F7E94] hover:text-[#F48A9B]">
+        <button type="button" onClick={onRemove} aria-label={t('digitalHuman.insight.remove')} className="p-1 text-[#6F7E94] hover:text-[#F48A9B]">
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
@@ -202,12 +205,12 @@ function InspirationItem({ item, asset, busy, onAnalyze, onRemove, onApply }: In
           className="inline-flex h-8 items-center gap-1.5 border border-[#34425A] px-3 text-xs"
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-          {analysis ? '重新分析' : '开始分析'}
+          {t(analysis ? 'digitalHuman.insight.reanalyze' : 'digitalHuman.insight.analyze')}
         </button>
         {analysis && (
           <button type="button" onClick={onApply} className="inline-flex h-8 items-center gap-1.5 bg-[#5965E8] px-3 text-xs">
             <ArrowRight className="h-3.5 w-3.5" />
-            应用到创作
+            {t('digitalHuman.insight.apply')}
           </button>
         )}
       </div>
@@ -216,19 +219,20 @@ function InspirationItem({ item, asset, busy, onAnalyze, onRemove, onApply }: In
 }
 
 function AnalysisPanel({ analysis }: { analysis: InspirationAnalysis }) {
+  const { t } = useI18n()
   return (
     <div className="mt-4 grid gap-3 border-t border-[#1E2939] pt-4 md:grid-cols-2">
       <div>
-        <span className="text-[11px] text-[#718098]">开场钩子</span>
-        <p className="mt-1 text-sm leading-6 text-[#D7DDE8]">{analysis.hook || '已完成内容理解'}</p>
+        <span className="text-[11px] text-[#718098]">{t('digitalHuman.insight.hook')}</span>
+        <p className="mt-1 text-sm leading-6 text-[#D7DDE8]">{analysis.hook || t('digitalHuman.insight.understood')}</p>
       </div>
       <div>
-        <span className="text-[11px] text-[#718098]">核心卖点</span>
-        <p className="mt-1 text-sm leading-6 text-[#D7DDE8]">{analysis.selling_points?.join(' · ') || '等待整理'}</p>
+        <span className="text-[11px] text-[#718098]">{t('digitalHuman.insight.sellingPoints')}</span>
+        <p className="mt-1 text-sm leading-6 text-[#D7DDE8]">{analysis.selling_points?.join(' · ') || t('digitalHuman.insight.pending')}</p>
       </div>
       <div className="md:col-span-2">
-        <span className="text-[11px] text-[#718098]">文案</span>
-        <p className="mt-1 line-clamp-3 text-sm leading-6 text-[#AEB9CA]">{analysis.transcript || '未识别到明确口播'}</p>
+        <span className="text-[11px] text-[#718098]">{t('digitalHuman.insight.script')}</span>
+        <p className="mt-1 line-clamp-3 text-sm leading-6 text-[#AEB9CA]">{analysis.transcript || t('digitalHuman.insight.noTranscript')}</p>
       </div>
     </div>
   )
@@ -243,6 +247,7 @@ function ContextMenu({
   onClose: () => void
   onPaste: () => void
 }) {
+  const { t } = useI18n()
   return (
     <div
       className="fixed inset-0 z-[120]"
@@ -262,7 +267,7 @@ function ContextMenu({
           onClick={onPaste}
           className="flex h-8 w-full items-center gap-2 rounded px-2.5 text-left text-sm text-[#E2E8F0] transition hover:bg-[#202B3D]"
         >
-          <ClipboardPaste className="h-4 w-4 text-[#8F9BFF]" />粘贴
+          <ClipboardPaste className="h-4 w-4 text-[#8F9BFF]" />{t('digitalHuman.paste')}
         </button>
       </div>
     </div>
