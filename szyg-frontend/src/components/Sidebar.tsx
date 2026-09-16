@@ -75,11 +75,11 @@ export default function Sidebar() {
     <div className={cn('flex h-16 shrink-0 items-center border-b border-[#1E293B]', collapsed ? 'justify-center px-2' : 'px-4')}>
       <Link to="/" className="flex min-w-0 items-center gap-3" title={collapsed ? product.name : undefined}>
         <img src={product.logoUrl} alt={product.name} className="h-8 w-8 shrink-0 rounded-md object-cover" />
-        {!collapsed && <div className="min-w-0"><p className="whitespace-nowrap font-display text-xl font-bold text-[#F1F5F9]">{product.name}</p><p className="-mt-0.5 whitespace-nowrap text-[10px] text-[#64748B]">{t('超级数字员工')}</p></div>}
+        {!collapsed && <div className="min-w-0"><p className="whitespace-nowrap font-display text-xl font-bold text-[#F1F5F9]">{product.name}</p><p className="-mt-0.5 whitespace-nowrap text-[10px] text-[#64748B]">{t('navigation.superWorkforce')}</p></div>}
       </Link>
     </div>
 
-    <nav className={cn('min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-3', collapsed ? 'px-2' : 'px-3')} aria-label={t('主导航')}>
+    <nav className={cn('min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-3', collapsed ? 'px-2' : 'px-3')} aria-label={t('navigation.main')}>
       <div className="space-y-2">
         {navGroups.map((group) => {
           const isExpanded = expandedGroups.has(group.id) && !collapsed
@@ -113,7 +113,7 @@ export default function Sidebar() {
                       {isActive && <span className="absolute bottom-2 left-0 top-2 w-[3px] rounded-r-full bg-[#6366F1]" />}
                       <ChildIcon className="h-4 w-4 shrink-0" />
                       <span className="min-w-0 flex-1 truncate">{t(child.label)}</span>
-                      {workDone.has(child.path) && <span title={t('有已完成的工作,点击查看')} className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#10B981] shadow-[0_0_6px_rgba(16,185,129,0.8)]" />}
+                      {workDone.has(child.path) && <span title={t('navigation.completedWork')} className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#10B981] shadow-[0_0_6px_rgba(16,185,129,0.8)]" />}
                     </Link>
                   })}
                 </div>
@@ -125,8 +125,8 @@ export default function Sidebar() {
     </nav>
 
     <div className="shrink-0 border-t border-[#1E293B] p-3">
-      <button type="button" onClick={() => setCollapsed(!collapsed)} className="flex h-10 w-full items-center justify-center rounded-lg text-[#64748B] outline-none transition-colors duration-100 hover:bg-white/[0.035] hover:text-[#CBD5E1] focus-visible:ring-1 focus-visible:ring-[#6366F1]" aria-label={t(collapsed ? '展开侧边栏' : '收起侧边栏')}>
-        {collapsed ? <ChevronRight className="h-5 w-5" /> : <span className="flex items-center gap-2 text-sm"><ChevronLeft className="h-5 w-5" />{t('收起')}</span>}
+      <button type="button" onClick={() => setCollapsed(!collapsed)} className="flex h-10 w-full items-center justify-center rounded-lg text-[#64748B] outline-none transition-colors duration-100 hover:bg-white/[0.035] hover:text-[#CBD5E1] focus-visible:ring-1 focus-visible:ring-[#6366F1]" aria-label={t(collapsed ? 'navigation.expandSidebar' : 'navigation.collapseSidebar')}>
+        {collapsed ? <ChevronRight className="h-5 w-5" /> : <span className="flex items-center gap-2 text-sm"><ChevronLeft className="h-5 w-5" />{t('common.collapse')}</span>}
       </button>
     </div>
   </aside>

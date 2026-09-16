@@ -60,13 +60,13 @@ function NotFound() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-6">
       <div className="text-display-xl text-[#1E293B] font-bold mb-4">404</div>
-      <h1 className="text-heading-lg text-[#F1F5F9] mb-2">{t('页面未找到')}</h1>
-      <p className="text-body-md text-[#64748B] mb-6">{t('您访问的页面不存在或已被移动')}</p>
+      <h1 className="text-heading-lg text-[#F1F5F9] mb-2">{t('errors.pageNotFound')}</h1>
+      <p className="text-body-md text-[#64748B] mb-6">{t('errors.pageNotFoundDescription')}</p>
       <a
         href="/"
         className="px-4 py-2 rounded-button bg-[#6366F1] text-white text-sm font-medium hover:bg-[#818CF8] transition-colors"
       >
-        {t('返回超级员工')}
+        {t('errors.backToSuperAgent')}
       </a>
     </div>
   )

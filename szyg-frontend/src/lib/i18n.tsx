@@ -1,4 +1,5 @@
 import { createContext, useContext, useLayoutEffect, useMemo, useState, type ReactNode } from 'react'
+import { enUS as coreEnUS, zhCN as coreZhCN } from '@/locales/core'
 
 export type AppLocale = 'zh-CN' | 'en-US'
 type InterpolationValues = Record<string, string | number>
@@ -12,7 +13,7 @@ interface I18nContextValue {
 const LOCALE_STORAGE_KEY = 'szyg-locale'
 
 /** UI copy catalog. Chinese is the source locale; add every user-facing string here. */
-const enUS: Record<string, string> = {
+const legacyEnUS: Record<string, string> = {
   '数字员工': 'Digital Employee', 'AI员工': 'AI Staff', '超级员工': 'Super Agent', 'AI人才市场': 'AI Talent',
   'AI工具导航': 'AI Tools', '内容发布': 'Content', '内容生成': 'Content Studio', '素材管理与发布': 'Assets & Publishing',
   '渠道账号': 'Channel Accounts', '发布看板': 'Publishing Board', '数字人': 'Digital Human', '营销获客': 'Marketing',
@@ -81,6 +82,14 @@ function interpolate(template: string, values?: InterpolationValues) {
   return template.replace(/\{(\w+)\}/g, (_, key: string) => String(values[key] ?? `{${key}}`))
 }
 
+function translate(locale: AppLocale, key: string, values?: InterpolationValues) {
+  const coreMessages = locale === 'en-US' ? coreEnUS : coreZhCN
+  const coreMessage = coreMessages[key as keyof typeof coreMessages]
+  if (coreMessage) return interpolate(coreMessage, values)
+  if (locale === 'en-US' && legacyEnUS[key]) return interpolate(legacyEnUS[key], values)
+  return interpolate(key, values)
+}
+
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<AppLocale>(readLocale)
   useLayoutEffect(() => {
@@ -89,7 +98,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, [locale])
   const value = useMemo<I18nContextValue>(() => ({
     locale, setLocale: setLocaleState,
-    t: (key, values) => interpolate(locale === 'en-US' ? (enUS[key] || key) : key, values),
+    t: (key, values) => translate(locale, key, values),
   }), [locale])
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>
 }

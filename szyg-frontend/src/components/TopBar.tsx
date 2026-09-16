@@ -68,13 +68,13 @@ export default function TopBar() {
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
             className="flex items-center gap-2"
           >
-            <h1 className="text-lg font-semibold text-[#F1F5F9]">{t('超级员工')}</h1>
+            <h1 className="text-lg font-semibold text-[#F1F5F9]">{t('navigation.superAgent')}</h1>
             <button
               type="button"
               onClick={toggleSuperAgentHistory}
               className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#1E293B] bg-[#0B0F1A] text-[#94A3B8] transition-colors hover:border-[#6366F1]/50 hover:text-[#F1F5F9]"
-              aria-label={t(superAgentHistoryCollapsed ? '展开' : '折叠')}
-              title={t(superAgentHistoryCollapsed ? '展开' : '折叠')}
+              aria-label={t(superAgentHistoryCollapsed ? 'common.expand' : 'common.collapse')}
+              title={t(superAgentHistoryCollapsed ? 'common.expand' : 'common.collapse')}
             >
               {superAgentHistoryCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </button>
@@ -117,7 +117,7 @@ export default function TopBar() {
                   onBlur={() => {
                     if (!searchValue) setSearchOpen(false)
                   }}
-                  placeholder={t('搜索...')}
+                  placeholder={t('common.search')}
                   className="w-full h-10 pl-10 pr-4 rounded-lg bg-[#0B0F1A] border border-[#1E293B] text-sm text-[#F1F5F9] placeholder-[#64748B] focus:outline-none focus:border-[#334155] transition-colors"
                 />
               </motion.div>
@@ -131,7 +131,7 @@ export default function TopBar() {
                 className="flex items-center gap-2 h-10 px-3 rounded-lg bg-[#0B0F1A] border border-[#1E293B] text-[#64748B] hover:text-[#94A3B8] hover:border-[#334155] transition-colors"
               >
                 <Search className="w-4 h-4" />
-                <span className="text-sm">{t('搜索...')}</span>
+                <span className="text-sm">{t('common.search')}</span>
               </motion.button>
             )}
           </AnimatePresence>
@@ -155,15 +155,15 @@ export default function TopBar() {
                   setAvatarSettingsOpen(true)
                 }}
                 className="p-1.5 rounded-lg hover:bg-[rgba(255,255,255,0.03)] transition-colors"
-                aria-label={t('点击设置头像')}
-                title={t('点击设置头像')}
+                aria-label={t('common.changeAvatarHint')}
+                title={t('common.changeAvatarHint')}
               >
                 <UserAvatar className="h-8 w-8" alt={displayName} />
               </button>
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className="p-1.5 rounded-lg hover:bg-[rgba(255,255,255,0.03)] transition-colors"
-                aria-label={t('个人菜单')}
+                aria-label={t('common.accountMenu')}
               >
                 <ChevronDown className={cn('w-4 h-4 text-[#64748B] transition-transform', userMenuOpen && 'rotate-180')} />
               </button>
@@ -190,16 +190,16 @@ export default function TopBar() {
                     className="flex items-center w-full px-3 py-2 text-sm text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[rgba(255,255,255,0.03)] transition-colors"
                   >
                     <User className="w-4 h-4 mr-2 shrink-0" />
-                    {t('更换头像')}
+                    {t('common.changeAvatar')}
                   </button>
                   <button className="flex items-center w-full px-3 py-2 text-sm text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[rgba(255,255,255,0.03)] transition-colors">
                     <User className="w-4 h-4 mr-2 shrink-0" />
-                    {t('个人资料')}
+                    {t('common.profile')}
                   </button>
                   <div className="border-t border-[#1E293B]" />
                   <button className="flex items-center w-full px-3 py-2 text-sm text-[#EF4444] hover:bg-[rgba(239,68,68,0.05)] transition-colors">
                     <LogOut className="w-4 h-4 mr-2 shrink-0" />
-                    {t('退出登录')}
+                    {t('common.signOut')}
                   </button>
                 </motion.div>
               )}

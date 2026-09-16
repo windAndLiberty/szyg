@@ -111,19 +111,19 @@ export default function CloudLogin({ initialMessage = '', onSuccess }: { initial
       <section className="relative z-10 mx-auto w-full max-w-[420px] md:mx-0">
         <div className="mb-7 flex items-center gap-3 drop-shadow-lg">
           <div className="grid h-11 w-11 place-items-center overflow-hidden rounded-lg border border-white/15 bg-[#0B1220]/80"><img src={product.logoUrl} alt={product.name} className="h-full w-full object-cover" /></div>
-          <div><h1 className="text-xl font-semibold">{product.name}</h1><p className="mt-1 text-sm text-[#CBD5E1]">{t(mode === 'login' ? '登录后继续使用智能服务' : mode === 'register' ? '注册账号后按需充值 Credits' : '验证当前密码后设置新密码')}</p></div>
+          <div><h1 className="text-xl font-semibold">{product.name}</h1><p className="mt-1 text-sm text-[#CBD5E1]">{t(mode === 'login' ? 'auth.loginSubtitle' : mode === 'register' ? 'auth.registerSubtitle' : 'auth.changePasswordSubtitle')}</p></div>
         </div>
         <form className="rounded-lg border border-white/15 bg-[#0B1220]/90 p-6 shadow-2xl backdrop-blur-md" onSubmit={(event) => { event.preventDefault(); void submit() }}>
             <div className="space-y-4">
-              {isRegistering && <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={t('你的称呼')} autoComplete="name" autoFocus className="border-[#475569] bg-[#0D1321]/90" />}
-              <Input value={account} onChange={(e) => { setAccount(e.target.value); if (isRegistering) { setVerificationId(''); setVerificationCode(''); setResendIn(0) } }} placeholder={t('邮箱')} type="email" autoComplete="username" autoFocus={mode !== 'register'} className="border-[#475569] bg-[#0D1321]/90" />
-              <Input value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t(mode === 'change-password' ? '当前密码' : '密码（至少 10 个字符）')} type="password" autoComplete={isRegistering ? 'new-password' : 'current-password'} className="border-[#475569] bg-[#0D1321]/90" />
+              {isRegistering && <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={t('auth.displayName')} autoComplete="name" autoFocus className="border-[#475569] bg-[#0D1321]/90" />}
+              <Input value={account} onChange={(e) => { setAccount(e.target.value); if (isRegistering) { setVerificationId(''); setVerificationCode(''); setResendIn(0) } }} placeholder={t('auth.email')} type="email" autoComplete="username" autoFocus={mode !== 'register'} className="border-[#475569] bg-[#0D1321]/90" />
+              <Input value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t(mode === 'change-password' ? 'auth.currentPassword' : 'auth.passwordHint')} type="password" autoComplete={isRegistering ? 'new-password' : 'current-password'} className="border-[#475569] bg-[#0D1321]/90" />
               {isRegistering && <>
                 <div className="flex gap-2">
                   <Input
                     value={verificationCode}
                     onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder={t('6位邮箱验证码')}
+                    placeholder={t('auth.verificationCode')}
                     inputMode="numeric"
                     autoComplete="one-time-code"
                     className="border-[#475569] bg-[#0D1321]/90"
@@ -136,30 +136,30 @@ export default function CloudLogin({ initialMessage = '', onSuccess }: { initial
                     onClick={() => void sendRegistrationCode()}
                   >
                     {codeLoading ? <LoaderCircle className="mr-1.5 h-4 w-4 animate-spin" /> : <MailCheck className="mr-1.5 h-4 w-4" />}
-                    {resendIn > 0 ? `${resendIn}s` : verificationId ? t('重新发送') : t('发送验证码')}
+                    {resendIn > 0 ? `${resendIn}s` : verificationId ? t('auth.resendCode') : t('auth.sendCode')}
                   </Button>
                 </div>
                 <label className="flex items-start gap-2 text-xs leading-5 text-[#CBD5E1]">
                   <input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="mt-1 accent-[#6366F1]" />
-                  <span>我已阅读并同意 <a href={product.termsUrl} target="_blank" rel="noreferrer" className="text-[#A5B4FC] hover:text-[#C7D2FE]">用户协议</a> 和 <a href={product.privacyUrl} target="_blank" rel="noreferrer" className="text-[#A5B4FC] hover:text-[#C7D2FE]">隐私政策</a></span>
+                  <span>{t('auth.termsPrefix')} <a href={product.termsUrl} target="_blank" rel="noreferrer" className="text-[#A5B4FC] hover:text-[#C7D2FE]">{t('auth.terms')}</a> {t('auth.termsJoiner')} <a href={product.privacyUrl} target="_blank" rel="noreferrer" className="text-[#A5B4FC] hover:text-[#C7D2FE]">{t('auth.privacy')}</a></span>
                 </label>
               </>}
               {mode === 'change-password' && <>
-                <Input value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t('新密码（至少 10 个字符）')} type="password" autoComplete="new-password" className="border-[#475569] bg-[#0D1321]/90" />
-                <Input value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder={t('再次输入新密码')} type="password" autoComplete="new-password" className="border-[#475569] bg-[#0D1321]/90" />
+                <Input value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t('auth.newPasswordHint')} type="password" autoComplete="new-password" className="border-[#475569] bg-[#0D1321]/90" />
+                <Input value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder={t('auth.confirmPassword')} type="password" autoComplete="new-password" className="border-[#475569] bg-[#0D1321]/90" />
               </>}
               {message && <p className={`rounded-md border px-3 py-2 text-sm ${codeSent ? 'border-[#065F46] bg-[#064E3B]/35 text-[#A7F3D0]' : 'border-[#7F1D1D] bg-[#450A0A]/40 text-[#FCA5A5]'}`}>{message}</p>}
               <Button type="submit" className="w-full bg-[#6366F1] hover:bg-[#818CF8]" disabled={loading || !password || !account.trim() || (isRegistering && (!displayName.trim() || !verificationId || verificationCode.length !== 6 || !acceptedTerms)) || (mode === 'change-password' && (!newPassword || !confirmPassword))}>
-                {loading ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}{t(mode === 'login' ? '登录' : mode === 'register' ? '注册并登录' : '确认修改')}
+                {loading ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}{t(mode === 'login' ? 'auth.signIn' : mode === 'register' ? 'auth.createAndSignIn' : 'auth.confirmChange')}
               </Button>
               {mode === 'login' ? (
-                <div className="flex items-center justify-center gap-5 text-sm">{product.allowSelfRegistration && <button type="button" onClick={() => { setMode('register'); setMessage('') }} className="text-[#A5B4FC] transition-colors hover:text-[#C7D2FE]">{t('注册账号')}</button>}<button type="button" onClick={() => { setMode('change-password'); setMessage('') }} className="text-[#94A3B8] transition-colors hover:text-[#E2E8F0]">{t('修改密码')}</button></div>
+                <div className="flex items-center justify-center gap-5 text-sm">{product.allowSelfRegistration && <button type="button" onClick={() => { setMode('register'); setMessage('') }} className="text-[#A5B4FC] transition-colors hover:text-[#C7D2FE]">{t('auth.createAccount')}</button>}<button type="button" onClick={() => { setMode('change-password'); setMessage('') }} className="text-[#94A3B8] transition-colors hover:text-[#E2E8F0]">{t('auth.changePassword')}</button></div>
               ) : (
-                <button type="button" onClick={() => { setMode('login'); setDisplayName(''); setNewPassword(''); setConfirmPassword(''); setVerificationCode(''); setVerificationId(''); setAcceptedTerms(false); setMessage('') }} className="flex w-full items-center justify-center gap-1.5 text-sm text-[#94A3B8] transition-colors hover:text-[#E2E8F0]"><ArrowLeft className="h-4 w-4" />{t('返回登录')}</button>
+                <button type="button" onClick={() => { setMode('login'); setDisplayName(''); setNewPassword(''); setConfirmPassword(''); setVerificationCode(''); setVerificationId(''); setAcceptedTerms(false); setMessage('') }} className="flex w-full items-center justify-center gap-1.5 text-sm text-[#94A3B8] transition-colors hover:text-[#E2E8F0]"><ArrowLeft className="h-4 w-4" />{t('auth.backToSignIn')}</button>
               )}
             </div>
         </form>
-        <p className="mt-5 text-center text-xs text-[#CBD5E1] drop-shadow-md">{t('本机素材不会上传到云端')}</p>
+        <p className="mt-5 text-center text-xs text-[#CBD5E1] drop-shadow-md">{t('auth.localFilesNotice')}</p>
       </section>
     </main>
   )

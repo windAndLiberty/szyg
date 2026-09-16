@@ -31,14 +31,14 @@ class AppErrorBoundaryCore extends Component<AppErrorBoundaryProps, AppErrorBoun
           <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-lg bg-[#F59E0B]/10 text-[#FBBF24]">
             <AlertTriangle className="h-5 w-5" />
           </span>
-          <h1 className="mt-4 text-lg font-semibold">{this.props.t('当前页面暂时无法显示')}</h1>
-          <p className="mt-2 text-sm leading-6 text-[#64748B]">{this.props.t('页面数据可能发生了变化。你可以重新加载，其他功能不会受到影响。')}</p>
+          <h1 className="mt-4 text-lg font-semibold">{this.props.t('errors.pageUnavailable')}</h1>
+          <p className="mt-2 text-sm leading-6 text-[#64748B]">{this.props.t('errors.pageUnavailableDescription')}</p>
           <div className="mt-6 flex justify-center gap-3">
             <button type="button" onClick={() => window.location.reload()} className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#334155] px-3 text-sm text-[#94A3B8] transition-colors hover:text-[#F1F5F9]">
-              <RefreshCw className="h-4 w-4" />{this.props.t('重新加载')}
+              <RefreshCw className="h-4 w-4" />{this.props.t('common.reload')}
             </button>
             <button type="button" onClick={() => { window.location.href = '/' }} className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#6366F1] px-3 text-sm text-white transition-colors hover:bg-[#5558E6]">
-              <Home className="h-4 w-4" />{this.props.t('返回首页')}
+              <Home className="h-4 w-4" />{this.props.t('common.backHome')}
             </button>
           </div>
         </div>
