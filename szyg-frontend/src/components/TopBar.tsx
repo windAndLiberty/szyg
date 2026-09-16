@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils'
 import { allNavChildren, pageTitleMap } from '@/lib/navConfig'
 import { useLayout } from '@/lib/layout'
 import { useI18n } from '@/lib/i18n'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
 import { getCurrentUser } from '@/lib/api'
 
 export default function TopBar() {
@@ -138,6 +139,7 @@ export default function TopBar() {
 
         {/* Right: Notifications + User */}
         <div className="flex items-center gap-3">
+          <LanguageSwitcher />
           {/* Notifications */}
           <button className="relative p-2 rounded-lg text-[#94A3B8] hover:bg-[rgba(255,255,255,0.03)] hover:text-[#F1F5F9] transition-colors">
             <Bell className="w-5 h-5" />
