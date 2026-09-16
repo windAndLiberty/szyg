@@ -3,6 +3,7 @@ import { Check, Copy, Loader2, Mic2, Plus, Save, Trash2, UserRound } from 'lucid
 import type { DigitalHumanAsset, DigitalHumanProfile } from '@/lib/api'
 import DropZone from './DropZone'
 import { acceptForAvatar, acceptForVoice } from './studioUtils'
+import { useI18n } from '@/lib/i18n'
 
 interface ProfileLibraryProps {
   profiles: DigitalHumanProfile[]
@@ -36,6 +37,7 @@ const EMPTY_DRAFT: ProfileDraft = {
 export { EMPTY_DRAFT }
 
 export default function ProfileLibrary(props: ProfileLibraryProps) {
+  const { t } = useI18n()
   const {
     profiles,
     assetById,
@@ -59,8 +61,8 @@ export default function ProfileLibrary(props: ProfileLibraryProps) {
     <div>
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold">数字人形象库</h2>
-          <p className="mt-1 text-xs text-[#7F8DA5]">人物和声音绑定保存，后续作品可以直接复用。</p>
+          <h2 className="text-base font-semibold">{t('数字人形象库')}</h2>
+          <p className="mt-1 text-xs text-[#7F8DA5]">{t('人物和声音绑定保存，后续作品可以直接复用。')}</p>
         </div>
         <button
           type="button"
@@ -68,17 +70,17 @@ export default function ProfileLibrary(props: ProfileLibraryProps) {
           className="inline-flex h-9 items-center gap-1.5 bg-[#5965E8] px-3 text-sm"
         >
           <Plus className="h-4 w-4" />
-          {showForm ? '收起' : '新建形象'}
+          {showForm ? t('收起') : t('新建形象')}
         </button>
       </div>
       {showForm && (
         <div className="mb-6 grid gap-5 border-y border-[#283448] bg-[#0D1320] px-4 py-5 lg:grid-cols-[240px_1fr_1fr_auto]">
           <div>
-            <label className="text-xs text-[#8795AA]">形象名称</label>
+            <label className="text-xs text-[#8795AA]">{t('形象名称')}</label>
             <input
               value={draft.name}
               onChange={(event) => onDraftChange({ ...draft, name: event.target.value })}
-              placeholder="例如：品牌讲解员"
+              placeholder={t('例如：品牌讲解员')}
               className="mt-2 h-10 w-full border border-[#2B374B] bg-[#080D16] px-3 text-sm outline-none"
             />
             <div className="mt-3 flex gap-2">
@@ -91,13 +93,13 @@ export default function ProfileLibrary(props: ProfileLibraryProps) {
                     draft.profileType === value ? 'border-[#6974F1] bg-[#252B63]' : 'border-[#2B374B]'
                   }`}
                 >
-                  {value === 'virtual' ? '虚拟人物' : '真人形象'}
+                  {t(value === 'virtual' ? '虚拟人物' : '真人形象')}
                 </button>
               ))}
             </div>
           </div>
           <div>
-            <label className="text-xs text-[#8795AA]">人物参考</label>
+            <label className="text-xs text-[#8795AA]">{t('人物参考')}</label>
             <div className="mt-2">
               <DropZone
                 accept={acceptForAvatar()}
@@ -106,9 +108,9 @@ export default function ProfileLibrary(props: ProfileLibraryProps) {
                 busy={busyKey === 'profile-avatar'}
                 size="sm"
                 icon={<UserRound className="mr-1.5 h-4 w-4" />}
-                title="拖入或点击上传"
-                hint="图片 / 视频，可多次上传"
-                overlayLabel="松开即可加入人物参考"
+                title={t('拖入或点击上传')}
+                hint={t('图片 / 视频，可多次上传')}
+                overlayLabel={t('松开即可加入人物参考')}
               />
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -118,7 +120,7 @@ export default function ProfileLibrary(props: ProfileLibraryProps) {
             </div>
           </div>
           <div>
-            <label className="text-xs text-[#8795AA]">绑定声音</label>
+            <label className="text-xs text-[#8795AA]">{t('绑定声音')}</label>
             <div className="mt-2">
               <DropZone
                 accept={acceptForVoice()}
@@ -130,12 +132,12 @@ export default function ProfileLibrary(props: ProfileLibraryProps) {
                 busy={busyKey === 'profile-voice'}
                 size="sm"
                 icon={<Mic2 className="mr-1.5 h-4 w-4" />}
-                title="拖入或点击上传"
-                hint="上传单人清晰说话的音频或有声视频"
-                overlayLabel="松开即可绑定声音"
+                title={t('拖入或点击上传')}
+                hint={t('上传单人清晰说话的音频或有声视频')}
+                overlayLabel={t('松开即可绑定声音')}
               />
             </div>
-            <p className="mt-2 text-xs text-[#7F8DA5]">生成新台词时，以这段声音的音色和说话风格为参考。</p>
+            <p className="mt-2 text-xs text-[#7F8DA5]">{t('生成新台词时，以这段声音的音色和说话风格为参考。')}</p>
             {draft.voiceId && (
               <p className="mt-2 truncate text-xs text-[#83D9C2]">已绑定：{assetById.get(draft.voiceId)?.name}</p>
             )}
@@ -148,7 +150,7 @@ export default function ProfileLibrary(props: ProfileLibraryProps) {
               className="inline-flex h-10 items-center gap-2 bg-[#5965E8] px-4 text-sm disabled:opacity-40"
             >
               {busyKey === 'profile-save' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              保存
+              {t('保存')}
             </button>
           </div>
         </div>
@@ -156,8 +158,8 @@ export default function ProfileLibrary(props: ProfileLibraryProps) {
       {profiles.length === 0 ? (
         <div className="flex min-h-[200px] flex-col items-center justify-center border border-dashed border-[#2B3850] bg-[#0B101B]/40 px-6 text-center">
           <UserRound className="mb-3 h-7 w-7 text-[#7184A3]" />
-          <p className="text-sm font-medium text-[#E7ECF5]">建立第一个数字人形象</p>
-          <p className="mt-1 max-w-sm text-xs leading-5 text-[#7F8DA5]">上传虚拟人物参考和声音，保存后可以在所有数字人口播作品中复用。</p>
+          <p className="text-sm font-medium text-[#E7ECF5]">{t('建立第一个数字人形象')}</p>
+          <p className="mt-1 max-w-sm text-xs leading-5 text-[#7F8DA5]">{t('上传虚拟人物参考和声音，保存后可以在所有数字人口播作品中复用。')}</p>
         </div>
       ) : (
         <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -201,6 +203,7 @@ interface ProfileCardProps {
 }
 
 function ProfileCard({ profile, cover, voiceName, selected, onSelect, onRemove, onRemix }: ProfileCardProps) {
+  const { t } = useI18n()
   const canRemix = profile.profile_type === 'virtual' && Boolean(profile.voice_asset_id)
   return (
     <article
@@ -223,10 +226,10 @@ function ProfileCard({ profile, cover, voiceName, selected, onSelect, onRemove, 
             {selected && <Check className="h-4 w-4 text-[#7D87FF]" />}
           </div>
           <p className="mt-1 text-xs text-[#7F8DA5]">
-            {profile.profile_type === 'virtual' ? '虚拟人物 · 可生成' : '真人形象 · 暂不可生成'}
+            {t(profile.profile_type === 'virtual' ? '虚拟人物 · 可生成' : '真人形象 · 暂不可生成')}
           </p>
           <p className="mt-2 truncate text-xs text-[#A7B2C3]">
-            {voiceName ? `声音：${voiceName}` : '未绑定声音'}
+            {voiceName ? `${t('声音：')}${voiceName}` : t('未绑定声音')}
           </p>
         </div>
         <button
@@ -235,7 +238,7 @@ function ProfileCard({ profile, cover, voiceName, selected, onSelect, onRemove, 
             event.stopPropagation()
             onRemove()
           }}
-          aria-label="删除形象"
+          aria-label={t('删除形象')}
           className="p-1 text-[#6E7D93] hover:text-[#F48A9B]"
         >
           <Trash2 className="h-4 w-4" />
@@ -252,7 +255,7 @@ function ProfileCard({ profile, cover, voiceName, selected, onSelect, onRemove, 
             className="inline-flex h-8 items-center gap-1.5 border border-[#535FCB] bg-[#202653] px-3 text-xs text-[#D6DAFF] hover:border-[#6974F1]"
           >
             <Copy className="h-3.5 w-3.5" />
-            用此形象高仿复刻
+            {t('用此形象高仿复刻')}
           </button>
         </div>
       )}

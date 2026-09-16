@@ -57,6 +57,16 @@ const enUS: Record<string, string> = {
   '新密码至少需要 10 个字符': 'New password must be at least 10 characters.', '两次输入的新密码不一致': 'The new passwords do not match.',
   '验证码已发送至 {email}，10分钟内有效': 'A code was sent to {email}. It is valid for 10 minutes.', '验证码发送失败，请稍后再试': 'Could not send the code. Try again shortly.',
   '登录未完成，请检查输入': 'Sign-in could not be completed. Check your details.', '请先登录': 'Please sign in', '登录状态已过期，请重新登录': 'Your session has expired. Sign in again.',
+  '数字人形象库': 'Digital human library', '人物和声音绑定保存，后续作品可以直接复用。': 'Save linked character and voice references for reuse in future projects.',
+  '新建形象': 'New profile', '形象名称': 'Profile name', '例如：品牌讲解员': 'For example: Brand presenter',
+  '虚拟人物': 'Virtual person', '真人形象': 'Real-person profile', '人物参考': 'Character references', '拖入或点击上传': 'Drop files or click to upload',
+  '图片 / 视频，可多次上传': 'Images or videos; multiple uploads supported', '松开即可加入人物参考': 'Release to add character references',
+  '绑定声音': 'Voice reference', '上传单人清晰说话的音频或有声视频': 'Upload clear single-speaker audio or video', '松开即可绑定声音': 'Release to attach voice',
+  '生成新台词时，以这段声音的音色和说话风格为参考。': 'New scripts use this voice’s tone and speaking style as a reference.',
+  '保存': 'Save', '建立第一个数字人形象': 'Create your first digital human profile',
+  '上传虚拟人物参考和声音，保存后可以在所有数字人口播作品中复用。': 'Upload virtual-person references and a voice to reuse across all digital-human videos.',
+  '虚拟人物 · 可生成': 'Virtual person · Ready to generate', '真人形象 · 暂不可生成': 'Real-person profile · Generation unavailable',
+  '声音：': 'Voice: ', '未绑定声音': 'No voice attached', '删除形象': 'Delete profile', '用此形象高仿复刻': 'Create a likeness with this profile',
 }
 
 const I18nContext = createContext<I18nContextValue | null>(null)
