@@ -1,0 +1,3 @@
+# Dependencies imported by SZYG's wrapper around the vendored Hermes agent.
+# The upstream agent environment does not install these on SZYG's behalf.
+pydantic-settings>=2.13.1,<3

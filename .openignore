@@ -1,0 +1,60 @@
+# Open-source sync manifest: default-ignore everything, allowlist what the
+# public repo may contain, then apply the precise blacklist. push-public.ps1
+# parses this file; git itself uses .gitignore only.
+
+# ---- precise blacklist (checked first, always wins) ----
+vendor/**
+server/vendor/**
+frontend_refer/**
+services/**
+KnowledgeBase/**
+LogBook/**
+.clinerules
+.stignore
+.gitmodules
+CLAUDE.md
+hermes.yaml
+_test_import.py
+start_backend.bat
+start_electron.bat
+run_server.bat
+szyg_service.bat
+docs/MICROSOFT_STORE_RELEASE.md
+docs/superpowers/**
+docs/*spec*
+assets/avatar/**
+assets/private/**
+assets/public/**
+assets/store-listing/**
+assets/logo1.png
+electron/store/**
+electron/scripts/build-store-msix.ps1
+electron/assets/public/**
+electron/start_desktop.vbs
+szyg-frontend/src/assets/products/public-*
+szyg-frontend/src/assets/login-digital-team.png
+szyg-frontend/public/login-digital-team.png
+szyg-frontend/public/logo1.jpg
+server/szyg/video_templates/*/preview.png
+server/apps/desktop/public/ds-assets/**
+
+# ---- allowlist (top-level entries from the local repo) ----
+!README.md
+!pyproject.toml
+!uv.lock
+!.gitignore
+!.gitattributes
+!config.example.yaml
+!secrets.example.yaml
+!start.sh
+!restart_szyg.ps1
+!restart_szyg.bat
+!scripts/**
+!docs/**
+!loop-agent/**
+!tests/**
+!tools/**
+!szyg-frontend/**
+!electron/**
+!server/**
+!assets/szyg.ico

@@ -1,0 +1,121 @@
+{
+  "name": "szyg",
+  "version": "1.1.9",
+  "description": "数字员工 - 超级数字员工",
+  "author": "数字员工",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:frontend": "npm --prefix ../szyg-frontend run build",
+    "build:backend": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-backend-runtime.ps1",
+    "build:hermes": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-hermes-runtime.ps1",
+    "build:config": "..\\.venv\\Scripts\\python.exe scripts/build-release-config.py ../config.yaml runtime/config.yaml",
+    "build:integrity": "node scripts/build-runtime-manifest.cjs",
+    "build:runtime": "npm run prepare:product && npm run build:frontend && npm run build:backend && npm run build:hermes && npm run build:config && npm run build:integrity",
+    "audit:source": "node scripts/audit-release.cjs source",
+    "audit:dist": "node scripts/audit-release.cjs dist",
+    "build:dir": "npm run audit:source && npm run build:runtime && electron-builder --win dir --config electron-builder.config.cjs && npm run audit:dist",
+    "build": "npm run audit:source && npm run build:runtime && electron-builder --win nsis --config electron-builder.config.cjs && npm run audit:dist",
+    "build:zip": "npm run audit:source && npm run build:runtime && electron-builder --win zip --config electron-builder.config.cjs && npm run audit:dist",
+    "build:release": "node scripts/assert-signing.cjs && npm run build",
+    "prepare:product": "node scripts/prepare-product.cjs"
+  },
+  "build": {
+    "appId": "com.szyg.app",
+    "productName": "数字员工",
+    "directories": {
+      "output": "dist"
+    },
+    "compression": "maximum",
+    "files": [
+      "main.js",
+      "preload.js",
+      "browser/**/*",
+      "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "runtime/backend/szyg-backend",
+        "to": "backend"
+      },
+      {
+        "from": "../szyg-frontend/dist",
+        "to": "frontend"
+      },
+      {
+        "from": "../server/szyg/storage/chromium",
+        "to": "runtime/chromium"
+      },
+      {
+        "from": "../runtime/llama",
+        "to": "runtime/llama"
+      },
+      {
+        "from": "../runtime/ffmpeg",
+        "to": "runtime/ffmpeg"
+      },
+      {
+        "from": "runtime/hermes/hermes-runtime",
+        "to": "runtime/hermes"
+      },
+      {
+        "from": "../server/vendor/hermes-agent.lock.json",
+        "to": "runtime/hermes/upstream.lock.json"
+      },
+      {
+        "from": "providers/cua",
+        "to": "runtime/cua"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
+      },
+      {
+        "from": "runtime/config.yaml",
+        "to": "config.yaml"
+      },
+      {
+        "from": "runtime/runtime-integrity.json",
+        "to": "runtime-integrity.json"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "../assets/szyg.ico",
+      "executableName": "数字员工",
+      "verifyUpdateCodeSignature": true
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "数字员工",
+      "installerIcon": "../assets/szyg.ico",
+      "uninstallerIcon": "../assets/szyg.ico",
+      "installerHeaderIcon": "../assets/szyg.ico",
+      "uninstallDisplayName": "数字员工 ${version}",
+      "deleteAppDataOnUninstall": false,
+      "installerLanguages": [
+        "zh_CN"
+      ],
+      "language": "2052",
+      "artifactName": "数字员工-${version}-Windows-${arch}-安装包.${ext}"
+    },
+    "artifactName": "数字员工-${version}-Windows-${arch}.${ext}"
+  },
+  "devDependencies": {
+    "7zip-bin": "^5.2.0",
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3"
+  }
+}

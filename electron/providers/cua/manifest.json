@@ -1,0 +1,14 @@
+{
+  "name": "cua-driver",
+  "version": "0.14.2",
+  "source": "https://github.com/trycua/cua/releases/tag/cua-driver-rs-v0.14.2",
+  "archive_sha256": "4B379379E4F73BF4BB90E1E10E2A0962ED7CD398543FA961405249371425F654",
+  "telemetry": false,
+  "auto_update": false,
+  "files": {
+    "cua-driver.exe": "AE1752AAA723478FDE8BB2E3D138C5CD0ABE1538CE3FCD67E9B52D5DB61E1F2A",
+    "cua-driver-uia.exe": "C5CFDCFC1F2B9435042857657F3A0B63E5C59C634766921653683CAD51CBB7A2",
+    "cua_driver_sdk.dll": "350E7EC68F9DAD0E64DD7B967CEB8E04723BE26530902D5D202551F8F5C36E64",
+    "cua-cursor-theme.exe": "475CF3926EBF4695F472715162F508BBCFCAFB2D97FCD2AC9EB404BFDE04C7C3"
+  }
+}

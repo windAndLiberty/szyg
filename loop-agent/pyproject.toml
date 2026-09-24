@@ -1,0 +1,19 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_functions = ["test_*"]
+markers = [
+    "e2e: end-to-end tests that require real NVIDIA NIM API calls",
+]
+
+[project]
+name = "orchestration"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "deepagents>=0.6.12",
+    "langchain-nvidia-ai-endpoints>=1.4.3",
+    "pytest>=9.1.1",
+    "tavily-python>=0.7.26",
+]

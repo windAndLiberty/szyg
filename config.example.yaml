@@ -1,0 +1,238 @@
+cloud:
+  enabled: ${SZYG_CLOUD_ENABLED:true}
+  control_url: ${SZYG_CONTROL_URL:}
+  app_version: 1.0.2
+llm:
+  default_backend: volcengine
+  local_llama:
+    enabled: true
+    base_url: http://127.0.0.1:11435/v1
+    default_model: qwen3-4b
+    optional_model: qwen3-8b
+    auto_start: true
+    task_timeout_seconds: 30
+  ollama:
+    enabled: true
+    base_url: http://localhost:11434
+    default_model: qwen3:0.6B
+    timeout: 120
+  liteLLM:
+    enabled: false
+    api_key: ''
+    base_url: http://localhost:4000
+    default_model: gpt-4
+    timeout: 60
+  volcengine:
+    enabled: true
+    api_key: ''
+    speech_api_key: ''
+    base_url: https://ark.cn-beijing.volces.com/api/v3
+    timeout: 120
+    max_retries: 3
+    output_dir: ./data/volcengine_output
+    endpoints: {}
+  fallback_enabled: true
+  fallback_order:
+  - ollama
+tts:
+  backend: edge_tts
+  edge_tts:
+    voice: zh-CN-XiaoxiaoNeural
+    rate: +0%
+    pitch: +0Hz
+video:
+  ffmpeg_path: D:\tools\ffmpeg\bin\ffmpeg.exe
+  ffprobe_path: D:\tools\ffmpeg\bin\ffprobe.exe
+  default_video_codec: libx264
+  default_audio_codec: aac
+  threads: 4
+  output_dir: ./data/output
+  templates_dir: ./data/ffmpeg_templates
+  generation:
+    default_model: doubao-seedance-2.0
+    compose_default_model: doubao-seedance-1.5-pro
+    compose_vision_model: doubao-seed-2-0-pro-260215
+    compose_planner_model: doubao-seed-2-0-pro-260215
+    storyboard_remote_model: doubao-seed-2-0-lite-260428
+    prompt_optimize_model: doubao-seed-2-0-lite-260428
+    defaults:
+      duration: 15
+      size: 720p
+      ratio: '9:16'
+      native_audio: false
+      count: 1
+    models:
+      doubao-seedance-1.5-pro:
+        provider_model: doubao-seedance-1-5-pro-251215
+        label: 基础模式
+        sizes:
+        - 720p
+        - 1080p
+        min_duration: 4
+        max_duration: 12
+        native_audio: true
+      doubao-seedance-2.0-fast:
+        provider_model: doubao-seedance-2.0-fast
+        label: 快速模式
+        sizes:
+        - 720p
+        min_duration: 4
+        max_duration: 15
+        native_audio: true
+      doubao-seedance-2.0:
+        provider_model: doubao-seedance-2.0
+        label: 高质量模式
+        sizes:
+        - 720p
+        - 1080p
+        min_duration: 4
+        max_duration: 15
+        native_audio: true
+      doubao-seedance-2.5:
+        provider_model: doubao-seedance-2.5
+        label: 专业模式
+        available: false
+        sizes:
+        - 720p
+        - 1080p
+        - 4K
+        min_duration: 3
+        max_duration: 30
+        native_audio: true
+digital_human:
+  provider: volcengine
+  model_label: 专业口播
+  model: doubao-seedance-2.5
+  endpoint: ${SEEDANCE_25_ENDPOINT:}
+  require_endpoint: true
+  sizes:
+  - 720p
+  - 1080p
+  - 4K
+  max_duration: 30
+  max_assets: 50
+  max_upload_mb: 80
+  max_inline_asset_mb: 12
+content:
+  graphic:
+    multimodal_model: ''
+knowledge:
+  storage_dir: ''
+  db_path: ''
+  vision_model: ''
+  normalize_model: doubao-seed-2-0-lite-260428
+  embedding_model: ''
+  max_file_bytes: 1073741824
+marketing:
+  comment_generation_model: doubao-seed-2-0-lite-260428
+intelligence:
+  analysis_model: doubao-seed-2-0-lite-260428
+  query_all_enabled_platforms: true
+  max_external_samples: 45
+  max_publish_records: 100
+  evidence_limit: 5
+  max_query_keywords: 2
+  platform_search_timeout_seconds: 18
+  collection_timeout_seconds: 65
+  model_timeout_seconds: 45
+  collectors:
+    douyin: browser_session
+    xhs: browser_session
+    kuaishou: browser_session
+    bilibili: public_page
+    weibo: browser_session
+    public_web: public_feed
+geo:
+  # GEO 联网检测平台、模型与密钥均由 Dolphin 控制服务统一管理。
+  # 本地桌面端只保存企业资料、客户问题、回答证据和分析结果。
+  default_diagnostic_samples: 2
+  default_scheduled_samples: 1
+  default_verification_samples: 3
+workflow:
+  ai:
+    planner_model: doubao-seed-2-0-lite-260428
+    reasoning_effort: minimal
+  skills:
+    auto_learn: true
+    guard_agent_created: true
+skills:
+  guard_agent_created: true
+publishing:
+  title_model: doubao-seed-2-0-lite-260428
+  title_limits:
+    douyin:
+      note: 20
+    xhs:
+      note: 20
+sop:
+  db_path: ./data/sop.db
+  auto_load: true
+api:
+  host: 0.0.0.0
+  port: 8000
+  workers: 1
+  reload: false
+  cors_origins:
+  - http://localhost:5173
+  - http://localhost:8000
+  api_key: ''
+  request_timeout: 120
+  enable_docs: true
+wechaty:
+  enabled: false
+  name: 域灵助手
+  puppet: wechaty-puppet-wechat
+  token: ''
+  endpoint: ${WECHATY_ENDPOINT:-}
+  auto_accept_friend: false
+  allowed_groups: []
+  cooldown_seconds: 1
+debug: false
+log_level: INFO
+data_dir: ./data
+platforms:
+  browser:
+    headless: false
+    channel: chrome
+    viewport_width: 1536
+    viewport_height: 864
+    stealth_enabled: true
+  desktop_browser:
+    browser: msedge
+    executable_path: ''
+    profile_root: ./data/browser_profiles
+    remote_debugging_port: 9223
+    no_proxy: true
+    profiles:
+      tencent_channels_edge:
+        browser: msedge
+        profile_dir: ./data/browser_profiles/tencent_channels_edge
+        remote_debugging_port: 9223
+        no_proxy: true
+  douyin:
+    enabled: true
+    creator_url: https://creator.douyin.com
+    publish_url: https://creator.douyin.com/creator-micro/content/upload
+    login_timeout: 300
+    max_title_length: 1000
+    max_images: 12
+    max_tags: 5
+  xiaohongshu:
+    enabled: true
+    creator_url: https://creator.xiaohongshu.com
+    publish_url: https://creator.xiaohongshu.com/publish/publish
+    login_timeout: 300
+    max_title_length: 20
+    max_body_length: 1000
+    max_images: 18
+    max_tags: 5
+  wechat:
+    enabled: true
+    exe_paths:
+    - C:\Program Files\Tencent\WeChat\WeChat.exe
+    - C:\Program Files (x86)\Tencent\WeChat\WeChat.exe
+    login_timeout: 300
+    max_moments_text: 2000
+    max_moments_images: 9
+  signatures:
+    engine: auto
