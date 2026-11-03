@@ -6,10 +6,12 @@ import secrets
 import sqlite3
 import os
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Optional
 
 from jose import JWTError, jwt
 from pydantic import BaseModel
+from szyg.data_path import get_data_dir
 
 # --- Config ---
 _DEFAULT_SECRET = "dev-secret-change-in-production"
@@ -23,7 +25,15 @@ if not SECRET_KEY:
     )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 1 day
-DB_PATH = os.environ.get("SZYG_AUTH_DB", "data/auth.db")
+def get_auth_db_path() -> str:
+    """Resolve local auth state to a writable per-user directory."""
+    configured = (os.environ.get("SZYG_AUTH_DB", "") or "").strip()
+    if configured:
+        return str(Path(configured).expanduser())
+    return str(get_data_dir() / "auth.db")
+
+
+DB_PATH = get_auth_db_path()
 
 # Simple password hashing using PBKDF2-SHA256 (no external bcrypt dependency needed)
 def _hash_pw(password: str, salt: str | None = None) -> str:

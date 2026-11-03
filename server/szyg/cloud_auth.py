@@ -10,6 +10,7 @@ import base64
 import ctypes
 import hashlib
 import json
+import logging
 import os
 import platform
 import socket
@@ -24,6 +25,9 @@ import httpx
 from jose import JWTError, jwt
 
 from szyg.config.loader import load_config
+
+
+logger = logging.getLogger(__name__)
 
 
 class CloudAuthError(RuntimeError):
@@ -215,19 +219,32 @@ class CloudAuthManager:
             raise CloudAuthError("云账户服务尚未配置")
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         try:
-            with httpx.Client(timeout=30, trust_env=False) as client:
+            # Retry only connection establishment failures. HTTPTransport does
+            # not replay requests after they may have reached the server, so
+            # login attempts and verification-code requests cannot be
+            # submitted twice when a response is interrupted.
+            transport = httpx.HTTPTransport(retries=2)
+            with httpx.Client(timeout=30, trust_env=False, transport=transport) as client:
                 response = client.request(method, cfg["control_url"] + path, json=json_body, headers=headers)
         except httpx.HTTPError as exc:
+            logger.warning(
+                "Cloud account request failed: method=%s path=%s error=%s: %s",
+                method,
+                path,
+                type(exc).__name__,
+                exc,
+            )
             raise CloudAuthError("云账户服务暂时不可用") from exc
         if response.status_code >= 400:
             try:
-                detail = response.json().get("detail", "")
-                if isinstance(detail, dict):
-                    detail = detail.get("message", "")
+                detail_payload = response.json().get("detail", "")
+                detail = detail_payload.get("message", "") if isinstance(detail_payload, dict) else detail_payload
             except Exception:
+                detail_payload = ""
                 detail = ""
             error = CloudAuthError(str(detail or "请求未完成"))
             error.status_code = response.status_code
+            error.detail = detail_payload
             raise error
         return response.json() if response.content else {}
 
@@ -302,6 +319,60 @@ class CloudAuthManager:
             return self._request("POST", "/api/v1/auth/register/code", json_body={
                 "product_id": self.config["product_id"],
                 "email": email,
+                "device": self.device(),
+            })
+
+    def request_password_reset_code(self, email: str) -> dict:
+        with self._lock:
+            return self._request("POST", "/api/v1/auth/password/code", json_body={
+                "product_id": self.config["product_id"],
+                "email": email,
+                "device": self.device(),
+            })
+
+    def request_device_replacement_code(self, email: str, password: str) -> dict:
+        with self._lock:
+            return self._request("POST", "/api/v1/auth/device-replacement/code", json_body={
+                "product_id": self.config["product_id"],
+                "email": email,
+                "password": password,
+                "device": self.device(),
+            })
+
+    def replace_device(
+        self,
+        email: str,
+        password: str,
+        verification_id: str,
+        verification_code: str,
+        revoke_device_id: str,
+    ) -> dict:
+        with self._lock:
+            data = self._request("POST", "/api/v1/auth/device-replacement", json_body={
+                "product_id": self.config["product_id"],
+                "email": email,
+                "password": password,
+                "device": self.device(),
+                "verification_id": verification_id,
+                "verification_code": verification_code,
+                "revoke_device_id": revoke_device_id,
+            })
+            return self._accept_session(data)
+
+    def reset_password(
+        self,
+        email: str,
+        new_password: str,
+        verification_id: str,
+        verification_code: str,
+    ) -> dict:
+        with self._lock:
+            return self._request("PUT", "/api/v1/auth/password/reset", json_body={
+                "product_id": self.config["product_id"],
+                "email": email,
+                "new_password": new_password,
+                "verification_id": verification_id,
+                "verification_code": verification_code,
                 "device": self.device(),
             })
 

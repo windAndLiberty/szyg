@@ -26,6 +26,18 @@ const files = [
     target: 'runtime/hermes/hermes-runtime.exe',
   },
   {
+    source: path.join(electronDir, 'runtime', 'openclaw', '2026.10.5', 'node.exe'),
+    target: 'runtime/openclaw/2026.10.5/node.exe',
+  },
+  {
+    source: path.join(electronDir, 'runtime', 'openclaw', '2026.10.5', 'app', 'node_modules', 'openclaw', 'openclaw.mjs'),
+    target: 'runtime/openclaw/2026.10.5/app/node_modules/openclaw/openclaw.mjs',
+  },
+  {
+    source: path.join(electronDir, 'runtime', 'openclaw', '2026.10.5', 'manifest.json'),
+    target: 'runtime/openclaw/2026.10.5/manifest.json',
+  },
+  {
     source: path.join(electronDir, 'providers', 'cua', 'cua-driver.exe'),
     target: 'runtime/cua/cua-driver.exe',
   },

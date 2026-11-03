@@ -48,6 +48,8 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(tools_router)
     app.include_router(oem_router)
+    from szyg.api.business_mcp_routes import router as business_mcp_router
+    app.include_router(business_mcp_router)
 
     # Agent marketplace, AI tools hub, announcements
     from szyg.api.agent_routes import router as agent_router

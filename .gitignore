@@ -37,6 +37,8 @@ debug2.log
 /assets/human_avatar/
 
 # szyg — temp / test
+.artifacts/
+.diagnostics/
 _tmp/
 _test_output/
 temp_*

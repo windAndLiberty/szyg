@@ -73,9 +73,9 @@ export default function Sidebar() {
     style={{ width: collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED }}
   >
     <div className={cn('flex h-16 shrink-0 items-center border-b border-[#1E293B]', collapsed ? 'justify-center px-2' : 'px-4')}>
-      <Link to="/" className="flex min-w-0 items-center gap-3" title={collapsed ? product.name : undefined}>
-        <img src={product.logoUrl} alt={product.name} className="h-8 w-8 shrink-0 rounded-md object-cover" />
-        {!collapsed && <div className="min-w-0"><p className="whitespace-nowrap font-display text-xl font-bold text-[#F1F5F9]">{product.name}</p><p className="-mt-0.5 whitespace-nowrap text-[10px] text-[#64748B]">{t('navigation.superWorkforce')}</p></div>}
+      <Link to="/" className="flex min-w-0 items-center gap-3" title={collapsed ? t(product.name) : undefined}>
+        <img src={product.logoUrl} alt={t(product.name)} className="h-8 w-8 shrink-0 rounded-md object-cover" />
+        {!collapsed && <div className="min-w-0"><p className="whitespace-nowrap font-display text-xl font-bold text-[#F1F5F9]">{t(product.name)}</p><p className="-mt-0.5 whitespace-nowrap text-[10px] text-[#64748B]">{t('navigation.superWorkforce')}</p></div>}
       </Link>
     </div>
 

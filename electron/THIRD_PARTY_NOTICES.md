@@ -17,6 +17,20 @@ environments, sample media, logs, cookies and account data are excluded.
 - License: MIT
 - Distribution: isolated agent runtime, built-in tools, skills, plugins and upstream license
 
+## OpenClaw
+
+- Project: openclaw/openclaw
+- Version: 2026.10.5
+- License: MIT
+- Distribution: complete npm installation supervised as a replaceable local runtime
+
+## Node.js
+
+- Project: nodejs/node
+- Version: 24.16.0 Windows x64
+- License: MIT and bundled third-party notices
+- Distribution: dedicated runtime used only to launch OpenClaw
+
 ## Cua Driver
 
 - Project: trycua/cua

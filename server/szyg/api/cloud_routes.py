@@ -32,6 +32,21 @@ class RegisterCodeBody(BaseModel):
     email: str = Field(min_length=3, max_length=320)
 
 
+class PasswordResetCodeBody(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+
+
+class DeviceReplacementCodeBody(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    password: str
+
+
+class DeviceReplacementBody(DeviceReplacementCodeBody):
+    verification_id: str = Field(min_length=8, max_length=80)
+    verification_code: str = Field(pattern="^[0-9]{6}$")
+    revoke_device_id: str = Field(min_length=8, max_length=80)
+
+
 class FeedbackBody(BaseModel):
     category: str = "general"
     message: str
@@ -39,8 +54,10 @@ class FeedbackBody(BaseModel):
 
 
 class ChangePasswordBody(BaseModel):
-    current_password: str
+    email: str = Field(min_length=3, max_length=320)
     new_password: str = Field(min_length=10, max_length=200)
+    verification_id: str = Field(min_length=8, max_length=80)
+    verification_code: str = Field(pattern="^[0-9]{6}$")
 
 
 class PaymentOrderBody(BaseModel):
@@ -52,7 +69,9 @@ def call(fn, *args, **kwargs):
     try:
         return fn(*args, **kwargs)
     except CloudAuthError as exc:
-        raise HTTPException(401 if str(exc) == "请先登录" else 400, str(exc)) from exc
+        status_code = int(getattr(exc, "status_code", 0) or (401 if str(exc) == "请先登录" else 400))
+        detail = getattr(exc, "detail", None)
+        raise HTTPException(status_code, detail if isinstance(detail, dict) else str(exc)) from exc
 
 
 @router.get("/config")
@@ -98,6 +117,28 @@ def register_code(body: RegisterCodeBody):
     return call(cloud_auth.request_registration_code, body.email)
 
 
+@router.post("/password/code")
+def password_reset_code(body: PasswordResetCodeBody):
+    return call(cloud_auth.request_password_reset_code, body.email)
+
+
+@router.post("/device-replacement/code")
+def device_replacement_code(body: DeviceReplacementCodeBody):
+    return call(cloud_auth.request_device_replacement_code, body.email, body.password)
+
+
+@router.post("/device-replacement")
+def device_replacement(body: DeviceReplacementBody):
+    return call(
+        cloud_auth.replace_device,
+        body.email,
+        body.password,
+        body.verification_id,
+        body.verification_code,
+        body.revoke_device_id,
+    )
+
+
 @router.post("/logout")
 def logout():
     cloud_auth.logout()
@@ -106,7 +147,13 @@ def logout():
 
 @router.put("/password")
 def change_password(body: ChangePasswordBody):
-    return call(cloud_auth.proxy, "PUT", "/api/v1/auth/password", body.model_dump())
+    return call(
+        cloud_auth.reset_password,
+        body.email,
+        body.new_password,
+        body.verification_id,
+        body.verification_code,
+    )
 
 
 @router.get("/devices")

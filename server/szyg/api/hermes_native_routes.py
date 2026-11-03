@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import hmac
 import json
+import os
 import time
 import uuid
 from typing import Any
 
 import httpx
 from fastapi import APIRouter, Header, HTTPException, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from szyg.execution_kernel import get_execution_kernel
@@ -108,8 +110,13 @@ async def case_cards(body: CaseCardRequest):
 
 
 def _verify_runtime(value: str) -> None:
-    import hmac
     if not value or not hmac.compare_digest(value, hermes_process_manager.token):
+        raise HTTPException(401, "Unauthorized")
+
+
+def _verify_openclaw_runtime(value: str) -> None:
+    expected = os.environ.get("SZYG_OPENCLAW_MODEL_TOKEN", "").strip()
+    if not value or not expected or not hmac.compare_digest(value, expected):
         raise HTTPException(401, "Unauthorized")
 
 
@@ -352,10 +359,21 @@ def _normalize_tool_calls(calls: Any) -> list[dict[str, Any]]:
     return normalized
 
 
-@router.post("/api/internal/hermes/openai/v1/chat/completions")
-async def openai_chat(body: dict[str, Any], authorization: str = Header(default="")):
-    token = authorization.removeprefix("Bearer ").strip()
-    _verify_runtime(token)
+def _openclaw_reasoning_requested(body: dict[str, Any]) -> bool:
+    requested_model = str(body.get("model") or "").strip().lower()
+    if requested_model.endswith("text.fast"):
+        return False
+    if requested_model.endswith("text.reasoning"):
+        return True
+    reasoning = body.get("reasoning_effort", body.get("reasoning"))
+    if isinstance(reasoning, dict):
+        reasoning = reasoning.get("effort", reasoning.get("level", reasoning.get("enabled")))
+    if isinstance(reasoning, str):
+        return reasoning.strip().lower() not in {"", "off", "none", "false", "0", "disabled"}
+    return bool(reasoning)
+
+
+async def _openai_chat_completion(body: dict[str, Any]):
     client = CloudInferenceClient(timeout=90)
     payload = {
         "messages": body.get("messages") or [],
@@ -367,7 +385,7 @@ async def openai_chat(body: dict[str, Any], authorization: str = Header(default=
         payload["tools"] = _normalize_tools(body["tools"])
     if body.get("tool_choice") is not None:
         payload["tool_choice"] = body["tool_choice"]
-    capability = "text.reasoning" if body.get("reasoning_effort") or body.get("reasoning") else "text.fast"
+    capability = "text.reasoning" if _openclaw_reasoning_requested(body) else "text.fast"
     try:
         result = await client._request("POST", "/api/v1/inference/chat", client._body(capability, payload))
     except IntegrationError as exc:
@@ -392,22 +410,43 @@ async def openai_chat(body: dict[str, Any], authorization: str = Header(default=
             "usage": data.get("usage") or {},
         })
 
-    async def chunks():
-        base = {"id": completion_id, "object": "chat.completion.chunk", "created": int(time.time()), "model": model}
-        yield f"data: {json.dumps({**base, 'choices': [{'index': 0, 'delta': {'role': 'assistant'}, 'finish_reason': None}]})}\n\n"
-        if message.get("tool_calls"):
-            delta_calls = []
-            for index, item in enumerate(message["tool_calls"]):
-                delta_calls.append({"index": index, **item})
-            yield f"data: {json.dumps({**base, 'choices': [{'index': 0, 'delta': {'tool_calls': delta_calls}, 'finish_reason': None}]}, ensure_ascii=False)}\n\n"
-            finish = "tool_calls"
-        else:
-            content = str(message.get("content") or "")
-            for offset in range(0, len(content), 80):
-                delta = content[offset:offset + 80]
-                yield f"data: {json.dumps({**base, 'choices': [{'index': 0, 'delta': {'content': delta}, 'finish_reason': None}]}, ensure_ascii=False)}\n\n"
-            finish = "stop"
-        yield f"data: {json.dumps({**base, 'choices': [{'index': 0, 'delta': {}, 'finish_reason': finish}], 'usage': data.get('usage') or {}}, ensure_ascii=False)}\n\n"
-        yield "data: [DONE]\n\n"
+    # Managed inference already returns one completed result. Encode the
+    # synthetic SSE stream as a finite response with Content-Length instead of
+    # an HTTP chunked StreamingResponse. This preserves OpenAI's stream
+    # contract while giving the embedded OpenClaw SDK an unambiguous terminal
+    # boundary on Windows loopback connections.
+    base = {"id": completion_id, "object": "chat.completion.chunk", "created": int(time.time()), "model": model}
+    chunks = [
+        f"data: {json.dumps({**base, 'choices': [{'index': 0, 'delta': {'role': 'assistant'}, 'finish_reason': None}]})}\n\n"
+    ]
+    if message.get("tool_calls"):
+        delta_calls = []
+        for index, item in enumerate(message["tool_calls"]):
+            delta_calls.append({"index": index, **item})
+        chunks.append(f"data: {json.dumps({**base, 'choices': [{'index': 0, 'delta': {'tool_calls': delta_calls}, 'finish_reason': None}]}, ensure_ascii=False)}\n\n")
+        finish = "tool_calls"
+    else:
+        content = str(message.get("content") or "")
+        for offset in range(0, len(content), 80):
+            delta = content[offset:offset + 80]
+            chunks.append(f"data: {json.dumps({**base, 'choices': [{'index': 0, 'delta': {'content': delta}, 'finish_reason': None}]}, ensure_ascii=False)}\n\n")
+        finish = "stop"
+    chunks.append(f"data: {json.dumps({**base, 'choices': [{'index': 0, 'delta': {}, 'finish_reason': finish}], 'usage': data.get('usage') or {}}, ensure_ascii=False)}\n\n")
+    chunks.append("data: [DONE]\n\n")
+    return Response(
+        content="".join(chunks),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
-    return StreamingResponse(chunks(), media_type="text/event-stream")
+
+@router.post("/api/internal/hermes/openai/v1/chat/completions")
+async def openai_chat(body: dict[str, Any], authorization: str = Header(default="")):
+    _verify_runtime(authorization.removeprefix("Bearer ").strip())
+    return await _openai_chat_completion(body)
+
+
+@router.post("/api/internal/openclaw/v1/chat/completions")
+async def openclaw_chat(body: dict[str, Any], authorization: str = Header(default="")):
+    _verify_openclaw_runtime(authorization.removeprefix("Bearer ").strip())
+    return await _openai_chat_completion(body)

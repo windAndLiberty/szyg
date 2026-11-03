@@ -10,6 +10,22 @@ from unittest.mock import patch
 
 import pytest
 
+
+def test_auth_db_path_uses_explicit_desktop_path(tmp_path: Path):
+    import szyg.auth as auth_mod
+
+    expected = tmp_path / "desktop-data" / "auth.db"
+    with patch.dict(os.environ, {"SZYG_AUTH_DB": str(expected)}):
+        assert Path(auth_mod.get_auth_db_path()) == expected
+
+
+def test_auth_db_path_falls_back_to_data_dir(tmp_path: Path):
+    import szyg.auth as auth_mod
+
+    data_dir = tmp_path / "desktop-data"
+    with patch.dict(os.environ, {"SZYG_AUTH_DB": "", "SZYG_DATA_DIR": str(data_dir)}):
+        assert Path(auth_mod.get_auth_db_path()) == data_dir / "auth.db"
+
 # We need to patch DB_PATH before importing auth, so we use a fixture approach
 # that patches at the module level during tests.
 
@@ -18,7 +34,7 @@ import pytest
 def isolated_auth_db(tmp_path: Path):
     """Patch auth module to use an isolated SQLite DB per test."""
     db_path = str(tmp_path / "test_auth.db")
-    with patch("szyg.auth.DB_PATH", db_path):
+    with patch("szyg.auth.DB_PATH", db_path), patch.dict(os.environ, {"SZYG_ADMIN_PASSWORD": "admin123"}):
         # Re-init the DB with the patched path
         import szyg.auth as auth_mod
         auth_mod.DB_PATH = db_path

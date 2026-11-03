@@ -10,7 +10,7 @@ import CloudAuthGate from './components/CloudAuthGate'
 import CloudAuthExpiredBanner from './components/CloudAuthExpiredBanner'
 
 // 已实现的真实页面
-import SuperAgent from './pages/SuperAgent'
+import EmployeeWorkspace from './pages/EmployeeWorkspace'
 import Settings from './pages/Settings'
 
 // 占位页面 — AI员工
@@ -84,7 +84,7 @@ function AppRoutes({ location }: { location: Location }) {
         path="/"
         element={
           <FullBleedLayout>
-            <SuperAgent />
+            <EmployeeWorkspace />
           </FullBleedLayout>
         }
       />

@@ -240,16 +240,52 @@ export type RegistrationCodeChallenge = {
   expires_in_seconds: number
   retry_after_seconds: number
 }
+export type CloudDevice = {
+  id: string
+  name: string
+  installation_id: string
+  app_version: string
+  status: string
+  created_at: string
+  last_seen_at: string
+}
+export type DeviceReplacementChallenge = RegistrationCodeChallenge & {
+  devices: CloudDevice[]
+}
 export const requestRegistrationCode = (email: string) =>
   apiPost<RegistrationCodeChallenge>('/api/cloud/register/code', { email })
+export const requestPasswordResetCode = (email: string) =>
+  apiPost<RegistrationCodeChallenge>('/api/cloud/password/code', { email })
+export const requestDeviceReplacementCode = (email: string, password: string) =>
+  apiPost<DeviceReplacementChallenge>('/api/cloud/device-replacement/code', { email, password })
+export const replaceCloudDevice = (
+  email: string,
+  password: string,
+  verification_id: string,
+  verification_code: string,
+  revoke_device_id: string,
+) => apiPost<CloudSession>('/api/cloud/device-replacement', {
+  email,
+  password,
+  verification_id,
+  verification_code,
+  revoke_device_id,
+})
 export const registerCloud = (email: string, display_name: string, password: string, verification_id: string, verification_code: string) =>
   apiPost<CloudSession>('/api/cloud/register', { email, display_name, password, verification_id, verification_code })
 export const activateCloud = (invitation_code: string, display_name: string, password: string) =>
   apiPost<CloudSession>('/api/cloud/activate', { invitation_code, display_name, password })
 export const logoutCloud = () => apiPost<{ ok: boolean }>('/api/cloud/logout')
-export const changeCloudPassword = (current_password: string, new_password: string) =>
-  apiPut<{ ok: boolean; password_changed_at: string; next_change_at: string }>('/api/cloud/password', { current_password, new_password })
-export const fetchCloudDevices = () => apiGet<{ items: Array<Record<string, unknown>> }>('/api/cloud/devices')
+export const resetCloudPassword = (email: string, new_password: string, verification_id: string, verification_code: string) =>
+  apiPut<{ ok: boolean; password_changed_at: string; next_change_at: string }>('/api/cloud/password', {
+    email,
+    new_password,
+    verification_id,
+    verification_code,
+  })
+export const fetchCloudDevices = () => apiGet<{ items: CloudDevice[] }>('/api/cloud/devices')
+export const revokeCloudDevice = (deviceId: string) =>
+  apiDel<{ ok: boolean }>(`/api/cloud/devices/${encodeURIComponent(deviceId)}`)
 export const fetchCloudEntitlements = () => apiGet<Record<string, unknown>>('/api/cloud/entitlements')
 export const fetchCloudUsage = () => apiGet<CloudUsage>('/api/cloud/usage')
 export const fetchCloudBilling = () => apiGet<CloudBilling>('/api/cloud/billing')

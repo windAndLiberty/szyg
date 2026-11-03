@@ -1,4 +1,5 @@
 const { WebContentsView, session } = require('electron')
+const crypto = require('crypto')
 
 const DEFAULT_URL = 'about:blank'
 
@@ -15,6 +16,8 @@ function asHttpUrl(value) {
 class BrowserSessionManager {
   constructor({ partition = 'persist:szyg-agent-browser', blockedOrigins = [] } = {}) {
     this.partition = partition
+    this.defaultPartition = partition
+    this.profileId = 'default'
     this.blockedOrigins = new Set(blockedOrigins.filter(Boolean))
     this.hostWindow = null
     this.view = null
@@ -29,6 +32,24 @@ class BrowserSessionManager {
   setHostWindow(window) {
     this.hostWindow = window
     if (this.visible) this._attach()
+  }
+
+  useAgentProfile(agentId) {
+    const profileId = String(agentId || '').trim() || 'default'
+    const partition = profileId === 'default'
+      ? this.defaultPartition
+      : `persist:szyg-agent-${crypto.createHash('sha256').update(profileId).digest('hex').slice(0, 24)}`
+    if (partition === this.partition) return this.state()
+    const wasVisible = this.visible
+    this.destroy()
+    this.partition = partition
+    this.profileId = profileId
+    this.sessionConfigured = false
+    this.owner = 'none'
+    this.lastAction = '已切换员工工作电脑'
+    if (wasVisible) this._attach()
+    this._emitState()
+    return this.state()
   }
 
   _ensureView() {
@@ -143,6 +164,7 @@ class BrowserSessionManager {
       available: true,
       visible: this.visible,
       owner: this.owner,
+      profileId: this.profileId,
       url: contents?.getURL() || '',
       title: contents?.getTitle() || '',
       loading: Boolean(contents?.isLoading()),

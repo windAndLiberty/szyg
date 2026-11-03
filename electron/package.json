@@ -1,17 +1,20 @@
 {
   "name": "szyg",
-  "version": "1.1.9",
+  "version": "1.1.11",
   "description": "数字员工 - 超级数字员工",
   "author": "数字员工",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "test:openclaw": "node --test test/openclaw-runtime.test.js",
+    "smoke:openclaw": "node scripts/smoke-openclaw-runtime.cjs",
     "build:frontend": "npm --prefix ../szyg-frontend run build",
     "build:backend": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-backend-runtime.ps1",
+    "build:openclaw": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-openclaw-runtime.ps1",
     "build:hermes": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-hermes-runtime.ps1",
     "build:config": "..\\.venv\\Scripts\\python.exe scripts/build-release-config.py ../config.yaml runtime/config.yaml",
     "build:integrity": "node scripts/build-runtime-manifest.cjs",
-    "build:runtime": "npm run prepare:product && npm run build:frontend && npm run build:backend && npm run build:hermes && npm run build:config && npm run build:integrity",
+    "build:runtime": "npm run prepare:product && npm run build:frontend && npm run build:backend && npm run build:openclaw && npm run build:hermes && npm run build:config && npm run build:integrity",
     "audit:source": "node scripts/audit-release.cjs source",
     "audit:dist": "node scripts/audit-release.cjs dist",
     "build:dir": "npm run audit:source && npm run build:runtime && electron-builder --win dir --config electron-builder.config.cjs && npm run audit:dist",
@@ -31,6 +34,7 @@
       "main.js",
       "preload.js",
       "browser/**/*",
+      "openclaw/**/*",
       "assets/**/*"
     ],
     "extraResources": [
@@ -57,6 +61,10 @@
       {
         "from": "runtime/hermes/hermes-runtime",
         "to": "runtime/hermes"
+      },
+      {
+        "from": "runtime/openclaw/2026.10.5",
+        "to": "runtime/openclaw/2026.10.5"
       },
       {
         "from": "../server/vendor/hermes-agent.lock.json",
@@ -112,6 +120,10 @@
       "artifactName": "数字员工-${version}-Windows-${arch}-安装包.${ext}"
     },
     "artifactName": "数字员工-${version}-Windows-${arch}.${ext}"
+  },
+  "dependencies": {
+    "@openclaw/gateway-client": "2026.10.5",
+    "@openclaw/gateway-protocol": "2026.10.5"
   },
   "devDependencies": {
     "7zip-bin": "^5.2.0",

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Activity,
@@ -74,6 +74,20 @@ export default function Billing() {
   const [amount, setAmount] = useState(1)
   const [paying, setPaying] = useState(false)
   const [paymentError, setPaymentError] = useState('')
+  const previousBalanceRef = useRef<number | null>(null)
+  const runtimeRecoveryRef = useRef(false)
+
+  const recoverManagedRuntime = useCallback(() => {
+    const runtime = window.electronAPI?.openClaw?.runtime
+    if (!runtime || runtimeRecoveryRef.current) return
+    runtimeRecoveryRef.current = true
+    void runtime.restart().catch(() => {
+      // The employee workspace already exposes runtime recovery state. Billing
+      // must stay successful even if the local kernel needs a manual retry.
+    }).finally(() => {
+      runtimeRecoveryRef.current = false
+    })
+  }, [])
 
   useEffect(() => {
     const refreshOnFocus = () => reload()
@@ -86,18 +100,32 @@ export default function Billing() {
   }, [])
 
   useEffect(() => {
+    if (!data) return
+    const previous = previousBalanceRef.current
+    previousBalanceRef.current = data.balance_credits
+    if (previous !== null && data.balance_credits > previous) recoverManagedRuntime()
+  }, [data, recoverManagedRuntime])
+
+  useEffect(() => {
     if (!paymentOrder || paymentOrder.status !== 'pending') return
     const timer = window.setInterval(async () => {
       try {
         const current = await fetchCloudPaymentOrder(paymentOrder.id)
         setPaymentOrder(current)
-        if (current.status === 'paid') reload()
+        if (current.status === 'paid') {
+          reload()
+          // OpenClaw temporarily disables a provider after a 429 billing
+          // response. A confirmed top-up is the authoritative signal to clear
+          // that local circuit breaker immediately instead of making the user
+          // wait for its backoff window.
+          recoverManagedRuntime()
+        }
       } catch {
         // A temporary polling failure must not replace the payment page.
       }
     }, 3000)
     return () => window.clearInterval(timer)
-  }, [paymentOrder?.id, paymentOrder?.status, reload])
+  }, [paymentOrder?.id, paymentOrder?.status, recoverManagedRuntime, reload])
 
   const startAlipay = async () => {
     if (!paymentConfig || !Number.isFinite(amount)

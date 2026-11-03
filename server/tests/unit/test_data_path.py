@@ -44,6 +44,16 @@ class TestGetDataDir:
             result = get_data_dir()
             assert isinstance(result, Path)
 
+    def test_production_fallback_uses_appdata_not_working_directory(self, tmp_path: Path):
+        with patch.dict(os.environ, {
+            "SZYG_DATA_DIR": "",
+            "SZYG_PRODUCTION": "true",
+            "APPDATA": str(tmp_path / "AppData"),
+        }, clear=False):
+            result = get_data_dir()
+            assert result == tmp_path / "AppData" / "szyg" / "data"
+            assert result.is_dir()
+
     def test_project_relative_with_tools_json(self, tmp_path: Path):
         """If project-relative data/ has tools.json, it is chosen."""
         # Simulate the project structure: __file__ is at server/szyg/data_path.py

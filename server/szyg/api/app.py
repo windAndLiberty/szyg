@@ -75,6 +75,8 @@ def create_app() -> FastAPI:
     configure_background_workers(app)
 
     desktop_token = os.environ.get("SZYG_DESKTOP_TOKEN", "").strip()
+    business_mcp_token = os.environ.get("SZYG_BUSINESS_MCP_TOKEN", "").strip()
+    openclaw_model_token = os.environ.get("SZYG_OPENCLAW_MODEL_TOKEN", "").strip()
 
     @app.middleware("http")
     async def protect_desktop_api(request: Request, call_next):
@@ -89,6 +91,14 @@ def create_app() -> FastAPI:
             if supplied_internal and hermes_process_manager.token and hmac.compare_digest(
                 supplied_internal, hermes_process_manager.token
             ):
+                exempt = True
+        if request.url.path == "/api/mcp/szyg-business" and business_mcp_token:
+            bearer = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+            if bearer and hmac.compare_digest(bearer, business_mcp_token):
+                exempt = True
+        if request.url.path.startswith("/api/internal/openclaw/") and openclaw_model_token:
+            bearer = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+            if bearer and hmac.compare_digest(bearer, openclaw_model_token):
                 exempt = True
         if desktop_token and protected and not exempt:
             supplied = request.cookies.get("szyg_desktop_token", "")
@@ -123,6 +133,8 @@ def create_app() -> FastAPI:
         app.include_router(auth_router)
     app.include_router(tools_router)
     app.include_router(oem_router)
+    from szyg.api.business_mcp_routes import router as business_mcp_router
+    app.include_router(business_mcp_router)
     from szyg.api.cloud_routes import router as cloud_router
     app.include_router(cloud_router)
 

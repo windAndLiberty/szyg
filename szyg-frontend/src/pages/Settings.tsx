@@ -14,6 +14,9 @@ import {
   Info,
   LogOut,
   Laptop,
+  LoaderCircle,
+  MailCheck,
+  Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -31,8 +34,13 @@ import { logoutCloudSession } from '@/lib/cloudSession'
 import {
   getCurrentUser,
   fetchCloudSession,
-  changeCloudPassword,
+  fetchCloudDevices,
+  loginCloud,
+  requestPasswordResetCode,
+  resetCloudPassword,
+  revokeCloudDevice,
   getErrorMessage,
+  type CloudDevice,
   type CloudSession,
 } from '@/lib/api'
 
@@ -94,7 +102,12 @@ const [activeTab, setActiveTab] = useState<SettingsTab>('general')
   const [profileEmail] = useState(`${currentUser?.username ?? 'admin'}@szyg.local`)
   const [profileRole, setProfileRole] = useState(t("系统管理员"))
   const { data: cloudSession, reload: reloadCloudSession } = useAsync<CloudSession>(fetchCloudSession)
-  const [currentPassword, setCurrentPassword] = useState('')
+  const [cloudDevices, setCloudDevices] = useState<CloudDevice[]>([])
+  const [deviceActionId, setDeviceActionId] = useState('')
+  const [passwordVerificationCode, setPasswordVerificationCode] = useState('')
+  const [passwordVerificationId, setPasswordVerificationId] = useState('')
+  const [passwordCodeLoading, setPasswordCodeLoading] = useState(false)
+  const [passwordResendIn, setPasswordResendIn] = useState(0)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordSaving, setPasswordSaving] = useState(false)
@@ -107,6 +120,18 @@ const [activeTab, setActiveTab] = useState<SettingsTab>('general')
       setProfileRole(cloudSession.user.role === 'admin' ? t("系统管理员") : t("内测用户"))
     }
   }, [cloudSession])
+  useEffect(() => {
+    if (!cloudSession?.authenticated) {
+      setCloudDevices([])
+      return
+    }
+    void fetchCloudDevices().then((result) => setCloudDevices(result.items)).catch(() => setCloudDevices([]))
+  }, [cloudSession?.authenticated, cloudSession?.device?.id])
+  useEffect(() => {
+    if (passwordResendIn <= 0) return
+    const timer = window.setInterval(() => setPasswordResendIn((value) => Math.max(0, value - 1)), 1000)
+    return () => window.clearInterval(timer)
+  }, [passwordResendIn])
   /* -- handlers -- */
   const handleNotifEventToggle = (id: string) => {
     setNotifEvents((prev) =>
@@ -126,6 +151,10 @@ const [activeTab, setActiveTab] = useState<SettingsTab>('general')
   const handlePasswordChange = async () => {
     setPasswordError('')
     setPasswordMessage('')
+    if (!passwordVerificationId || !/^\d{6}$/.test(passwordVerificationCode)) {
+      setPasswordError(t("请先获取并填写6位邮箱验证码"))
+      return
+    }
     if (newPassword.length < 10) {
       setPasswordError(t("新密码至少需要 10 个字符"))
       return
@@ -136,8 +165,12 @@ const [activeTab, setActiveTab] = useState<SettingsTab>('general')
     }
     setPasswordSaving(true)
     try {
-      await changeCloudPassword(currentPassword, newPassword)
-      setCurrentPassword('')
+      const email = cloudSession?.user?.email || ''
+      await resetCloudPassword(email, newPassword, passwordVerificationId, passwordVerificationCode)
+      await loginCloud(email, newPassword)
+      setPasswordVerificationCode('')
+      setPasswordVerificationId('')
+      setPasswordResendIn(0)
       setNewPassword('')
       setConfirmPassword('')
       setPasswordMessage(t("密码已更新"))
@@ -149,6 +182,24 @@ const [activeTab, setActiveTab] = useState<SettingsTab>('general')
     }
   }
 
+  const handleSendPasswordCode = async () => {
+    const email = cloudSession?.user?.email || ''
+    if (!email || passwordCodeLoading || passwordResendIn > 0) return
+    setPasswordCodeLoading(true)
+    setPasswordError('')
+    setPasswordMessage('')
+    try {
+      const challenge = await requestPasswordResetCode(email)
+      setPasswordVerificationId(challenge.verification_id)
+      setPasswordResendIn(challenge.retry_after_seconds || 60)
+      setPasswordMessage(t("验证码已发送至 {v0}，10分钟内有效", { v0: challenge.email }))
+    } catch (error) {
+      setPasswordError(getErrorMessage(error, t("验证码发送失败，请稍后再试")))
+    } finally {
+      setPasswordCodeLoading(false)
+    }
+  }
+
   const handleLogout = async () => {
     if (loggingOut) return
     setLoggingOut(true)
@@ -156,6 +207,22 @@ const [activeTab, setActiveTab] = useState<SettingsTab>('general')
       await logoutCloudSession()
     } finally {
       setLoggingOut(false)
+    }
+  }
+
+  const handleRevokeDevice = async (device: CloudDevice) => {
+    if (device.id === cloudSession?.device?.id || deviceActionId) return
+    if (!window.confirm(t("确定移除设备“{v0}”吗？该设备会立即退出登录。", { v0: device.name || 'Windows PC' }))) return
+    setDeviceActionId(device.id)
+    try {
+      await revokeCloudDevice(device.id)
+      const result = await fetchCloudDevices()
+      setCloudDevices(result.items)
+      showNotice(t("旧设备已移除"))
+    } catch (error) {
+      showNotice(getErrorMessage(error, t("设备移除失败")))
+    } finally {
+      setDeviceActionId('')
     }
   }
 
@@ -392,6 +459,17 @@ const [activeTab, setActiveTab] = useState<SettingsTab>('general')
                     </div>
                     <Badge className="border-[#10B981]/40 bg-[#10B981]/10 text-[#6EE7B7]">{t("在线")}</Badge>
                   </div>
+                  {cloudDevices.some((device) => device.status === 'active') && <div className="mt-5 space-y-2 border-t border-[#26334B] pt-4">
+                    <p className="mb-2 text-xs font-medium text-[#94A3B8]">{t("登录设备")}</p>
+                    {cloudDevices.filter((device) => device.status === 'active').map((device) => {
+                      const current = device.id === cloudSession.device?.id
+                      return <div key={device.id} className="flex items-center gap-3 rounded-lg border border-[#26334B] bg-[#0D1321]/60 px-3 py-2.5">
+                        <Laptop className="h-4 w-4 shrink-0 text-[#94A3B8]" />
+                        <div className="min-w-0 flex-1"><p className="truncate text-sm text-[#E2E8F0]">{device.name || 'Windows PC'}</p><p className="mt-0.5 text-xs text-[#64748B]">{device.last_seen_at ? new Date(device.last_seen_at).toLocaleString() : device.app_version}</p></div>
+                        {current ? <Badge className="border-[#10B981]/30 bg-[#10B981]/10 text-[#6EE7B7]">{t("当前设备")}</Badge> : <button type="button" onClick={() => void handleRevokeDevice(device)} disabled={Boolean(deviceActionId)} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-[#FCA5A5] hover:bg-[#7F1D1D]/25 disabled:opacity-50">{deviceActionId === device.id ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}{t("移除")}</button>}
+                      </div>
+                    })}
+                  </div>}
                   <button onClick={() => void handleLogout()} disabled={loggingOut} className="mt-5 inline-flex items-center gap-2 text-sm text-[#94A3B8] transition-colors hover:text-[#F1F5F9] disabled:cursor-not-allowed disabled:opacity-60"><LogOut className="h-4 w-4" />{loggingOut ? t("正在退出…") : t("退出登录")}</button>
                 </div>
               </motion.div>
@@ -463,15 +541,21 @@ const [activeTab, setActiveTab] = useState<SettingsTab>('general')
             {cloudSession?.configured && cloudSession.authenticated && (
               <motion.div variants={cardVariant}>
                 <h2 className="mb-1 text-heading-sm text-[#F1F5F9]">{t("账户安全")}</h2>
-                <p className="mb-4 text-body-sm text-[#64748B]">{t("修改登录密码，每个账号每天最多修改一次。")}</p>
+                <p className="mb-4 text-body-sm text-[#64748B]">{t("验证码将发送到账号邮箱；每个账号每天最多修改一次密码。")}</p>
                 <form
                   className="glass-card space-y-4 rounded-[16px] border border-[#1E293B] p-5"
                   onSubmit={(event) => { event.preventDefault(); void handlePasswordChange() }}
                 >
                   <div className="grid gap-4 md:grid-cols-3">
                     <div>
-                      <Label className="mb-1.5 block text-body-sm text-[#94A3B8]">{t("当前密码")}</Label>
-                      <Input value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} type="password" autoComplete="current-password" className="border-[#1E293B] bg-[#0D1321] text-[#F1F5F9]" />
+                      <Label className="mb-1.5 block text-body-sm text-[#94A3B8]">{t("邮箱验证码")}</Label>
+                      <div className="flex gap-2">
+                        <Input value={passwordVerificationCode} onChange={(event) => setPasswordVerificationCode(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder={t("6位邮箱验证码")} className="border-[#1E293B] bg-[#0D1321] text-[#F1F5F9]" />
+                        <Button type="button" variant="secondary" className="shrink-0 border border-[#334155] bg-[#172033] text-[#E2E8F0] hover:bg-[#25314A]" disabled={passwordCodeLoading || passwordResendIn > 0} onClick={() => void handleSendPasswordCode()}>
+                          {passwordCodeLoading ? <LoaderCircle className="mr-1.5 h-4 w-4 animate-spin" /> : <MailCheck className="mr-1.5 h-4 w-4" />}
+                          {passwordResendIn > 0 ? `${passwordResendIn}s` : passwordVerificationId ? t("重新发送") : t("发送验证码")}
+                        </Button>
+                      </div>
                     </div>
                     <div>
                       <Label className="mb-1.5 block text-body-sm text-[#94A3B8]">{t("新密码")}</Label>
@@ -485,7 +569,7 @@ const [activeTab, setActiveTab] = useState<SettingsTab>('general')
                   {passwordError && <p className="text-sm text-[#FCA5A5]">{passwordError}</p>}
                   {passwordMessage && <p className="text-sm text-[#6EE7B7]">{passwordMessage}</p>}
                   <div className="flex justify-end">
-                    <Button type="submit" disabled={passwordSaving || !currentPassword || !newPassword || !confirmPassword} className="bg-[#6366F1] text-white hover:bg-[#818CF8]">
+                    <Button type="submit" disabled={passwordSaving || !passwordVerificationId || passwordVerificationCode.length !== 6 || !newPassword || !confirmPassword} className="bg-[#6366F1] text-white hover:bg-[#818CF8]">
                       {passwordSaving ? t("正在保存") : t("修改密码")}
                     </Button>
                   </div>

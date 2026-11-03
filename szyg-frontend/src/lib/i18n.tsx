@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useSt
 import { enUS as coreEnUS, zhCN as coreZhCN } from '@/locales/core'
 import { digitalHumanEnUS, digitalHumanZhCN } from '@/locales/digitalHuman'
 import { autoUiEnUS } from '@/locales/autoUi'
+import { product } from '@/lib/product'
 
 export type AppLocale = 'zh-CN' | 'en-US'
 type InterpolationValues = Record<string, string | number>
@@ -31,6 +32,9 @@ const legacyEnUS: Record<string, string> = {
   '收起侧边栏': 'Collapse sidebar', '点击设置头像': 'Change avatar', '个人菜单': 'Account menu', '更换头像': 'Change avatar',
   '有未保存的更改': 'You have unsaved changes', '头像仅保存在本机，不会上传云端': 'Your avatar is stored locally and is never uploaded.',
   '由登录服务统一管理': 'Managed by your sign-in service', '管理你的个人资料信息。': 'Manage your personal profile.',
+  '登录设备': 'Signed-in devices', '当前设备': 'Current device', '移除': 'Remove',
+  '旧设备已移除': 'The old device was removed.', '设备移除失败': 'Could not remove the device.',
+  '确定移除设备“{v0}”吗？该设备会立即退出登录。': 'Remove “{v0}”? It will be signed out immediately.',
   '通用设置': 'General', 'AI 模型': 'AI Models', '账户管理': 'Account', '配置你的超级数字员工系统参数': 'Configure your Super Digital Workforce.',
   '外观': 'Appearance', '自定义超级数字员工系统的外观风格。': 'Customize the appearance of your workspace.',
   '主题选择': 'Theme', '选择你喜欢的配色方案': 'Choose your preferred color scheme.', '亮色': 'Light', '深色': 'Dark',
@@ -51,14 +55,15 @@ const legacyEnUS: Record<string, string> = {
   '套餐、用量与账单管理': 'Plans, usage, and billing management.', '日历视图与发布计划编排': 'Calendar view and publishing schedule.',
   '页面未找到': 'Page not found', '您访问的页面不存在或已被移动': 'The page does not exist or has moved', '返回超级员工': 'Back to Super Agent',
   '登录后继续使用智能服务': 'Sign in to continue using intelligent services', '注册账号后按需充值 Credits': 'Create an account and top up Credits as needed',
-  '验证当前密码后设置新密码': 'Verify your current password to set a new one', '你的称呼': 'Your name', '密码（至少 10 个字符）': 'Password (at least 10 characters)',
-  '当前密码': 'Current password', '6位邮箱验证码': '6-digit email code', '重新发送': 'Resend', '发送验证码': 'Send code', '{seconds}秒': '{seconds}s',
+  '验证邮箱后设置新密码': 'Verify your email to set a new password', '你的称呼': 'Your name', '密码（至少 10 个字符）': 'Password (at least 10 characters)',
+  '当前密码': 'Current password', '邮箱验证码': 'Email verification code', '6位邮箱验证码': '6-digit email code', '重新发送': 'Resend', '发送验证码': 'Send code', '{seconds}秒': '{seconds}s',
   '我已阅读并同意 ': 'I have read and agree to the ', '用户协议': 'Terms of Service', ' 和 ': ' and ', '隐私政策': 'Privacy Policy',
   '新密码（至少 10 个字符）': 'New password (at least 10 characters)', '再次输入新密码': 'Confirm new password', '登录': 'Sign in',
   '注册并登录': 'Create account', '确认修改': 'Confirm change', '注册账号': 'Create account', '修改密码': 'Change password', '返回登录': 'Back to sign in',
   '本机素材不会上传到云端': 'Local materials are not uploaded to the cloud', '请输入你的称呼': 'Enter your name', '密码至少需要 10 个字符': 'Password must be at least 10 characters.',
   '请先获取并填写6位邮箱验证码': 'Request and enter the 6-digit email code first.', '请先阅读并同意用户协议和隐私政策': 'Read and accept the Terms of Service and Privacy Policy first.',
   '新密码至少需要 10 个字符': 'New password must be at least 10 characters.', '两次输入的新密码不一致': 'The new passwords do not match.',
+  '验证码将发送到账号邮箱；每个账号每天最多修改一次密码。': 'A code will be sent to the account email. Each account can change its password once per day.',
   '验证码已发送至 {email}，10分钟内有效': 'A code was sent to {email}. It is valid for 10 minutes.', '验证码发送失败，请稍后再试': 'Could not send the code. Try again shortly.',
   '登录未完成，请检查输入': 'Sign-in could not be completed. Check your details.', '请先登录': 'Please sign in', '登录状态已过期，请重新登录': 'Your session has expired. Sign in again.',
   '数字人形象库': 'Digital human library', '人物和声音绑定保存，后续作品可以直接复用。': 'Save linked character and voice references for reuse in future projects.',
@@ -107,6 +112,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   activeLocale = locale
   useLayoutEffect(() => {
     document.documentElement.lang = locale
+    const productName = translate(locale, product.name)
+    document.title = `${productName} - ${translate(locale, 'navigation.superWorkforce')}`
+    void window.electronAPI?.setLocale?.(locale)
     try { window.localStorage.setItem(LOCALE_STORAGE_KEY, locale) } catch { /* storage may be unavailable */ }
   }, [locale])
   const translateMessage = useCallback((key: string, values?: InterpolationValues) => translateCurrent(key, values), [])

@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, KeyRound, LoaderCircle, MailCheck } from 'lucide-react'
-import { changeCloudPassword, getErrorMessage, loginCloud, logoutCloud, registerCloud, requestRegistrationCode } from '@/lib/api'
+import {
+  getErrorMessage,
+  loginCloud,
+  registerCloud,
+  requestPasswordResetCode,
+  requestRegistrationCode,
+  resetCloudPassword,
+} from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import LanguageSwitcher from '@/components/LanguageSwitcher'
@@ -24,6 +31,8 @@ export default function CloudLogin({ initialMessage = '', onSuccess }: { initial
   const [codeSent, setCodeSent] = useState(false)
   const [loading, setLoading] = useState(false)
   const isRegistering = product.allowSelfRegistration && mode === 'register'
+  const isPasswordReset = mode === 'change-password'
+  const needsVerificationCode = isRegistering || isPasswordReset
 
   useEffect(() => {
     if (resendIn <= 0) return
@@ -31,12 +40,14 @@ export default function CloudLogin({ initialMessage = '', onSuccess }: { initial
     return () => window.clearInterval(timer)
   }, [resendIn])
 
-  const sendRegistrationCode = async () => {
+  const sendVerificationCode = async () => {
     if (!account.trim() || codeLoading || resendIn > 0) return
     setCodeLoading(true)
     setMessage('')
     try {
-      const challenge = await requestRegistrationCode(account.trim())
+      const challenge = isPasswordReset
+        ? await requestPasswordResetCode(account.trim())
+        : await requestRegistrationCode(account.trim())
       setVerificationId(challenge.verification_id)
       setResendIn(challenge.retry_after_seconds || 60)
       setCodeSent(true)
@@ -50,7 +61,7 @@ export default function CloudLogin({ initialMessage = '', onSuccess }: { initial
   }
 
   const submit = async () => {
-    if (!account.trim() || !password || loading) return
+    if (!account.trim() || (!isPasswordReset && !password) || loading) return
     setCodeSent(false)
     if (isRegistering && !displayName.trim()) {
       setMessage(t("请输入你的称呼"))
@@ -60,7 +71,7 @@ export default function CloudLogin({ initialMessage = '', onSuccess }: { initial
       setMessage(t("密码至少需要 10 个字符"))
       return
     }
-    if (isRegistering && (!verificationId || !/^\d{6}$/.test(verificationCode))) {
+    if (needsVerificationCode && (!verificationId || !/^\d{6}$/.test(verificationCode))) {
       setMessage(t("请先获取并填写6位邮箱验证码"))
       return
     }
@@ -68,7 +79,7 @@ export default function CloudLogin({ initialMessage = '', onSuccess }: { initial
       setMessage(t("请先阅读并同意用户协议和隐私政策"))
       return
     }
-    if (mode === 'change-password') {
+    if (isPasswordReset) {
       if (newPassword.length < 10) {
         setMessage(t("新密码至少需要 10 个字符"))
         return
@@ -80,23 +91,19 @@ export default function CloudLogin({ initialMessage = '', onSuccess }: { initial
     }
     setLoading(true)
     setMessage('')
-    let authenticatedForPasswordChange = false
     try {
       if (isRegistering) {
         await registerCloud(account.trim(), displayName.trim(), password, verificationId, verificationCode)
+      } else if (isPasswordReset) {
+        await resetCloudPassword(account.trim(), newPassword, verificationId, verificationCode)
+        await loginCloud(account.trim(), newPassword)
       } else {
         await loginCloud(account.trim(), password)
       }
-      if (mode === 'change-password') {
-        authenticatedForPasswordChange = true
-        await changeCloudPassword(password, newPassword)
-      }
       await onSuccess()
     } catch (error) {
-      if (authenticatedForPasswordChange) {
-        try { await logoutCloud() } catch { /* Keep the original password-change error. */ }
-      }
-      setMessage(getErrorMessage(error, t("登录未完成，请检查输入")))
+      const errorMessage = getErrorMessage(error, t("登录未完成，请检查输入"))
+      setMessage(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -113,15 +120,15 @@ export default function CloudLogin({ initialMessage = '', onSuccess }: { initial
       <LanguageSwitcher className="absolute right-5 top-5 z-20 md:right-8 md:top-8" />
       <section className="relative z-10 mx-auto w-full max-w-[420px] md:mx-0">
         <div className="mb-7 flex items-center gap-3 drop-shadow-lg">
-          <div className="grid h-11 w-11 place-items-center overflow-hidden rounded-lg border border-white/15 bg-[#0B1220]/80"><img src={product.logoUrl} alt={product.name} className="h-full w-full object-cover" /></div>
-          <div><h1 className="text-xl font-semibold">{product.name}</h1><p className="mt-1 text-sm text-[#CBD5E1]">{t(mode === 'login' ? 'auth.loginSubtitle' : mode === 'register' ? 'auth.registerSubtitle' : 'auth.changePasswordSubtitle')}</p></div>
+          <div className="grid h-11 w-11 place-items-center overflow-hidden rounded-lg border border-white/15 bg-[#0B1220]/80"><img src={product.logoUrl} alt={t(product.name)} className="h-full w-full object-cover" /></div>
+          <div><h1 className="text-xl font-semibold">{t(product.name)}</h1><p className="mt-1 text-sm text-[#CBD5E1]">{t(mode === 'login' ? 'auth.loginSubtitle' : mode === 'register' ? 'auth.registerSubtitle' : 'auth.changePasswordSubtitle')}</p></div>
         </div>
         <form className="rounded-lg border border-white/15 bg-[#0B1220]/90 p-6 shadow-2xl backdrop-blur-md" onSubmit={(event) => { event.preventDefault(); void submit() }}>
             <div className="space-y-4">
               {isRegistering && <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={t('auth.displayName')} autoComplete="name" autoFocus className="border-[#475569] bg-[#0D1321]/90" />}
-              <Input value={account} onChange={(e) => { setAccount(e.target.value); if (isRegistering) { setVerificationId(''); setVerificationCode(''); setResendIn(0) } }} placeholder={t('auth.email')} type="email" autoComplete="username" autoFocus={mode !== 'register'} className="border-[#475569] bg-[#0D1321]/90" />
-              <Input value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t(mode === 'change-password' ? 'auth.currentPassword' : 'auth.passwordHint')} type="password" autoComplete={isRegistering ? 'new-password' : 'current-password'} className="border-[#475569] bg-[#0D1321]/90" />
-              {isRegistering && <>
+              <Input value={account} onChange={(e) => { setAccount(e.target.value); if (needsVerificationCode) { setVerificationId(''); setVerificationCode(''); setResendIn(0) } }} placeholder={t('auth.email')} type="email" autoComplete="username" autoFocus={mode !== 'register'} className="border-[#475569] bg-[#0D1321]/90" />
+              {!isPasswordReset && <Input value={password} onChange={(e) => setPassword(e.target.value)} placeholder={t('auth.passwordHint')} type="password" autoComplete={isRegistering ? 'new-password' : 'current-password'} className="border-[#475569] bg-[#0D1321]/90" />}
+              {needsVerificationCode && <>
                 <div className="flex gap-2">
                   <Input
                     value={verificationCode}
@@ -136,23 +143,23 @@ export default function CloudLogin({ initialMessage = '', onSuccess }: { initial
                     variant="secondary"
                     className="w-[132px] shrink-0 border border-[#475569] bg-[#172033] text-[#E2E8F0] hover:bg-[#25314A]"
                     disabled={codeLoading || resendIn > 0 || !account.trim()}
-                    onClick={() => void sendRegistrationCode()}
+                    onClick={() => void sendVerificationCode()}
                   >
                     {codeLoading ? <LoaderCircle className="mr-1.5 h-4 w-4 animate-spin" /> : <MailCheck className="mr-1.5 h-4 w-4" />}
                     {resendIn > 0 ? `${resendIn}s` : verificationId ? t('auth.resendCode') : t('auth.sendCode')}
                   </Button>
                 </div>
-                <label className="flex items-start gap-2 text-xs leading-5 text-[#CBD5E1]">
+                {isRegistering && <label className="flex items-start gap-2 text-xs leading-5 text-[#CBD5E1]">
                   <input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="mt-1 accent-[#6366F1]" />
                   <span>{t('auth.termsPrefix')} <a href={product.termsUrl} target="_blank" rel="noreferrer" className="text-[#A5B4FC] hover:text-[#C7D2FE]">{t('auth.terms')}</a> {t('auth.termsJoiner')} <a href={product.privacyUrl} target="_blank" rel="noreferrer" className="text-[#A5B4FC] hover:text-[#C7D2FE]">{t('auth.privacy')}</a></span>
-                </label>
+                </label>}
               </>}
-              {mode === 'change-password' && <>
+              {isPasswordReset && <>
                 <Input value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t('auth.newPasswordHint')} type="password" autoComplete="new-password" className="border-[#475569] bg-[#0D1321]/90" />
                 <Input value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder={t('auth.confirmPassword')} type="password" autoComplete="new-password" className="border-[#475569] bg-[#0D1321]/90" />
               </>}
               {message && <p className={`rounded-md border px-3 py-2 text-sm ${codeSent ? 'border-[#065F46] bg-[#064E3B]/35 text-[#A7F3D0]' : 'border-[#7F1D1D] bg-[#450A0A]/40 text-[#FCA5A5]'}`}>{message}</p>}
-              <Button type="submit" className="w-full bg-[#6366F1] hover:bg-[#818CF8]" disabled={loading || !password || !account.trim() || (isRegistering && (!displayName.trim() || !verificationId || verificationCode.length !== 6 || !acceptedTerms)) || (mode === 'change-password' && (!newPassword || !confirmPassword))}>
+              <Button type="submit" className="w-full bg-[#6366F1] hover:bg-[#818CF8]" disabled={loading || !account.trim() || (!isPasswordReset && !password) || (isRegistering && (!displayName.trim() || !verificationId || verificationCode.length !== 6 || !acceptedTerms)) || (isPasswordReset && (!verificationId || verificationCode.length !== 6 || !newPassword || !confirmPassword))}>
                 {loading ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}{t(mode === 'login' ? 'auth.signIn' : mode === 'register' ? 'auth.createAndSignIn' : 'auth.confirmChange')}
               </Button>
               {mode === 'login' ? (
