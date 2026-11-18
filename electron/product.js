@@ -1,8 +1,9 @@
 module.exports = {
-  id: 'szyg_private',
-  name: '数字员工',
-  userDataDirectory: 'szyg',
-  appUserModelId: 'com.szyg.app',
-  icon: 'private/app-icon.png',
-  trayIcon: 'private/tray-icon.png',
+  id: 'xiaoyu_public',
+  name: '小妤 AI',
+  englishName: 'Yuna AI',
+  userDataDirectory: 'xiaoyu-digital-employee',
+  appUserModelId: 'YuSeTech.AI',
+  icon: 'public/app-icon.png',
+  trayIcon: 'public/tray-icon.png',
 }

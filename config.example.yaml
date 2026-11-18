@@ -1,6 +1,7 @@
 cloud:
   enabled: ${SZYG_CLOUD_ENABLED:true}
-  control_url: ${SZYG_CONTROL_URL:}
+  control_url: ${SZYG_CONTROL_URL:https://szyg.qdtracing.com}
+  product_id: xiaoyu_public
   app_version: 1.0.2
 llm:
   default_backend: volcengine

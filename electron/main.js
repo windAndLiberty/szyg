@@ -30,7 +30,7 @@ app.setAppUserModelId(product.appUserModelId)
 
 let PORT = 8000
 const FRONTEND_PORT = 5173
-const PRODUCTION_CONTROL_URL = ''
+const PRODUCTION_CONTROL_URL = 'https://szyg.qdtracing.com'
 
 let mainWindow = null
 let tray = null
@@ -106,11 +106,7 @@ function getProjectRoot() {
 
 function getRuntimeDataDir() {
   if (!isDev) return path.join(app.getPath('userData'), 'data')
-  // Keep the public Xiaoyu development state isolated from the legacy private
-  // product while preserving the existing private development data location.
-  return product.id === 'xiaoyu_public'
-    ? path.join(getProjectRoot(), 'data', 'xiaoyu_public')
-    : path.join(getProjectRoot(), 'data')
+  return path.join(getProjectRoot(), 'data', product.id)
 }
 
 function ensureRuntimeDataDir() {

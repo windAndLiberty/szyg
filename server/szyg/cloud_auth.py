@@ -78,9 +78,9 @@ class CloudAuthManager:
         enabled_value = os.environ.get("SZYG_CLOUD_ENABLED", section.get("enabled", bool(url)))
         enabled = str(enabled_value).lower() in {"1", "true", "yes", "on"}
         app_version = os.environ.get("SZYG_APP_VERSION", str(section.get("app_version", "1.1.3"))).strip()
-        product_id = os.environ.get("SZYG_PRODUCT_ID", str(section.get("product_id", "szyg_private"))).strip()
-        if product_id != "szyg_private":
-            product_id = "szyg_private"
+        product_id = os.environ.get("SZYG_PRODUCT_ID", str(section.get("product_id", "xiaoyu_public"))).strip()
+        if product_id not in {"szyg_private", "xiaoyu_public"}:
+            product_id = "xiaoyu_public"
         return {
             "enabled": enabled and bool(url),
             "control_url": url,
@@ -181,6 +181,7 @@ class CloudAuthManager:
         temp = self._session_file.with_suffix(".tmp")
         temp.write_text(json.dumps({
             "refresh_token": encrypted,
+            "product_id": self.config["product_id"],
             "license": license_data if isinstance(license_data, dict) else cached.get("license", {}),
             "public_key": public_key if public_key is not None else str(cached.get("public_key") or ""),
             "profile": self._profile,
@@ -197,7 +198,8 @@ class CloudAuthManager:
     def _load_refresh(self) -> str:
         try:
             cached = json.loads(self._session_file.read_text(encoding="utf-8"))
-            profile_product = str(((cached.get("profile") or {}).get("user") or {}).get("product_id") or "szyg_private")
+            user = (cached.get("profile") or {}).get("user") or {}
+            profile_product = str(user.get("product_id") or cached.get("product_id") or "szyg_private")
             if profile_product != self.config["product_id"]:
                 return ""
             raw = cached["refresh_token"]
@@ -314,7 +316,7 @@ class CloudAuthManager:
 
     def request_registration_code(self, email: str) -> dict:
         with self._lock:
-            if self.config["product_id"] == "szyg_private":
+            if self.config["product_id"] != "xiaoyu_public":
                 raise CloudAuthError("当前产品未开放自助注册")
             return self._request("POST", "/api/v1/auth/register/code", json_body={
                 "product_id": self.config["product_id"],
@@ -385,7 +387,7 @@ class CloudAuthManager:
         verification_code: str,
     ) -> dict:
         with self._lock:
-            if self.config["product_id"] == "szyg_private":
+            if self.config["product_id"] != "xiaoyu_public":
                 raise CloudAuthError("当前产品未开放自助注册")
 
             def attempt() -> dict:

@@ -1,7 +1,7 @@
 const fs = require('fs')
 const path = require('path')
 
-const edition = 'private'
+const edition = 'public'
 
 const runtimeDir = path.resolve(__dirname, '..', 'runtime')
 fs.mkdirSync(runtimeDir, { recursive: true })

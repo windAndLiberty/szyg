@@ -1,17 +1,14 @@
-import privateLogoUrl from '@/assets/products/private-logo.png'
-import privateLoginBackgroundUrl from '@/assets/products/private-login-background.png'
-
-export type ProductEdition = 'private'
-
-const edition: ProductEdition = 'private'
+import publicLogoUrl from '@/assets/products/public-logo.png'
+import publicLoginBackgroundUrl from '@/assets/products/public-login-background.png'
 
 export const product = {
-  edition,
-  id: 'szyg_private',
-  name: '数字员工',
-  logoUrl: privateLogoUrl,
-  loginBackgroundUrl: privateLoginBackgroundUrl,
-  allowSelfRegistration: false,
-  termsUrl: '',
-  privacyUrl: '',
+  edition: 'public',
+  id: 'xiaoyu_public',
+  name: '小妤 AI',
+  englishName: 'Yuna AI',
+  logoUrl: publicLogoUrl,
+  loginBackgroundUrl: publicLoginBackgroundUrl,
+  allowSelfRegistration: true,
+  termsUrl: 'https://yuse.studio/yuna/terms',
+  privacyUrl: 'https://yuse.studio/yuna/privacy',
 }
