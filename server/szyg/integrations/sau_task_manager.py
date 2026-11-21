@@ -115,21 +115,18 @@ class SAUPublishTaskManager:
         started = datetime.now()
         self._patch(task_id, status="running", progress="starting", started_at=started.isoformat())
         try:
-            from szyg.integrations.social_auto_upload_adapter import get_sau_adapter
+            from szyg.execution_kernel import get_execution_kernel
 
             task = self.get_task(task_id)
             if not task:
                 return
             payload = dict(task.get("payload") or {})
-            if payload.get("schedule"):
-                payload["schedule"] = datetime.strptime(payload["schedule"], "%Y-%m-%d %H:%M")
-            adapter = get_sau_adapter()
             if task.get("kind") == "upload_video":
                 self._patch(task_id, progress="uploading_video")
-                result = await adapter.upload_video(**payload)
+                result = await get_execution_kernel().publish_sau_result(payload, is_note=False)
             elif task.get("kind") == "upload_note":
                 self._patch(task_id, progress="uploading_note")
-                result = await adapter.upload_note(**payload)
+                result = await get_execution_kernel().publish_sau_result(payload, is_note=True)
             else:
                 raise ValueError(f"Unsupported SAU task kind: {task.get('kind')}")
 

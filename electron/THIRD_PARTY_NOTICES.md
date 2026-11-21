@@ -48,13 +48,9 @@ environments, sample media, logs, cookies and account data are excluded.
 ## Social Auto Upload
 
 - Project: dreammis/social-auto-upload
-- Version: local integrated revision
-- License declaration: MIT (as stated in the upstream README)
-- Distribution: frozen Python modules and required browser helper
-
-The upstream checkout does not contain the LICENSE file referenced by its
-README. Its README is bundled alongside the frozen modules to retain the
-project's attribution and license declaration.
+- Version: local integrated revision, compared with upstream `3847fff01f54`
+- License declaration: MIT
+- Distribution: frozen Python modules, browser helper, upstream README and LICENSE
 
 ## FFmpeg
 

@@ -8,6 +8,7 @@ events, and observations so automation can pause safely when uncertain.
 from __future__ import annotations
 
 import asyncio
+import json
 import threading
 import uuid
 from datetime import datetime
@@ -30,6 +31,28 @@ ARCHIVED_ASSERTIONS_FILE = DATA_DIR / "execution_assertions_archive.json"
 
 TERMINAL_STATUSES = {"success", "failed", "cancelled"}
 PUBLISH_TASK_TYPES = {"publish_video", "publish_note"}
+PUBLISH_RECEIPT_PLATFORMS = {"douyin", "tencent", "xhs", "kuaishou"}
+PUBLISH_RECHECK_MESSAGE = "发布已尝试提交，请到平台作品后台核实，避免重复发布。"
+
+
+def _publish_key(task_type: str, data: dict) -> str:
+    account = next((str(data[key]) for key in ("account_id", "account_file", "account_name") if data.get(key)), "")
+    files = data.get("image_paths") or [data.get("file_path")]
+    return json.dumps([
+        task_type, data.get("platform"), account,
+        [str(Path(file).resolve()) for file in files if file],
+        str(data.get("title") or "").strip(), str(data.get("schedule") or ""),
+    ], ensure_ascii=False)
+
+
+def _publish_attempted(run: dict) -> bool:
+    return (
+        run.get("task_type") in PUBLISH_TASK_TYPES
+        and (bool(run.get("publish_attempt_started_at"))
+             or run.get("error_code") in {"publish_timeout", "verification_uncertain", "execution_interrupted"}
+             or run.get("status") == "success")
+    )
+
 PUBLISH_ACTIVE_RECORD_LIMIT = 300
 PUBLISH_ARCHIVE_RECORD_LIMIT = 2000
 HUMAN_REQUIRED_CODES = {
@@ -117,6 +140,8 @@ def classify_error(message: str) -> str:
         return "invalid_publish_content"
     if "file not found" in text or "no such file" in text or "素材" in text and "不存在" in text:
         return "material_missing"
+    if "提交结果待核实" in text:
+        return "verification_uncertain"
     if "captcha" in text or "验证码" in text or "验证" in text:
         return "captcha_required"
     if "login" in text or "登录" in text or "cookie" in text:
@@ -438,7 +463,17 @@ class ExecutionKernel:
             "finished_at": "",
             "duration_ms": 0,
         }
-        self._upsert_run(run)
+        with self._lock:
+            if auto_start and task_type in PUBLISH_TASK_TYPES and platform in PUBLISH_RECEIPT_PLATFORMS:
+                key = _publish_key(task_type, input_data)
+                for existing in _read(RUNS_FILE):
+                    if existing.get("task_type") != task_type or existing.get("platform") != platform:
+                        continue
+                    if (existing.get("status") in {"queued", "running"} or _publish_attempted(existing)) and (
+                        _publish_key(existing.get("task_type", ""), existing.get("input") or {}) == key
+                    ):
+                        return existing
+            self._upsert_run(run)
         if auto_start:
             self._running[run["id"]] = asyncio.create_task(self.run_sau_publish(run["id"]))
         return run
@@ -617,6 +652,8 @@ class ExecutionKernel:
         run = self.get_run(run_id)
         if not run:
             raise KeyError(run_id)
+        if _publish_attempted(run):
+            raise ValueError(PUBLISH_RECHECK_MESSAGE)
         if run.get("task_type") in {"publish_video", "publish_note"} and run.get("source_task_id", "").startswith("sau:"):
             updated = self._patch_run(run_id, status="queued", error_code="", error_message="", finished_at="")
             self.add_audit(run_id, "", "resume", "queued", "Execution resumed")
@@ -642,6 +679,8 @@ class ExecutionKernel:
         run = self.get_run(run_id)
         if not run:
             raise KeyError(run_id)
+        if _publish_attempted(run):
+            raise ValueError(PUBLISH_RECHECK_MESSAGE)
         if run.get("status") not in {"failed", "paused", "needs_human"}:
             raise ValueError("Only failed, paused, or needs_human executions can be retried")
         self.add_audit(run_id, "", "retry", "queued", "Execution retry queued")
@@ -752,6 +791,26 @@ class ExecutionKernel:
             auto_start=True,
         )
 
+    async def publish_sau(self, payload: dict, *, is_note: bool) -> dict:
+        create = self.create_sau_upload_note_run if is_note else self.create_sau_upload_video_run
+        run = create(payload)
+        task = self._running.get(run["id"])
+        if task is not None:
+            await asyncio.shield(task)
+        return self.get_run(run["id"]) or run
+
+    async def publish_sau_result(self, payload: dict, *, is_note: bool) -> dict:
+        run = await self.publish_sau(payload, is_note=is_note)
+        result = run.get("result") or {}
+        return {
+            **result,
+            "success": run.get("status") == "success",
+            "platform": run.get("platform"),
+            "message": run.get("error_message") or result.get("message", ""),
+            "error_code": run.get("error_code", ""),
+            "execution_id": run["id"],
+        }
+
     def create_computer_use_run(self, payload: dict, source_task_id: str = "") -> dict:
         normalized = _normalize_computer_use_payload(payload)
         run = self.create_run(
@@ -821,6 +880,9 @@ class ExecutionKernel:
             try:
                 async with self._sau_global_semaphore:
                     async with self._sau_platform_lock(payload.get("platform", "")):
+                        self._ensure_active(run_id)
+                        if payload.get("platform") in PUBLISH_RECEIPT_PLATFORMS:
+                            self._patch_run(run_id, publish_attempt_started_at=_now())
                         if task_type == "publish_note":
                             upload_payload = {
                                 key: payload.get(key)
@@ -870,6 +932,18 @@ class ExecutionKernel:
             status = "success" if result.get("success") else "failed"
             message = result.get("message", "")
             error_code = "" if status == "success" else result.get("error_code") or classify_error(message)
+            if payload.get("platform") in PUBLISH_RECEIPT_PLATFORMS and (
+                error_code in {"publish_timeout", "verification_uncertain"}
+                or status == "success" and (
+                    result.get("publish_status") != "published" or not result.get("platform_post_id")
+                )
+            ):
+                if status == "success":
+                    result.setdefault("publish_status", "submitted")
+                result["success"] = False
+                status = "failed"
+                error_code = "verification_uncertain"
+                message = PUBLISH_RECHECK_MESSAGE
             artifact = _debug_screenshot_path(started)
             if artifact:
                 self.add_observation(run_id, upload["id"], "screenshot", "Executor debug screenshot", artifact)

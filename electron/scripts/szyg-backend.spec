@@ -1,6 +1,9 @@
 from pathlib import Path
 
+import json
 import os
+import tomllib
+from importlib.metadata import distribution
 
 from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
 
@@ -37,56 +40,36 @@ datas.extend([
         str(SERVER_ROOT / "szyg" / "integrations" / "social_auto_upload" / "UPSTREAM_README.md"),
         "third_party_licenses/social-auto-upload",
     ),
+    (
+        str(SERVER_ROOT / "szyg" / "integrations" / "social_auto_upload" / "LICENSE"),
+        "third_party_licenses/social-auto-upload",
+    ),
 ])
 
-# patchright (`n`) resolves its browser registry to
-# `<driver>/package/.local-browsers` when PLAYWRIGHT_BROWSERS_PATH is unset/0
-# (see lib/server/registry/index.js). The bundled Chromium version is pinned by
-# patchright's browsers.json — installing the revision at build time and shipping
-# it under .local-browsers keeps the packaged runtime self-contained. Without
-# this, account login / publishing fails with "Executable doesn't exist".
-#
-# Two binaries are required: the full Chromium (headed launches) and the
-# headless shell (headless launches, which the publisher uses with
-# LOCAL_CHROME_HEADLESS=True). Both are pinned to the same revision (1208).
-_patchright_browser_names = [
-    "chromium-1208",
-    "chromium_headless_shell-1208",
-]
-_patchright_browser_candidates = [
-    Path(os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "")) / name
-    for name in _patchright_browser_names
-] + [
-    Path.home() / "AppData" / "Local" / "ms-playwright" / name
-    for name in _patchright_browser_names
-]
-_missing_browsers = []
-for _name in _patchright_browser_names:
-    _rel_exe = (
-        "chrome-win64/chrome.exe"
-        if _name.startswith("chromium-1")
-        else "chrome-headless-shell-win64/chrome-headless-shell.exe"
-    )
-    _src = next(
-        (
-            p
-            for p in _patchright_browser_candidates
-            if p.name == _name and (p / _rel_exe).exists()
-        ),
-        None,
-    )
-    if _src is None:
-        _missing_browsers.append(_name)
-        continue
-    datas.extend([
-        (str(_src), f"patchright/driver/package/.local-browsers/{_name}"),
-    ])
-if _missing_browsers:
-    raise SystemExit(
-        "patchright bundled Chromium missing: "
-        + ", ".join(_missing_browsers)
-        + " — run `n install chromium` first."
-    )
+# Freeze the exact browser builds installed by this Python Playwright driver.
+_playwright = distribution("playwright")
+_locked = tomllib.loads((REPO_ROOT / "uv.lock").read_text(encoding="utf-8"))
+_expected = next(item["version"] for item in _locked["package"] if item["name"] == "playwright")
+if _playwright.version != _expected:
+    raise SystemExit(f"Playwright {_playwright.version} installed; uv.lock requires {_expected}")
+
+_driver = Path(_playwright.locate_file("playwright/driver/package"))
+_manifest = _driver / "browsers.json"
+_browsers = {item["name"]: item for item in json.loads(_manifest.read_text(encoding="utf-8"))["browsers"]}
+_browser_root = Path(os.environ["PLAYWRIGHT_BROWSERS_PATH"])
+for _name, _executable in (
+    ("chromium", "chrome-win64/chrome.exe"),
+    ("chromium-headless-shell", "chrome-headless-shell-win64/chrome-headless-shell.exe"),
+    ("ffmpeg", "ffmpeg-win64.exe"),
+    ("winldd", "PrintDeps.exe"),
+):
+    _browser = _browsers[_name]
+    _directory = f"{_name.replace('-', '_')}-{_browser['revision']}"
+    _source = _browser_root / _directory
+    if not (_source / _executable).is_file() or not (_source / "INSTALLATION_COMPLETE").is_file():
+        raise SystemExit(f"Incomplete Playwright browser installation: {_source}")
+    datas.append((str(_source), f"playwright/driver/package/.local-browsers/{_directory}"))
+datas.append((str(_manifest), "playwright/driver/package"))
 binaries = collect_dynamic_libs("uiautomation")
 
 # Digital presenter renders are normalized locally. Bundle one audited FFmpeg

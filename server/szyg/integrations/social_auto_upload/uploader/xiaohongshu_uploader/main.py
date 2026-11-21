@@ -7,10 +7,11 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from patchright.async_api import Page
-from patchright.async_api import Playwright
-from patchright.async_api import async_playwright
+from playwright.async_api import Page
+from playwright.async_api import Playwright
+from playwright.async_api import async_playwright
 
+from ...utils.publish_submission import submit_once
 from ...conf import DEBUG_MODE, LOCAL_CHROME_HEADLESS, LOCAL_CHROME_PATH
 from ..base_video import BaseVideoUploader
 from ...utils.base_social_media import set_init_script
@@ -525,6 +526,9 @@ class XiaoHongShuVideo(XiaoHongShuBaseUploader):
         modal = page.locator("div.d-modal.cover-modal")
         await modal.wait_for(state="visible", timeout=30000)
 
+        upload_tab = modal.get_by_text("上传封面", exact=True).first
+        if await upload_tab.is_visible():
+            await upload_tab.click()
         file_input = modal.locator('input[type="file"][accept*="image"]').first
         await file_input.wait_for(state="attached", timeout=10000)
         await file_input.set_input_files(thumbnail_path)
@@ -597,23 +601,8 @@ class XiaoHongShuVideo(XiaoHongShuBaseUploader):
         if self.publish_strategy == XIAOHONGSHU_PUBLISH_STRATEGY_SCHEDULED and self.publish_date != 0:
             await self.set_schedule_time_xiaohongshu(page, self.publish_date)
 
-        while True:
-            try:
-                if self.publish_strategy == XIAOHONGSHU_PUBLISH_STRATEGY_SCHEDULED:
-                    await page.locator('button:has-text("定时发布")').click()
-                else:
-                    await page.locator('button:has-text("发布")').click()
-                await page.wait_for_url(
-                    XHS_PUBLISH_SUCCESS_URL_PATTERN,
-                    timeout=3000
-                )
-                xiaohongshu_logger.success(_msg("🥳", "视频发布成功，小人开心收工"))
-                break
-            except Exception:
-                xiaohongshu_logger.info(_msg("🏃", "小人正在冲刺发布视频"))
-                if self.debug:
-                    await page.screenshot(full_page=True)
-                await asyncio.sleep(0.5)
+        button_name = "定时发布" if self.publish_strategy == XIAOHONGSHU_PUBLISH_STRATEGY_SCHEDULED else "发布"
+        await submit_once(page, page.get_by_role("button", name=button_name, exact=True), XHS_PUBLISH_SUCCESS_URL_PATTERN)
 
     async def upload(self, playwright: Playwright) -> None:
         xiaohongshu_logger.info(_msg("🧍", "小人先检查 cookie、视频文件、封面和发布时间"))
@@ -720,23 +709,8 @@ class XiaoHongShuNote(XiaoHongShuBaseUploader):
         if self.publish_strategy == XIAOHONGSHU_PUBLISH_STRATEGY_SCHEDULED and self.publish_date != 0:
             await self.set_schedule_time_xiaohongshu(page, self.publish_date)
 
-        while True:
-            try:
-                if self.publish_strategy == XIAOHONGSHU_PUBLISH_STRATEGY_SCHEDULED:
-                    await page.locator('button:has-text("定时发布")').click()
-                else:
-                    await page.locator('button:has-text("发布")').click()
-                await page.wait_for_url(
-                    XHS_PUBLISH_SUCCESS_URL_PATTERN,
-                    timeout=3000
-                )
-                xiaohongshu_logger.success(_msg("🥳", "图文发布成功，小人开心收工"))
-                break
-            except Exception:
-                xiaohongshu_logger.info(_msg("🏃", "小人正在冲刺发布图文"))
-                if self.debug:
-                    await page.screenshot(full_page=True)
-                await asyncio.sleep(0.5)
+        button_name = "定时发布" if self.publish_strategy == XIAOHONGSHU_PUBLISH_STRATEGY_SCHEDULED else "发布"
+        await submit_once(page, page.get_by_role("button", name=button_name, exact=True), XHS_PUBLISH_SUCCESS_URL_PATTERN)
 
     async def upload(self, playwright: Playwright) -> None:
         xiaohongshu_logger.info(_msg("🧍", "小人先检查 cookie、图片和发布时间"))

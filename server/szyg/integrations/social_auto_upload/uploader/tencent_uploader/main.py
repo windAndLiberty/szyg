@@ -7,10 +7,11 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from patchright.async_api import Page
-from patchright.async_api import Playwright
-from patchright.async_api import async_playwright
+from playwright.async_api import Page
+from playwright.async_api import Playwright
+from playwright.async_api import async_playwright
 
+from ...utils.publish_submission import submit_once
 from ...conf import COOKIES_DIR, DEBUG_MODE, LOCAL_CHROME_HEADLESS, LOCAL_CHROME_PATH, RUNTIME_HOME
 from ..base_video import BaseVideoUploader
 from ...utils.base_social_media import set_init_script
@@ -249,35 +250,19 @@ async def _save_tencent_qrcode(page: Page, account_file: str, previous_qrcode_pa
 
 
 async def _is_tencent_login_completed(page: Page) -> bool:
-    publish_markers = [
-        page.locator('div:has-text("发表视频")').first,
-        page.locator('button:has-text("发表")').first,
-        page.locator('button:has-text("保存草稿")').first,
-    ]
-    for marker in publish_markers:
-        try:
-            if await marker.count() and await marker.is_visible():
-                return True
-        except Exception:
-            continue
-
-    if not (page.url.startswith(TENCENT_UPLOAD_URL) or page.url.startswith(TENCENT_MANAGE_URL)):
+    if not page.url.startswith((TENCENT_UPLOAD_URL, TENCENT_MANAGE_URL)):
         return False
 
-    login_markers = [
-        page.locator("div.login-qrcode-wrap").first,
-        page.locator("div.qrcode-wrap").first,
-        page.locator("img.qrcode").first,
-        page.locator('span:has-text("微信扫码登录 视频号助手")').first,
-    ]
-    for marker in login_markers:
-        try:
-            if await marker.count() and await marker.is_visible():
-                return False
-        except Exception:
-            continue
+    login_marker = page.locator("div.login-qrcode-wrap:visible, div.qrcode-wrap:visible, img.qrcode:visible").first
+    if await login_marker.is_visible():
+        return False
 
-    return True
+    if await page.get_by_text("发表视频", exact=True).first.is_visible():
+        return True
+    for button_name in ("发表", "保存草稿"):
+        if await page.get_by_role("button", name=button_name, exact=True).first.is_visible():
+            return True
+    return False
 
 
 async def _is_tencent_qrcode_expired(page: Page) -> bool:
@@ -738,34 +723,10 @@ class TencentBaseUploader(BaseVideoUploader):
                 await asyncio.sleep(2)
 
     async def submit_publish(self, page: Page) -> None:
-        while True:
-            try:
-                if getattr(self, "is_draft", False):
-                    draft_button = page.locator('div.form-btns button:has-text("保存草稿")')
-                    if await draft_button.count():
-                        await draft_button.click()
-                    await page.wait_for_url("**/post/list**", timeout=5000)
-                    tencent_logger.success(_msg("🥳", "视频草稿保存成功"))
-                else:
-                    publish_button = page.locator('div.form-btns button:has-text("发表")')
-                    if await publish_button.count():
-                        await publish_button.click()
-                    await page.wait_for_url(TENCENT_MANAGE_URL, timeout=5000)
-                    tencent_logger.success(_msg("🥳", "视频发布成功"))
-                break
-            except Exception as exc:
-                current_url = page.url
-                if getattr(self, "is_draft", False):
-                    if "post/list" in current_url or "draft" in current_url:
-                        tencent_logger.success(_msg("🥳", "视频草稿保存成功"))
-                        break
-                else:
-                    if TENCENT_MANAGE_URL in current_url:
-                        tencent_logger.success(_msg("🥳", "视频发布成功"))
-                        break
-                tencent_logger.exception(f"  [-] Exception: {exc}")
-                tencent_logger.info(_msg("🏃", "视频正在发布中..."))
-                await asyncio.sleep(0.5)
+        is_draft = getattr(self, "is_draft", False)
+        button_name = "保存草稿" if is_draft else "发表"
+        receipt_url = "**/post/list**" if is_draft else TENCENT_MANAGE_URL
+        await submit_once(page, page.get_by_role("button", name=button_name, exact=True), receipt_url)
 
 
 class TencentVideo(TencentBaseUploader):

@@ -7,10 +7,11 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from patchright.async_api import Page
-from patchright.async_api import Playwright
-from patchright.async_api import async_playwright
+from playwright.async_api import Page
+from playwright.async_api import Playwright
+from playwright.async_api import async_playwright
 
+from ...utils.publish_submission import submit_once
 from ...conf import DEBUG_MODE, LOCAL_CHROME_HEADLESS, LOCAL_CHROME_PATH
 from ..base_video import BaseVideoUploader
 from ...utils.base_social_media import set_init_script
@@ -545,32 +546,19 @@ class KSVideo(KSBaseUploader):
                 retry_count += 1
 
             if retry_count == max_retries:
-                kuaishou_logger.warning(_msg("😵", "超过最大重试次数，视频上传可能未完成"))
+                raise TimeoutError("快手视频上传等待超时，尚未提交发布")
 
             await self.set_thumbnail(page)
 
             if self.publish_strategy == KUAISHOU_PUBLISH_STRATEGY_SCHEDULED and self.publish_date != 0:
                 await self.set_schedule_time(page, self.publish_date)
 
-            while True:
-                try:
-                    publish_button = page.get_by_text("发布", exact=True)
-                    if await publish_button.count() > 0:
-                        await publish_button.click()
-
-                    await asyncio.sleep(1)
-                    confirm_button = page.get_by_text("确认发布")
-                    if await confirm_button.count() > 0:
-                        await confirm_button.click()
-
-                    await page.wait_for_url(KUAISHOU_MANAGE_URL_PATTERN, timeout=5000)
-                    kuaishou_logger.success(_msg("🥳", "视频发布成功，小人开心收工"))
-                    break
-                except Exception as exc:
-                    kuaishou_logger.info(_msg("🏃", f"小人正在冲刺发布视频: {exc}"))
-                    if self.debug:
-                        await page.screenshot(full_page=True)
-                    await asyncio.sleep(1)
+            await submit_once(
+                page,
+                page.get_by_text("发布", exact=True),
+                KUAISHOU_MANAGE_URL_PATTERN,
+                confirmation=page.get_by_text("确认发布", exact=True),
+            )
 
             upload_success = True
         finally:
@@ -686,30 +674,17 @@ class KSNote(KSBaseUploader):
             retry_count += 1
 
         if retry_count == max_retries:
-            kuaishou_logger.warning(_msg("😵", "超过最大重试次数，图文上传可能未完成"))
+            raise TimeoutError("快手图文上传等待超时，尚未提交发布")
 
         if self.publish_strategy == KUAISHOU_PUBLISH_STRATEGY_SCHEDULED and self.publish_date != 0:
             await self.set_schedule_time(page, self.publish_date)
 
-        while True:
-            try:
-                publish_button = page.get_by_text("发布", exact=True)
-                if await publish_button.count() > 0:
-                    await publish_button.click()
-
-                await asyncio.sleep(1)
-                confirm_button = page.get_by_text("确认发布")
-                if await confirm_button.count() > 0:
-                    await confirm_button.click()
-
-                await page.wait_for_url(KUAISHOU_MANAGE_URL_PATTERN, timeout=5000)
-                kuaishou_logger.success(_msg("🥳", "图文发布成功，小人开心收工"))
-                break
-            except Exception as exc:
-                kuaishou_logger.info(_msg("🏃", f"小人正在冲刺发布图文: {exc}"))
-                if self.debug:
-                    await page.screenshot(full_page=True)
-                await asyncio.sleep(1)
+        await submit_once(
+            page,
+            page.get_by_text("发布", exact=True),
+            KUAISHOU_MANAGE_URL_PATTERN,
+            confirmation=page.get_by_text("确认发布", exact=True),
+        )
 
     async def upload(self, playwright: Playwright) -> None:
         kuaishou_logger.info(_msg("🧍", "小人先检查 cookie、图片和发布时间"))

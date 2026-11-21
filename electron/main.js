@@ -486,7 +486,7 @@ async function startBackend() {
     SZYG_LOCAL_MODEL_DIR: path.join(runtimeDataDir, 'local_models'),
     SZYG_CHROMIUM_DIR: isDev
       ? path.join(projectRoot, 'server', 'szyg', 'storage', 'chromium')
-      : path.join(process.resourcesPath, 'runtime', 'chromium'),
+      : path.join(process.resourcesPath, 'backend', '_internal', 'playwright', 'driver', 'package', '.local-browsers'),
     SZYG_NODE_EXECUTABLE: isDev ? (process.env.SZYG_NODE_EXECUTABLE || '') : process.execPath,
     SZYG_HERMES_RUNTIME_EXECUTABLE: isDev
       ? (process.env.SZYG_HERMES_RUNTIME_EXECUTABLE || '')
@@ -497,11 +497,7 @@ async function startBackend() {
     SZYG_CORS_ORIGINS: isDev
       ? 'http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:8000'
       : `http://127.0.0.1:${PORT}`,
-    // Force the packaged patchright browser registry to the bundle-internal
-    // `.local-browsers` directory (see szyg-backend.spec). Without this,
-    // patchright resolves chromium-1208 from %LOCALAPPDATA%\ms-playwright,
-    // which does not exist on end-user machines, breaking account login and
-    // publishing with "Executable doesn't exist".
+    // Resolve the frozen Playwright driver and its matching browser together.
     PLAYWRIGHT_BROWSERS_PATH: isDev ? (process.env.PLAYWRIGHT_BROWSERS_PATH || '') : '0',
   }
 

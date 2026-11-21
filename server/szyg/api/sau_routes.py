@@ -516,25 +516,13 @@ async def generate_publish_copy(body: PublishCopyRequest):
 @router.post("/upload-video")
 async def upload_video(body: SAUUploadVideo):
     """上传视频到指定平台。"""
-    from szyg.integrations.social_auto_upload_adapter import get_sau_adapter
+    from szyg.execution_kernel import get_execution_kernel
     _ensure_supported_publish_platform(body.platform, "video")
     if (body.platform or "").strip().lower() == "weibo":
         raise HTTPException(400, "微博视频发布使用桌面辅助异步执行，请调用异步发布入口。")
     _ensure_not_desktop_assist_platform(body.platform)
-    adapter = get_sau_adapter()
-    sched = datetime.strptime(body.schedule, "%Y-%m-%d %H:%M") if body.schedule else None
-    result = await adapter.upload_video(
-        platform=body.platform,
-        file_path=body.file_path,
-        title=body.title,
-        desc=body.desc,
-        tags=body.tags,
-        thumbnail_path=body.thumbnail_path,
-        schedule=sched,
-        account_id=body.account_id,
-        headless=body.headless,
-    )
-    return result
+    payload = body.model_dump(include={"platform", "title", "tags", "schedule", "account_id", "headless", "file_path", "desc", "thumbnail_path"})
+    return await get_execution_kernel().publish_sau_result(payload, is_note=False)
 
 
 @router.post("/upload-video-async")
@@ -597,25 +585,14 @@ async def upload_video_async(body: SAUUploadVideo):
 @router.post("/upload-note")
 async def upload_note(body: SAUUploadNote):
     """上传图文到指定平台。"""
-    from szyg.integrations.social_auto_upload_adapter import get_sau_adapter
+    from szyg.execution_kernel import get_execution_kernel
     _ensure_supported_publish_platform(body.platform, "note")
     if (body.platform or "").strip().lower() == "weibo":
         raise HTTPException(400, "微博图文发布使用桌面辅助异步执行，请调用异步发布入口。")
     _ensure_not_desktop_assist_platform(body.platform)
     _validate_publish_payload(body.platform, "note", body.title)
-    adapter = get_sau_adapter()
-    sched = datetime.strptime(body.schedule, "%Y-%m-%d %H:%M") if body.schedule else None
-    result = await adapter.upload_note(
-        platform=body.platform,
-        image_paths=body.image_paths,
-        title=body.title,
-        note=body.note,
-        tags=body.tags,
-        schedule=sched,
-        account_id=body.account_id,
-        headless=body.headless,
-    )
-    return result
+    payload = body.model_dump(include={"platform", "title", "tags", "schedule", "account_id", "headless", "image_paths", "note"})
+    return await get_execution_kernel().publish_sau_result(payload, is_note=True)
 
 
 @router.post("/upload-note-async")

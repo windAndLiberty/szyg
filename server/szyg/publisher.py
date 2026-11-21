@@ -259,61 +259,32 @@ class Publisher:
                 }
                 sau_platform = sau_platform_map.get(plat)
                 if sau_platform and content.media_urls:
-                    try:
-                        from szyg.integrations.social_auto_upload_adapter import get_sau_adapter
-                        sau = get_sau_adapter()
-                        # 判断是视频还是图文
-                        video_exts = {".mp4", ".mov", ".avi", ".mkv", ".m4v", ".webm", ".flv"}
-                        first_media = content.media_urls[0]
-                        is_video = any(first_media.lower().endswith(ext) for ext in video_exts)
+                    from szyg.execution_kernel import get_execution_kernel
 
-                        if is_video:
-                            sau_result = await sau.upload_video(
-                                platform=sau_platform,
-                                file_path=first_media,
-                                title=content.title,
-                                desc=content.body,
-                                tags=content.tags,
-                                headless=content.extra.get("headless", True),
-                            )
-                        else:
-                            sau_result = await sau.upload_note(
-                                platform=sau_platform,
-                                image_paths=content.media_urls,
-                                title=content.title,
-                                note=content.body,
-                                tags=content.tags,
-                                headless=content.extra.get("headless", True),
-                            )
-
-                        if sau_result.get("success"):
-                            return {
-                                "id": str(uuid.uuid4())[:8],
-                                "content_id": content_id,
-                                "platform": plat.value,
-                                "status": "success",
-                                "published_at": datetime.now().isoformat(),
-                                "error_msg": "",
-                                "platform_post_id": f"sau_{plat.value}_{content_id}",
-                                "platform_post_url": "",
-                                "published_via": "social-auto-upload",
-                            }
-                        else:
-                            logger.info(f"[sau] {plat.value} 发布失败, fallback到原生适配器: {sau_result.get('message')}")
-                    except Exception as sau_err:
-                        logger.info(f"[sau] {plat.value} 异常, fallback到原生适配器: {sau_err}")
-
-                # ── 原生适配器 fallback ──
-                if plat == Platform.DOUYIN and content.media_urls:
+                    video_exts = {".mp4", ".mov", ".avi", ".mkv", ".m4v", ".webm", ".flv"}
+                    first_media = content.media_urls[0]
+                    is_video = Path(first_media).suffix.lower() in video_exts
+                    payload = {
+                        "platform": sau_platform,
+                        "title": content.title,
+                        "tags": content.tags,
+                        "headless": content.extra.get("headless", True),
+                    }
+                    if is_video:
+                        payload.update(file_path=first_media, desc=content.body)
+                    else:
+                        payload.update(image_paths=content.media_urls, note=content.body)
+                    run = await get_execution_kernel().publish_sau(payload, is_note=not is_video)
+                    result = run.get("result") or {}
                     return {
                         "id": str(uuid.uuid4())[:8],
                         "content_id": content_id,
                         "platform": plat.value,
-                        "status": "failed",
-                        "published_at": datetime.now().isoformat(),
-                        "error_msg": "social-auto-upload did not complete; native Douyin fallback is disabled",
-                        "platform_post_id": "",
-                        "platform_post_url": "",
+                        "status": run.get("status", "needs_human"),
+                        "published_at": result.get("published_at", ""),
+                        "error_msg": run.get("error_message", ""),
+                        "platform_post_id": result.get("platform_post_id", ""),
+                        "platform_post_url": result.get("post_url", ""),
                         "published_via": "social-auto-upload",
                     }
 

@@ -246,7 +246,7 @@ def sau_list_platforms():
 
 
 @server.tool("sau_upload_video", "通过 social-auto-upload 上传视频到指定平台")
-def sau_upload_video(platform: str, file_path: str, title: str,
+async def sau_upload_video(platform: str, file_path: str, title: str,
                      desc: str = "", tags: str = "",
                      thumbnail_path: str = "", schedule: str = "",
                      headless: bool = True):
@@ -263,30 +263,24 @@ def sau_upload_video(platform: str, file_path: str, title: str,
         schedule: 定时发布时间 "YYYY-MM-DD HH:MM" (可选, 空则立即发布)
         headless: 是否无头模式
     """
-    import asyncio
-    from datetime import datetime
-    from szyg.integrations.social_auto_upload_adapter import get_sau_adapter
+    from szyg.execution_kernel import get_execution_kernel
 
-    adapter = get_sau_adapter()
     tag_list = [t.strip() for t in tags.split(",")] if tags else []
-    sched = datetime.strptime(schedule, "%Y-%m-%d %H:%M") if schedule else None
-
-    async def _upload():
-        return await adapter.upload_video(
-            platform=platform,
-            file_path=file_path,
-            title=title,
-            desc=desc,
-            tags=tag_list,
-            thumbnail_path=thumbnail_path or None,
-            schedule=sched,
-            headless=headless,
-        )
-    return asyncio.run(_upload())
+    payload = dict(
+        platform=platform,
+        file_path=file_path,
+        title=title,
+        desc=desc,
+        tags=tag_list,
+        thumbnail_path=thumbnail_path or None,
+        schedule=schedule,
+        headless=headless,
+    )
+    return await get_execution_kernel().publish_sau_result(payload, is_note=False)
 
 
 @server.tool("sau_upload_note", "通过 social-auto-upload 上传图文到指定平台")
-def sau_upload_note(platform: str, image_paths: str, title: str,
+async def sau_upload_note(platform: str, image_paths: str, title: str,
                     note: str = "", tags: str = "",
                     schedule: str = "", headless: bool = True):
     """
@@ -301,26 +295,20 @@ def sau_upload_note(platform: str, image_paths: str, title: str,
         schedule: 定时发布时间 "YYYY-MM-DD HH:MM" (可选)
         headless: 是否无头模式
     """
-    import asyncio
-    from datetime import datetime
-    from szyg.integrations.social_auto_upload_adapter import get_sau_adapter
+    from szyg.execution_kernel import get_execution_kernel
 
-    adapter = get_sau_adapter()
     img_list = [p.strip() for p in image_paths.split(",")] if image_paths else []
     tag_list = [t.strip() for t in tags.split(",")] if tags else []
-    sched = datetime.strptime(schedule, "%Y-%m-%d %H:%M") if schedule else None
-
-    async def _upload():
-        return await adapter.upload_note(
-            platform=platform,
-            image_paths=img_list,
-            title=title,
-            note=note,
-            tags=tag_list,
-            schedule=sched,
-            headless=headless,
-        )
-    return asyncio.run(_upload())
+    payload = dict(
+        platform=platform,
+        image_paths=img_list,
+        title=title,
+        note=note,
+        tags=tag_list,
+        schedule=schedule,
+        headless=headless,
+    )
+    return await get_execution_kernel().publish_sau_result(payload, is_note=True)
 
 
 @server.tool("sau_check_login", "检查 social-auto-upload 平台登录状态")

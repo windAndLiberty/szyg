@@ -57,6 +57,7 @@ const requiredRuntimeEntries = [
   'resources/THIRD_PARTY_NOTICES.md',
   'resources/backend/_internal/third_party_licenses/wxauto/LICENSE',
   'resources/backend/_internal/third_party_licenses/social-auto-upload/UPSTREAM_README.md',
+  'resources/backend/_internal/third_party_licenses/social-auto-upload/LICENSE',
   'resources/backend/_internal/szyg/resources/social_auto_upload/stealth.min.js',
   'resources/backend/sau-cli.exe',
   'resources/runtime-integrity.json',
@@ -67,11 +68,38 @@ const obsoleteRuntimeRoots = [
   'resources/runtime/omniparser/',
 ]
 
-function validateRuntimeEntries(entries) {
+const publisherDriverRoot = 'resources/backend/_internal/playwright/driver/package'
+const publisherBrowserManifest = `${publisherDriverRoot}/browsers.json`
+
+function validatePublisherBrowsers(root, normalized) {
+  try {
+    const { browsers } = JSON.parse(fs.readFileSync(path.join(root, publisherBrowserManifest), 'utf8'))
+    for (const [name, executable] of [
+      ['chromium', 'chrome-win64/chrome.exe'],
+      ['chromium-headless-shell', 'chrome-headless-shell-win64/chrome-headless-shell.exe'],
+      ['ffmpeg', 'ffmpeg-win64.exe'],
+      ['winldd', 'PrintDeps.exe'],
+    ]) {
+      const revision = browsers.find((browser) => browser.name === name)?.revision
+      if (!/^\d+$/.test(revision || '')) throw new Error(`missing revision for ${name}`)
+      const directory = `${publisherDriverRoot}/.local-browsers/${name.replaceAll('-', '_')}-${revision}`
+      for (const file of [executable, 'INSTALLATION_COMPLETE']) {
+        if (!normalized.has(`${directory}/${file}`)) {
+          failures.push(`${directory}/${file}: required Playwright browser file is missing`)
+        }
+      }
+    }
+  } catch (error) {
+    failures.push(`${publisherBrowserManifest}: ${error.message}`)
+  }
+}
+
+function validateRuntimeEntries(entries, root) {
   const normalized = new Set(entries.map((entry) => entry.replaceAll('\\', '/')))
   for (const required of requiredRuntimeEntries) {
     if (!normalized.has(required)) failures.push(`${required}: required external runtime file is missing`)
   }
+  validatePublisherBrowsers(root, normalized)
   for (const obsolete of obsoleteRuntimeRoots) {
     if ([...normalized].some((entry) => entry.startsWith(obsolete))) {
       failures.push(`${obsolete}: obsolete computer-use runtime must not be distributed`)
@@ -151,17 +179,16 @@ function inspectArchive(archive, sevenZip) {
     failures.push(`${agencyRoot}: expected at least 155 expert definitions, found ${agencyMarkdown.length}`)
   }
 
-  validateRuntimeEntries(entries)
-
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'szyg-archive-audit-'))
   try {
     const extracted = spawnSync(sevenZip, [
-      'x', '-y', `-o${temp}`, archive, 'resources/app.asar', 'resources/config.yaml',
+      'x', '-y', `-o${temp}`, archive, 'resources/app.asar', 'resources/config.yaml', publisherBrowserManifest,
     ], { encoding: 'utf8', windowsHide: true })
     if (extracted.status !== 0) {
       failures.push(`unable to inspect protected release files: ${path.basename(archive)}`)
       return
     }
+    validateRuntimeEntries(entries, temp)
     const configPath = path.join(temp, 'resources', 'config.yaml')
     if (fs.existsSync(configPath)) inspectFile(configPath, temp)
     const asarPath = path.join(temp, 'resources', 'app.asar')
@@ -238,7 +265,7 @@ function auditDist() {
       // trigger the heuristic intended for Xiaoyu-owned release content.
       if (!pinnedOpenClawDependency) inspectFile(file, unpacked)
     })
-    validateRuntimeEntries(unpackedEntries)
+    validateRuntimeEntries(unpackedEntries, unpacked)
   }
   const asarPath = path.join(unpacked, 'resources', 'app.asar')
   if (fs.existsSync(asarPath)) {

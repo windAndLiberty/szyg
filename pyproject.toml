@@ -19,7 +19,7 @@ dependencies = [
     "passlib[bcrypt]>=1.7.4",
     "aiofiles>=24.1.0",
     "openai>=2.43.0",
-    "playwright>=1.60.0",
+    "playwright==1.65.2",
     "bilibili-api-python>=17.4.2",
     "douyin-tiktok-scraper>=1.2.9",
     "pyexecjs>=1.5.1",
@@ -34,8 +34,6 @@ dev = [
     "ruff>=0.7.0",
 ]
 platforms = [
-    "playwright>=1.48.0",        # 浏览器自动化 (抖音/小红书)
-    "patchright==1.58.2",        # 发布器 Chromium 驱动（与已审计的 revision 1208 匹配）
     "concurrent-log-handler==0.9.29", # Windows 打包运行时日志
     "portalocker==4.1.0",        # concurrent-log-handler 的文件锁依赖
     "loguru==0.7.3",            # 社媒上传器结构化日志

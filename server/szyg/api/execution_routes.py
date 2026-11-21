@@ -94,6 +94,8 @@ async def resume_execution(run_id: str):
         run = kernel.resume_run(run_id)
     except KeyError:
         raise HTTPException(404, "任务记录不存在")
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
     return {"ok": True, "run": run}
 
 

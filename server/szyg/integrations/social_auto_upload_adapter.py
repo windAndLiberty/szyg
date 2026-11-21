@@ -85,9 +85,9 @@ _PLATFORM_MAP = {
     "tencent": {
         "module": f"{_PROVIDER_PACKAGE}.uploader.tencent_uploader.main",
         "video_class": "TencentVideo",
-        "note_class": "TencentNote",
+        "note_class": None,
         "upload_method_video": "tencent_upload_video",
-        "upload_method_note": "tencent_upload_note",
+        "upload_method_note": None,
         "cookie_subdir": "tencent_uploader",
         "immediate_strategy": "TENCENT_PUBLISH_STRATEGY_IMMEDIATE",
         "scheduled_strategy": "TENCENT_PUBLISH_STRATEGY_SCHEDULED",
@@ -222,6 +222,7 @@ class SocialAutoUploadAdapter:
             return {
                 "success": False,
                 "message": f"social-auto-upload timed out after {timeout_seconds}s",
+                "error_code": "publish_timeout",
                 "stdout": stdout_bytes.decode("utf-8", errors="replace"),
                 "stderr": stderr_bytes.decode("utf-8", errors="replace"),
             }
@@ -310,7 +311,7 @@ class SocialAutoUploadAdapter:
             finally:
                 await browser.close()
 
-    async def _lookup_douyin_published_post(self, account_file: Path, title: str) -> dict:
+    async def _lookup_douyin_published_post(self, account_file: Path, title: str, started: datetime) -> dict:
         try:
             from playwright.async_api import async_playwright
         except Exception as exc:
@@ -385,32 +386,37 @@ class SocialAutoUploadAdapter:
                     pass
 
         title = (title or "").strip()
-        candidates: list[dict[str, Any]] = []
+        candidates = {}
+        since = int(started.timestamp())
         for data in work_lists:
             for item in data.get("aweme_list") or []:
-                item_title = str(item.get("item_title") or "").strip()
-                desc = str(item.get("desc") or "").strip()
-                if title and (item_title == title or title in desc):
-                    candidates.append(item)
+                item_title = str(item.get("item_title") or item.get("desc") or "").strip()
+                post_id = str(item.get("aweme_id") or item.get("item_id") or "").strip()
+                created = str(item.get("create_time") or "")
+                if post_id and title and item_title == title and created.isdigit() and int(created) >= since:
+                    candidates[post_id] = item
 
-        if not candidates:
+        if len(candidates) != 1:
             return {
                 "link_extraction": {
-                    "status": "not_found",
+                    "status": "not_found" if not candidates else "ambiguous",
                     "method": "douyin_creator_work_list",
-                    "message": "Post link lookup timed out; the work was not visible in the creator work list.",
-                    "attempts": 1,
-                    "timeout_seconds": 25,
+                    "message": "未回查到唯一且匹配本次提交时间的作品。",
                 }
             }
 
-        item = max(candidates, key=lambda entry: int(entry.get("create_time") or 0))
-        post_id = str(item.get("aweme_id") or item.get("item_id") or "").strip()
+        post_id, item = next(iter(candidates.items()))
         share_url = str(item.get("share_url") or "").strip()
-        post_url = f"https://www.douyin.com/video/{post_id}" if post_id else share_url
         status = item.get("status") or {}
-        in_reviewing = bool(status.get("in_reviewing")) if isinstance(status, dict) else False
-        publish_status = "pending_review" if in_reviewing else "published"
+        if not isinstance(status, dict):
+            status = {}
+        publish_status = "submitted"
+        if status.get("in_reviewing") is True:
+            publish_status = "pending_review"
+        elif (status.get("in_reviewing") is False and status.get("is_prohibited") is False
+              and status.get("private_status") == 0 and share_url.startswith("https://")):
+            publish_status = "published"
+        post_url = share_url
         return {
             "post_id": post_id,
             "platform_post_id": post_id,
@@ -464,6 +470,7 @@ class SocialAutoUploadAdapter:
         if schedule:
             args.extend(["--schedule", schedule.strftime("%Y-%m-%d %H:%M")])
 
+        started = datetime.now()
         result = await self._run_provider_cli(args, timeout_seconds=self._publish_timeout_seconds())
         self._sync_external_sau_to_douyin_session(account_id=account_id, account_file=account_file, account_name=account_name)
         result.update({
@@ -474,8 +481,12 @@ class SocialAutoUploadAdapter:
             "account_file": str(account_file_path),
             "engine": "external-social-auto-upload",
         })
-        if result.get("success") and not schedule:
-            result.update(await self._lookup_douyin_published_post(account_file_path, title))
+        if not schedule and (result.get("success") or result.get("error_code") == "publish_timeout"
+                             or "提交结果待核实" in result.get("message", "")):
+            receipt = await self._lookup_douyin_published_post(account_file_path, title, started)
+            result.update(receipt)
+            if receipt.get("publish_status") == "published":
+                result.update(success=True, error_code="", message="已在创作者后台核实作品")
         return result
 
     async def _external_douyin_upload_note(
@@ -511,6 +522,7 @@ class SocialAutoUploadAdapter:
         if schedule:
             args.extend(["--schedule", schedule.strftime("%Y-%m-%d %H:%M")])
 
+        started = datetime.now()
         result = await self._run_provider_cli(args, timeout_seconds=self._publish_timeout_seconds())
         self._sync_external_sau_to_douyin_session(account_id=account_id, account_file=account_file, account_name=account_name)
         result.update({
@@ -520,8 +532,12 @@ class SocialAutoUploadAdapter:
             "account_file": str(account_file_path),
             "engine": "external-social-auto-upload",
         })
-        if result.get("success") and not schedule:
-            result.update(await self._lookup_douyin_published_post(account_file_path, title))
+        if not schedule and (result.get("success") or result.get("error_code") == "publish_timeout"
+                             or "提交结果待核实" in result.get("message", "")):
+            receipt = await self._lookup_douyin_published_post(account_file_path, title, started)
+            result.update(receipt)
+            if receipt.get("publish_status") == "published":
+                result.update(success=True, error_code="", message="已在创作者后台核实作品")
         return result
 
     async def _external_bilibili_upload_video(

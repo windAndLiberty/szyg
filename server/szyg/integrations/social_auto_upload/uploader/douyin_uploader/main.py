@@ -6,10 +6,11 @@ import inspect
 import os
 from pathlib import Path
 
-from patchright.async_api import Page
-from patchright.async_api import Playwright
-from patchright.async_api import async_playwright
+from playwright.async_api import Page
+from playwright.async_api import Playwright
+from playwright.async_api import async_playwright
 
+from ...utils.publish_submission import submit_once
 from ...conf import DEBUG_MODE, LOCAL_CHROME_HEADLESS, LOCAL_CHROME_PATH, RUNTIME_HOME
 from ..base_video import BaseVideoUploader
 from ...utils.base_social_media import set_init_script
@@ -607,7 +608,12 @@ class DouYinVideo(DouYinBaseUploader):
         await page.evaluate(
             "() => document.querySelectorAll('.shepherd-element,.shepherd-modal-overlay-container').forEach(e=>e.remove())"
         )
-        await page.get_by_text("选择封面", exact=True).first.click(force=True)
+        cover_entry = (
+            page.get_by_text("选择封面", exact=True)
+            .or_(page.get_by_text("编辑封面", exact=True))
+            .or_(page.get_by_text("设置封面", exact=True))
+        ).first
+        await cover_entry.click(timeout=10_000)
         cover_locator_str = 'div.dy-creator-content-modal'
         cover_locator = page.locator(cover_locator_str).first
         await page.wait_for_selector(cover_locator_str, timeout=20000)
@@ -711,6 +717,7 @@ class DouYinVideo(DouYinBaseUploader):
             douyin_logger.info(_msg("🥳", "商品链接设置完成"))
 
         await self.set_thumbnail(page)
+        await self.handle_auto_video_cover(page)
 
         await self.set_self_declaration(page)
 
@@ -722,27 +729,11 @@ class DouYinVideo(DouYinBaseUploader):
         if self.publish_strategy == DOUYIN_PUBLISH_STRATEGY_SCHEDULED and self.publish_date != 0:
             await self.set_schedule_time_douyin(page, self.publish_date)
 
-        while True:
-            try:
-                # 移除会拦截发布按钮点击的新手引导/话题下拉浮层
-                await page.evaluate(
-                    "() => { document.querySelectorAll('.shepherd-element, .shepherd-modal-overlay-container, [class*=\"mention-wrapper\"]').forEach(e => e.remove()); }"
-                )
-                publish_button = page.get_by_role("button", name="发布", exact=True)
-                if await publish_button.count():
-                    await publish_button.click(force=True)
-                await page.wait_for_url(
-                    "https://creator.douyin.com/creator-micro/content/manage**",
-                    timeout=3000,
-                )
-                douyin_logger.success(_msg("🥳", "视频发布成功，小人开心收工"))
-                break
-            except Exception:
-                await self.handle_auto_video_cover(page)
-                douyin_logger.info(_msg("🏃", "小人正在冲刺发布视频"))
-                if self.debug:
-                    await page.screenshot(full_page=True)
-                await asyncio.sleep(0.5)
+        await submit_once(
+            page,
+            page.get_by_role("button", name="发布", exact=True),
+            "**/creator-micro/content/manage**",
+        )
 
         await context.storage_state(path=self.account_file)
         douyin_logger.success(_msg("🥳", "cookie 更新完毕"))
@@ -847,20 +838,11 @@ class DouYinNote(DouYinBaseUploader):
         if self.publish_strategy == DOUYIN_PUBLISH_STRATEGY_SCHEDULED and self.publish_date != 0:
             await self.set_schedule_time_douyin(page, self.publish_date)
 
-        while True:
-            try:
-                publish_button = page.get_by_role("button", name="发布", exact=True)
-                if await publish_button.count():
-                    await publish_button.click()
-                await page.wait_for_url(
-                    "**/creator-micro/content/manage?enter_from=publish**",
-                    timeout=3000,
-                )
-                douyin_logger.success(_msg("🥳", "图文发布成功，小人开心收工"))
-                break
-            except Exception:
-                douyin_logger.info(_msg("🏃", "小人正在冲刺发布图文"))
-                await asyncio.sleep(0.5)
+        await submit_once(
+            page,
+            page.get_by_role("button", name="发布", exact=True),
+            "**/creator-micro/content/manage**",
+        )
 
     async def upload(self, playwright: Playwright) -> None:
         douyin_logger.info(_msg("🧍", "小人先检查 cookie、图片和发布时间"))

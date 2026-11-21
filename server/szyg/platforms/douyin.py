@@ -491,9 +491,8 @@ class DouyinAdapter(BasePlatformAdapter):
                 error_msg="Douyin publishing through social-auto-upload requires at least one local media file.",
             )
 
-        from szyg.integrations.social_auto_upload_adapter import get_sau_adapter
+        from szyg.execution_kernel import get_execution_kernel
 
-        sau = get_sau_adapter()
         first_media = request.media_urls[0]
         video_exts = {".mp4", ".mov", ".avi", ".mkv", ".m4v", ".webm", ".flv"}
         is_video = request.content_type == ContentType.VIDEO_SCRIPT or any(
@@ -503,31 +502,25 @@ class DouyinAdapter(BasePlatformAdapter):
         self._state = AdapterState.PUBLISHING
         headless = bool(request.extra.get("headless", True))
         try:
+            payload = {
+                "platform": "douyin",
+                "title": request.title[:DOUYIN_MAX_TITLE_LEN],
+                "tags": request.tags[:DOUYIN_MAX_TAG_COUNT],
+                "headless": headless,
+            }
+            body = request.to_plain_text() if request.body else ""
             if is_video:
-                result = await sau.upload_video(
-                    platform="douyin",
-                    file_path=first_media,
-                    title=request.title[:DOUYIN_MAX_TITLE_LEN],
-                    desc=request.to_plain_text() if request.body else "",
-                    tags=request.tags[:DOUYIN_MAX_TAG_COUNT],
-                    headless=headless,
-                )
+                payload.update(file_path=first_media, desc=body)
             else:
-                result = await sau.upload_note(
-                    platform="douyin",
-                    image_paths=request.media_urls,
-                    title=request.title[:DOUYIN_MAX_TITLE_LEN],
-                    note=request.to_plain_text() if request.body else "",
-                    tags=request.tags[:DOUYIN_MAX_TAG_COUNT],
-                    headless=headless,
-                )
+                payload.update(image_paths=request.media_urls, note=body)
+            result = await get_execution_kernel().publish_sau_result(payload, is_note=not is_video)
 
             self._state = AdapterState.READY if result.get("success") else AdapterState.ERROR
             return PublishResult(
                 success=bool(result.get("success")),
                 platform=Platform.DOUYIN.value,
-                platform_post_id="",
-                platform_post_url="",
+                platform_post_id=result.get("platform_post_id", ""),
+                platform_post_url=result.get("post_url", ""),
                 error_msg="" if result.get("success") else result.get("message", "social-auto-upload failed"),
                 extra=result,
             )

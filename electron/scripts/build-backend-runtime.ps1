@@ -23,15 +23,27 @@ if (Test-Path $workPath) {
 }
 
 New-Item -ItemType Directory -Force -Path $distPath | Out-Null
-& $python -m PyInstaller `
-    --noconfirm `
-    --clean `
-    --distpath $distPath `
-    --workpath $workPath `
-    $spec
+$previousBrowserPath = $env:PLAYWRIGHT_BROWSERS_PATH
+$env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $workPath "publisher-browsers"
+try {
+    & $python -m playwright install chromium
+    if ($LASTEXITCODE -ne 0) {
+        throw "Playwright browser installation failed"
+    }
 
-if ($LASTEXITCODE -ne 0) {
-    throw "Backend runtime build failed"
+    & $python -m PyInstaller `
+        --noconfirm `
+        --clean `
+        --distpath $distPath `
+        --workpath $workPath `
+        $spec
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "Backend runtime build failed"
+    }
+}
+finally {
+    $env:PLAYWRIGHT_BROWSERS_PATH = $previousBrowserPath
 }
 
 $backendExe = Join-Path $distPath "szyg-backend\szyg-backend.exe"

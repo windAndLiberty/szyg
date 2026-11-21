@@ -11,7 +11,7 @@ if [[ ! -x "$ROOT/.venv/bin/python" ]]; then
   exit 1
 fi
 if [[ ! -x "$ELECTRON_DIR/node_modules/electron/dist/electron" ]]; then
-  echo "Electron runtime is missing. Run: npm --prefix electron ci" >&2
+  echo "Electron runtime is missing. Run: npm --prefix electron ci && npm --prefix electron run install:electron" >&2
   exit 1
 fi
 if curl --noproxy '*' --silent --max-time 1 http://127.0.0.1:8000/api/health >/dev/null 2>&1; then
