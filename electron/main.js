@@ -40,6 +40,8 @@ let backendRestartTimer = null
 let isQuitting = false
 let backendReady = false
 let backendLaunchError = ''
+let wechatWorker = null
+let wechatMonitor = null
 let openClawRuntime = null
 let startupGateActive = true
 const desktopToken = crypto.randomBytes(32).toString('hex')
@@ -557,8 +559,13 @@ async function startBackend() {
       return
     }
     if (!isQuitting) {
+      backendReady = false
+      wechatWorker?.kill()
       console.log('Restarting backend in 2s...')
-      setTimeout(startBackend, 2000)
+      setTimeout(() => {
+        if (!isQuitting) startBackend().then(() => waitForBackend(BACKEND_STARTUP_RETRIES))
+          .catch(error => writeDesktopLog(`Backend restart failed: ${error.message}`))
+      }, 2000)
     }
   })
 }
@@ -822,6 +829,31 @@ async function loadMainApplication() {
   }
 }
 
+// The Linux channel follows the actual backend port and only runs for an explicit QR binding.
+function monitorWechat(layout) {
+  if (!layout || process.platform !== 'linux') return
+  const entry = path.join(layout.root, 'wechat', 'assistant.mjs')
+  if (!fs.existsSync(entry)) return
+  const dir = getRuntimeDataDir()
+  const file = path.join(dir, 'wechat-assistant', 'binding.json')
+  const sync = () => {
+    if (isQuitting || !backendReady || !fs.existsSync(file)) {
+      wechatWorker?.kill()
+      return
+    }
+    if (wechatWorker) return
+    const child = spawn(layout.nodeExecutable, [entry, 'serve'], {
+      env: { ...process.env, SZYG_BACKEND_PORT: String(PORT), SZYG_DATA_DIR: dir },
+      cwd: dir, stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+    })
+    wechatWorker = child
+    child.on('error', () => writeDesktopLog('WeChat assistant could not start'))
+    child.once('close', () => { if (wechatWorker === child) wechatWorker = null })
+  }
+  sync()
+  wechatMonitor = setInterval(sync, 3000)
+}
+
 // ── App lifecycle ──
 app.whenReady().then(async () => {
   currentUiLocale = app.getLocale().toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US'
@@ -855,6 +887,7 @@ app.whenReady().then(async () => {
         if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('szyg-openclaw-event', event)
       },
     })
+    monitorWechat(openClawRuntime.findRuntime())
     await showStartupPhase('gateway')
     await openClawRuntime.start()
     await showStartupPhase('workspace')
@@ -870,6 +903,8 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   isQuitting = true
+  clearInterval(wechatMonitor)
+  wechatWorker?.kill()
   browserManager.destroy()
   browserControlServer?.close()
   browserControlServer = null

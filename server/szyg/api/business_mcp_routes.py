@@ -87,7 +87,7 @@ async def _dispatch(payload: dict[str, Any], *, allowed: set[str] | None = None)
     if method == "tools/list":
         tools = _tool_catalog()
         if allowed is not None:
-            required = {"content.copy.generate": ["prompt"], "knowledge.ingest": ["text"], "knowledge.search": ["q"]}
+            required = {"employee.reply": ["prompt"], "content.copy.generate": ["prompt"], "knowledge.ingest": ["text"], "knowledge.search": ["q"]}
             for tool in tools:
                 if tool["name"] in required:
                     tool["inputSchema"]["required"] = required[tool["name"]]

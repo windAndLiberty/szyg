@@ -1,6 +1,10 @@
 export const zhCN = {
   'mcp.copy': '复制凭证',
   'mcp.copied': '已复制',
+  'mcp.employee.reply': '指定员工文本答复（可能消耗额度）',
+  'wechat.local': '在微信单聊中使用本机小妤',
+  'wechat.bind': '为微信助理单独创建凭证，勾选需要的知识库、文案或员工文本答复工具。安装 Linux 桌面包后，在终端运行以下命令，粘贴凭证并用自己的微信扫码。',
+  'wechat.try': '在绑定的单聊发送「1分钟后 知识库概览」。关闭窗口后请保留托盘进程并保持电脑开机联网。运行 szyg-wechat status 查看状态，szyg-wechat unbind 解除绑定。',
   'mcp.title': '智能体接入',
   'mcp.help': '为本机智能体创建连接，逐项选择它可以调用的工具。请在客户端选择 Streamable HTTP 并配置 Bearer 凭证。',
   'mcp.client': '智能体名称',
@@ -100,6 +104,10 @@ export type CoreTranslationKey = keyof typeof zhCN
 export const enUS: Record<CoreTranslationKey, string> = {
   'mcp.copy': 'Copy credential',
   'mcp.copied': 'Copied',
+  'mcp.employee.reply': 'Employee text reply (may use credits)',
+  'wechat.local': 'Use local Xiaoyu in a WeChat direct message',
+  'wechat.bind': 'Create a separate credential for WeChat and select knowledge tools, copy generation or employee text replies. With the Linux desktop package installed, run this command in a terminal, paste the credential and scan with your own WeChat account.',
+  'wechat.try': 'Send “1分钟后 知识库概览” in the paired chat. Keep Xiaoyu in the tray and the computer awake and online. Use szyg-wechat status to check or szyg-wechat unbind to disconnect.',
   'mcp.title': 'Agent connections',
   'mcp.help': 'Create a connection for a local agent and choose its tools. Configure Streamable HTTP and bearer authentication in the client.',
   'mcp.client': 'Agent name',

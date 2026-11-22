@@ -70,11 +70,15 @@ install -m755 electron/build/linux/hermes-runtime "$res/hermes-runtime"
 npm install --prefix "$work/node" --no-audit --ignore-scripts --save-exact "node-linux-x64@$node_version"
 node_bin=$work/node/node_modules/node-linux-x64/bin
 install -m755 "$node_bin/node" "$claw/node"
+mkdir -p "$claw/wechat"
+install -m644 electron/wechat/*.mjs "$claw/wechat/"
+install -m755 electron/wechat/szyg-wechat "$claw/wechat/szyg-wechat"
 cp electron/build/linux/openclaw/package*.json "$claw/app/"
 PATH="$node_bin:$PATH" npm --prefix "$claw/app" ci --omit=dev --no-audit
 node electron/scripts/linux-manifest.cjs "$res"
 mkdir -p "$stage/DEBIAN" "$stage/usr/bin"
 ln -s /opt/szyg/szyg "$stage/usr/bin/szyg"
+ln -s "/opt/szyg/resources/runtime/openclaw/$claw_version/wechat/szyg-wechat" "$stage/usr/bin/szyg-wechat"
 install -Dm644 electron/build/linux/szyg.desktop "$stage/usr/share/applications/szyg.desktop"
 install -Dm644 electron/assets/public/app-icon.png "$stage/usr/share/pixmaps/szyg.png"
 cat > "$stage/DEBIAN/control" <<CONTROL

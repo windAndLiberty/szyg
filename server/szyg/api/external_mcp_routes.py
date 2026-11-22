@@ -21,7 +21,7 @@ ENDPOINT = "/api/mcp/xiaoyu"
 CONNECTIONS = "/api/settings/mcp-connections"
 # Adding an internal capability must never silently extend an existing grant.
 TOOLS = {"knowledge.stats", "knowledge.search", "knowledge.documents",
-         "knowledge.ingest", "content.copy.generate"}
+         "knowledge.ingest", "content.copy.generate", "employee.reply"}
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 

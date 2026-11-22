@@ -23,7 +23,8 @@ write(path.join(runtime, 'manifest.json'), {
   wireVersion: versions.OPENCLAW_WIRE_VERSION,
   nodeVersion: versions.OPENCLAW_NODE_VERSION,
   files: ['node', 'app/package-lock.json', 'app/node_modules/openclaw/openclaw.mjs',
-    'app/node_modules/openclaw/package.json'].map(file => entry(runtime, file)),
+    'app/node_modules/openclaw/package.json', 'wechat/tasks.mjs', 'wechat/assistant.mjs',
+    'wechat/szyg-wechat', 'app/node_modules/@tencent-weixin/openclaw-weixin/package.json'].map(file => entry(runtime, file)),
 })
 const files = ['config.yaml', 'python/bin/python3', 'hermes-runtime', 'server/szyg_backend_entry.py',
   'server/hermes_runtime_entry.py', 'frontend/index.html', `${runtimePath}/manifest.json`]

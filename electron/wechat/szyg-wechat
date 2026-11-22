@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+here=$(dirname "$(realpath "$0")")
+if [[ ${1:-} == bind && -z ${XIAOYU_MCP_TOKEN:-} ]]; then
+  read -rsp '输入小妤「智能体接入」中为微信助理创建的凭证：' XIAOYU_MCP_TOKEN
+  echo
+  export XIAOYU_MCP_TOKEN
+fi
+exec "$here/../node" "$here/assistant.mjs" "$@"

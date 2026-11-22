@@ -161,6 +161,7 @@ def _geo_audit_body(args: dict[str, Any]) -> dict[str, Any]:
 def _capabilities() -> list[Capability]:
     scalar = {"type": "string"}
     return [
+        Capability("employee.reply", "content", "数字员工文本答复", "以指定员工的岗位和职责处理文本任务，不授予桌面工具权限。", risk="generation", custom="employee_reply", parameters={"prompt": scalar, "employee_id": scalar}),
         Capability("content.copy.generate", "content", "生成营销文案", "根据需求生成一到十条可编辑营销文案。", method="POST", path="/api/content/copy/generate", risk="generation", body_builder=_body("prompt", "copy_type", "count", "min_words", "max_words"), timeout=180, parameters={"prompt": scalar, "copy_type": scalar, "count": {"type": "integer", "default": 5}, "min_words": {"type": "integer", "default": 80}, "max_words": {"type": "integer", "default": 160}}),
         Capability("content.image.generate", "content", "生成图片", "根据描述和视觉风格生成一到四张图片并保存到本机。", method="POST", path="/api/image/generate", risk="generation", body_builder=_body("prompt", "size", "count", "style"), timeout=240, parameters={"prompt": scalar, "size": scalar, "count": {"type": "integer", "default": 1}, "style": scalar}),
         Capability("content.video.create", "content", "创建视频生成任务", "根据最终提示、时长、比例和参考图片创建视频任务。", method="POST", path="/api/video/create", risk="generation", confirmation_required=True, body_builder=_body("prompt", "duration", "size", "ratio", "count", "native_audio", "prompt_optimize", "final_prompt", "model", "image_url"), timeout=180, parameters={"prompt": scalar, "duration": {"type": "integer", "default": 6}, "size": scalar, "ratio": scalar, "count": {"type": "integer", "default": 1}, "native_audio": {"type": "boolean", "default": False}, "final_prompt": scalar, "image_url": scalar}),
@@ -305,6 +306,30 @@ class HermesCapabilityRegistry:
         return response.json()
 
     async def _execute_custom(self, item: Capability, args: dict[str, Any], auth_headers: dict[str, str] | None) -> dict[str, Any]:
+        if item.custom == "employee_reply":
+            from szyg.data_path import get_data_dir
+            from szyg.integrations.cloud_inference_client import CloudInferenceClient
+
+            employee = str(args.get("employee_id") or "xiaoyu-wechat")
+            profile = {"title": "小妤微信助理"}
+            if employee != "xiaoyu-wechat":
+                file = get_data_dir() / "openclaw" / "xiaoyu-bots.json"
+                metadata = json.loads(file.read_text(encoding="utf-8")) if file.is_file() else {}
+                profile = metadata.get("profiles", {}).get(employee)
+                if not profile or metadata.get("archived", {}).get(employee):
+                    raise ValueError("指定数字员工不存在或已归档")
+            prompt = str(args.get("prompt") or "").strip()
+            if not prompt or len(prompt) > 4000:
+                raise ValueError("文本任务需为 1 至 4000 个字符")
+            result = await CloudInferenceClient(timeout=90).chat([
+                {"role": "system", "content": f"你是小妤 AI 的{profile.get('title') or '数字员工'}。岗位职责："
+                 f"{profile.get('instructions') or ''}。直接返回本次文本任务的结果。当前没有工具，不声称执行任何外部操作。"},
+                {"role": "user", "content": prompt},
+            ], max_tokens=1200)
+            reply = result.get("message") or {}
+            if reply.get("tool_calls") or not isinstance(reply.get("content"), str) or not reply["content"].strip():
+                raise ValueError("未取得员工文本答复")
+            return {"ok": True, "text": reply["content"].strip()}
         assets = _json_value(args.get("assets_json"), [])
         if not isinstance(assets, list) or not assets:
             raise ValueError("请提供至少一个素材引用")

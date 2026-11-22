@@ -36,6 +36,12 @@ export default function McpConnections() {
   return <section className="max-w-2xl space-y-5">
     <h2 className="text-lg font-semibold">{t('mcp.title')}</h2>
     <p className="text-sm text-muted-foreground">{t('mcp.help')}</p>
+    {navigator.userAgent.includes('Linux') && <details className="rounded-xl border p-4 text-sm">
+      <summary className="cursor-pointer font-medium">{t('wechat.local')}</summary>
+      <p className="mt-2 text-muted-foreground">{t('wechat.bind')}</p>
+      <code className="my-2 block select-all">szyg-wechat bind</code>
+      <p className="text-muted-foreground">{t('wechat.try')}</p>
+    </details>}
     {error && <div role="alert" className="text-sm text-red-500">{error} <Button variant="ghost" onClick={() => { setError(''); void refresh().catch(e => setError(getErrorMessage(e))) }}>{t('重试')}</Button></div>}
     {catalog && <>
       <label className="block space-y-1 text-sm">MCP URL<Input readOnly value={catalog.url} onFocus={e => e.target.select()} /></label>
