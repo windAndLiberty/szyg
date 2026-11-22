@@ -78,7 +78,7 @@ export default function TopBar() {
   }
 
   return (
-    <header className="fixed top-0 right-0 left-0 h-16 bg-[#111827]/95 backdrop-blur-md border-b border-[#1E293B] z-30 transition-[padding-left] duration-150 ease-out" style={{ paddingLeft: sidebarWidth }}>
+    <header className="fixed top-0 right-0 left-0 h-16 bg-background/95 backdrop-blur-md border-b z-30 transition-[padding-left] duration-150 ease-out" style={{ paddingLeft: sidebarWidth }}>
       <div className="h-full flex items-center justify-between px-6">
         {/* Left: Page Title / Super Agent history toggle */}
         {isSuperAgent ? (

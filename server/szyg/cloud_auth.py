@@ -509,6 +509,12 @@ class CloudAuthManager:
                 token=self.access_token(force_refresh=True),
             )
 
+    @property
+    def active_user_id(self) -> str:
+        """Account established by desktop sign-in or session refresh in this process."""
+        user = self._profile.get("user") or {}
+        return str(user.get("id") or "") if self._access_token else ""
+
     def logout(self) -> None:
         with self._lock:
             refresh = self._load_refresh()

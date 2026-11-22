@@ -470,3 +470,21 @@ html.theme-light ::selection {
     box-shadow: 0 0 24px rgba(16, 185, 129, 0.25);
   }
 }
+
+/* Neutral conversation surfaces keep activity and approval colors distinct. */
+.employee-desk {
+  --background: 225 6% 12%;
+  --card: 225 6% 16%;
+  --muted: 225 6% 21%;
+  --border: 225 6% 25%;
+  --foreground: 0 0% 94%;
+  --muted-foreground: 220 6% 65%;
+}
+html.theme-light .employee-desk {
+  --background: 0 0% 100%;
+  --card: 0 0% 99%;
+  --muted: 220 8% 94%;
+  --border: 220 6% 87%;
+  --foreground: 220 8% 14%;
+  --muted-foreground: 220 6% 42%;
+}

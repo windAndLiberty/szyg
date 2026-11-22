@@ -20,7 +20,10 @@ const LayoutContext = createContext<LayoutState | null>(null)
 
 export function LayoutProvider({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsedState] = useState(() => {
-    try { return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1' } catch { return false }
+    try {
+      const stored = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY)
+      return stored === null ? window.location.pathname === '/' : stored === '1'
+    } catch { return false }
   })
   const setCollapsed = useCallback((value: boolean) => {
     setCollapsedState(value)

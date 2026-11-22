@@ -14,7 +14,8 @@ import {
   Play,
   Plus,
   RefreshCw,
-  Send,
+  ArrowUp,
+  PanelRight,
   ShieldCheck,
   Sparkles,
   Users,
@@ -301,6 +302,7 @@ export default function EmployeeWorkspace() {
   const [questionAnswer, setQuestionAnswer] = useState('')
   const [browserOpen, setBrowserOpen] = useState(false)
   const [routinePanelOpen, setRoutinePanelOpen] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const [sideTab, setSideTab] = useState<'activity' | 'routines' | 'artifacts'>('activity')
   const [routines, setRoutines] = useState<Routine[]>([])
   const [routinesLoading, setRoutinesLoading] = useState(false)
@@ -578,23 +580,22 @@ export default function EmployeeWorkspace() {
   } : null
 
   useEffect(() => {
-    if (!api || sideTab !== 'artifacts' || !runtime.ready) return
+    if (!detailsOpen || !api || sideTab !== 'artifacts' || !runtime.ready) return
     void api.artifacts.list({ agentId: activeEmployeeId, limit: 4 }).then((result) => {
       const rows = Array.isArray(result.artifacts) ? result.artifacts : []
       setArtifacts(rows.map(asRecord))
     }).catch(() => setArtifacts([]))
-  }, [api, sideTab, runtime.ready, activeEmployeeId])
+  }, [detailsOpen, api, sideTab, runtime.ready, activeEmployeeId])
 
   if (legacyMode) return <SuperAgent />
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden bg-[#0B0F1A] text-[#F1F5F9]">
-      <aside className="flex w-[250px] shrink-0 flex-col border-r border-[#1E293B] bg-[#0D1320]">
+    <div className="employee-desk flex h-[calc(100dvh-4rem)] overflow-hidden bg-background text-foreground">
+      <aside className="flex w-[clamp(164px,16vw,220px)] shrink-0 flex-col border-r bg-muted/30">
         <div className="border-b border-[#1E293B] px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 text-sm font-semibold"><Users className="h-4 w-4 text-[#818CF8]" />{t("员工名册")}</div>
-              <div className="mt-1 text-xs text-[#64748B]">{t("每位员工拥有独立记忆与工作区")}</div>
             </div>
             <button onClick={() => setCreatingEmployee(true)} className="rounded-lg border border-[#273449] p-2 text-[#94A3B8] hover:border-[#6366F1] hover:text-white" title={t("新建员工")}><Plus className="h-4 w-4" /></button>
           </div>
@@ -611,7 +612,7 @@ export default function EmployeeWorkspace() {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto p-2">
+        <div className="min-h-0 flex-1 overflow-y-auto p-2">
           {employees.map((employee) => (
             <button
               key={employee.id}
@@ -620,7 +621,7 @@ export default function EmployeeWorkspace() {
                 const first = sessions.find((item) => item.agentId === employee.id)
                 setActiveSessionKey(first?.key || '')
               }}
-              className={`mb-1 w-full rounded-xl border px-3 py-3 text-left transition ${activeEmployee?.id === employee.id ? 'border-[#4F46E5] bg-[#312E81]/25' : 'border-transparent hover:border-[#273449] hover:bg-[#111827]'}`}
+              className={`mb-1 w-full rounded-lg border px-2.5 py-2 text-left transition ${activeEmployee?.id === employee.id ? 'border-transparent bg-muted' : 'border-transparent hover:border-[#273449] hover:bg-[#111827]'}`}
             >
               <div className="flex items-center gap-3">
                 <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#1E293B] text-lg">{employee.emoji}</div>
@@ -632,6 +633,10 @@ export default function EmployeeWorkspace() {
               </div>
             </button>
           ))}
+            <div className="mt-4 border-t px-1 pt-4">
+              <div className="mb-2 flex items-center justify-between text-xs text-[#64748B]"><span>{t("最近对话")}</span><button title={t("新任务")} disabled={!runtime.ready} onClick={() => void createSession()}><Plus className="h-4 w-4" /></button></div>
+              {filteredSessions.map((session) => <button key={session.key} onClick={() => { setError(''); setActiveSessionKey(session.key) }} className={`mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${activeSessionKey === session.key ? 'bg-[#1E293B]' : 'hover:bg-[#111827]'}`}><span className="min-w-0 flex-1 truncate">{session.label}</span>{session.hasActiveRun && <LoaderCircle className="h-3 w-3 animate-spin text-[#818CF8]" />}<ChevronRight className="h-3 w-3 text-[#475569]" /></button>)}
+            </div>
           {employees.length === 0 && runtime.ready && <div className="px-4 py-8 text-center text-xs text-[#64748B]">{t("正在准备首位数字员工…")}</div>}
         </div>
 
@@ -645,11 +650,11 @@ export default function EmployeeWorkspace() {
       </aside>
 
       <section className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 shrink-0 items-center gap-4 border-b border-[#1E293B] px-5">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] text-xl">{activeEmployee?.emoji || '✨'}</div>
+        <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2 lg:px-5">
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-muted text-xl">{activeEmployee?.emoji || '✨'}</div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2"><h1 className="truncate text-base font-semibold">{employeeDisplayName(activeEmployee?.name)}</h1><span className="rounded-full bg-[#1E293B] px-2 py-0.5 text-[11px] text-[#94A3B8]">{t(activeEmployee?.title || '数字员工')}</span></div>
-            <div className="mt-0.5 text-xs text-[#64748B]">{activeSession?.label || '选择或创建一个任务对话'}</div>
+            <div className="mt-0.5 truncate text-xs text-muted-foreground">{activeSession?.label || '选择或创建一个任务对话'}</div>
           </div>
           <button onClick={() => { setRoutinePanelOpen(true); void loadRoutines() }} disabled={!runtime.ready} className="relative inline-flex items-center gap-2 rounded-lg border border-[#273449] px-3 py-2 text-xs text-[#CBD5E1] hover:border-[#6366F1] disabled:opacity-40">
             {runningRoutines.length ? <LoaderCircle className="h-4 w-4 animate-spin text-[#A5B4FC]" /> : <Clock3 className="h-4 w-4" />}
@@ -657,6 +662,7 @@ export default function EmployeeWorkspace() {
             <span className={`min-w-5 rounded-full px-1.5 py-0.5 text-[10px] ${runningRoutines.length ? 'bg-[#4F46E5] text-white' : 'bg-[#1E293B] text-[#94A3B8]'}`}>{runningRoutines.length}</span>
           </button>
           <button onClick={() => void createSession()} disabled={!runtime.ready} className="inline-flex items-center gap-2 rounded-lg border border-[#273449] px-3 py-2 text-xs text-[#CBD5E1] hover:border-[#6366F1] disabled:opacity-40"><MessageSquarePlus className="h-4 w-4" />{t("新任务")}</button>
+          <button title={t("动态")} aria-expanded={detailsOpen} aria-controls="workspace-details" onClick={() => setDetailsOpen(!detailsOpen)} className="rounded-lg border p-2"><PanelRight className="h-4 w-4" /></button>
           <button onClick={() => setBrowserOpen(true)} className="inline-flex items-center gap-2 rounded-lg border border-[#273449] px-3 py-2 text-xs text-[#CBD5E1] hover:border-[#6366F1]"><Laptop className="h-4 w-4" />{t("工作电脑")}</button>
         </header>
 
@@ -673,20 +679,20 @@ export default function EmployeeWorkspace() {
 
         {error && <div className="mx-4 mt-3 flex items-center gap-2 rounded-lg border border-[#7F1D1D] bg-[#450A0A]/40 px-3 py-2 text-xs text-[#FCA5A5]"><CircleAlert className="h-4 w-4" /><span className="flex-1">{error}</span><button onClick={() => setError('')}><X className="h-4 w-4" /></button></div>}
 
-        <div className="flex min-h-0 flex-1">
+        <div className="relative flex min-h-0 flex-1">
           <div className="flex min-w-0 flex-1 flex-col">
-            <div className="flex-1 overflow-y-auto px-6 py-5">
+            <div className="flex-1 overflow-y-auto px-4 py-6 lg:px-8">
               {messages.length === 0 ? (
                 <div className="mx-auto flex h-full max-w-xl flex-col items-center justify-center text-center">
-                  <div className="mb-5 grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-[#4F46E5]/35 to-[#7C3AED]/20"><Sparkles className="h-8 w-8 text-[#A5B4FC]" /></div>
-                  <h2 className="text-xl font-semibold">{t("把一项工作交给{v0}", { v0: employeeDisplayName(activeEmployee?.name) })}</h2>
+                  <div className="mb-5 grid h-16 w-16 place-items-center rounded-2xl bg-muted"><Sparkles className="h-8 w-8 text-[#A5B4FC]" /></div>
+                  <h2 className="text-2xl font-medium tracking-tight">{t("把一项工作交给{v0}", { v0: employeeDisplayName(activeEmployee?.name) })}</h2>
                   <p className="mt-2 text-sm leading-6 text-[#64748B]">{t("员工会读取所需技能、检查前置条件，并在发布或其他不可逆操作前等待你的确认。")}</p>
                 </div>
               ) : (
                 <div className="mx-auto max-w-3xl space-y-5">
                   {messages.map((message) => (
                     <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[82%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === 'user' ? 'rounded-br-md bg-[#4F46E5] text-white' : 'rounded-bl-md border border-[#273449] bg-[#111827] text-[#E2E8F0]'}`}>{message.text}</div>
+                      <div className={`min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere] text-[15px] leading-7 ${message.role === 'user' ? 'max-w-[86%] rounded-2xl bg-muted px-4 py-2' : 'w-full'}`}>{message.text}</div>
                     </div>
                   ))}
                   {sending && <div className="flex items-center gap-2 text-xs text-[#818CF8]"><LoaderCircle className="h-4 w-4 animate-spin" />{t("员工正在处理…")}</div>}
@@ -708,11 +714,11 @@ export default function EmployeeWorkspace() {
               </div>
             )}
 
-            <div className="border-t border-[#1E293B] bg-[#0D1320]/90 p-4">
-              <div className="mx-auto max-w-3xl rounded-2xl border border-[#273449] bg-[#111827] p-3 focus-within:border-[#6366F1]">
+            <div className="px-4 pb-5 pt-2 lg:px-8">
+              <div className="mx-auto max-w-3xl rounded-2xl border bg-card p-3 shadow-sm focus-within:border-muted-foreground">
                 <div className="flex items-end gap-3">
-                  <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void sendMessage() } }} rows={2} placeholder={t("交代目标、资料和完成标准…")} disabled={!runtime.ready || !activeEmployee} className="max-h-40 min-h-[48px] flex-1 resize-none bg-transparent px-1 py-2 text-sm outline-none placeholder:text-[#475569] disabled:opacity-50" />
-                  {sending ? <button onClick={() => void api?.runs.interrupt({ key: activeSessionKey, agentId: activeEmployeeId })} className="grid h-10 w-10 place-items-center rounded-xl bg-[#334155]" title={t("停止")}><Pause className="h-4 w-4" /></button> : <button onClick={() => void sendMessage()} disabled={!input.trim() || !runtime.ready || !activeEmployee} className="grid h-10 w-10 place-items-center rounded-xl bg-[#6366F1] disabled:bg-[#273449]" title={t("发送")}><Send className="h-4 w-4" /></button>}
+                  <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) { event.preventDefault(); void sendMessage() } }} rows={2} placeholder={t("交代目标、资料和完成标准…")} disabled={!runtime.ready || !activeEmployee} className="max-h-40 min-h-[48px] min-w-0 flex-1 resize-none bg-transparent px-1 py-2 text-sm outline-none placeholder:text-muted-foreground disabled:opacity-50" />
+                  {sending ? <button onClick={() => void api?.runs.interrupt({ key: activeSessionKey, agentId: activeEmployeeId })} className="grid h-10 w-10 place-items-center rounded-xl bg-[#334155]" title={t("停止")}><Pause className="h-4 w-4" /></button> : <button onClick={() => void sendMessage()} disabled={!input.trim() || !runtime.ready || !activeEmployee} className="grid h-10 w-10 place-items-center rounded-full bg-foreground text-background disabled:opacity-35" title={t("发送")}><ArrowUp className="h-4 w-4" /></button>}
                 </div>
                 <div className="mt-2 flex items-center justify-between border-t border-[#1E293B] pt-2">
                   <button
@@ -734,7 +740,7 @@ export default function EmployeeWorkspace() {
             </div>
           </div>
 
-          <aside className="hidden w-[310px] shrink-0 border-l border-[#1E293B] bg-[#0D1320] xl:flex xl:flex-col">
+          {detailsOpen && <aside id="workspace-details" className="absolute inset-y-0 right-0 z-10 flex w-64 max-w-full flex-col border-l bg-card shadow-lg 2xl:static 2xl:shadow-none">
             <div className="flex border-b border-[#1E293B] p-2">
               {([
                 ['activity', '动态', Clock3],
@@ -747,11 +753,7 @@ export default function EmployeeWorkspace() {
               {sideTab === 'routines' && (routines.length ? <div className="space-y-2">{routines.map((routine, index) => <RoutineCard key={String(routine.id || index)} routine={routine} onPause={(item) => void pauseRoutine(item)} onRun={(item) => void runRoutine(item)} />)}</div> : <EmptySide icon={Play} text="暂无后台任务" />)}
               {sideTab === 'artifacts' && (artifacts.length ? artifacts.map((artifact, index) => <div key={String(artifact.id || index)} className="mb-2 rounded-xl border border-[#1E293B] bg-[#111827] p-3"><div className="flex items-center gap-2 text-xs font-medium"><FileBox className="h-3.5 w-3.5 text-[#2DD4A8]" />{String(artifact.title || artifact.name || '工作产物')}</div><div className="mt-1 text-[11px] text-[#64748B]">{String(artifact.mimeType || artifact.type || '文件')}</div></div>) : <EmptySide icon={FileBox} text="暂无产物" />)}
             </div>
-            <div className="border-t border-[#1E293B] p-3">
-              <div className="mb-2 flex items-center justify-between text-xs text-[#64748B]"><span>{t("最近对话")}</span><button onClick={() => void createSession()}><Plus className="h-4 w-4" /></button></div>
-              {filteredSessions.slice(0, 5).map((session) => <button key={session.key} onClick={() => { setError(''); setActiveSessionKey(session.key) }} className={`mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs ${activeSessionKey === session.key ? 'bg-[#1E293B]' : 'hover:bg-[#111827]'}`}><span className="min-w-0 flex-1 truncate">{session.label}</span>{session.hasActiveRun && <LoaderCircle className="h-3 w-3 animate-spin text-[#818CF8]" />}<ChevronRight className="h-3 w-3 text-[#475569]" /></button>)}
-            </div>
-          </aside>
+          </aside>}
         </div>
       </section>
 

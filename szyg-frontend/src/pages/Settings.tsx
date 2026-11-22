@@ -24,6 +24,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
+import McpConnections from '@/components/McpConnections'
 import UserAvatar from '@/components/ui/UserAvatar'
 import AvatarSettingsDialog from '@/components/ui/AvatarSettingsDialog'
 import { cn } from '@/lib/utils'
@@ -48,7 +49,7 @@ import {
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-type SettingsTab = 'general' | 'account'
+type SettingsTab = 'general' | 'account' | 'mcp'
 
 const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number]
 
@@ -58,6 +59,7 @@ const easeOutExpo = [0.16, 1, 0.3, 1] as [number, number, number, number]
 
 const settingsTabs: { id: SettingsTab; label: string; icon: typeof Settings }[] = [
   { id: 'general', get label() { return translateCurrent("通用设置") }, icon: Settings },
+  { id: 'mcp', label: 'mcp.title', icon: Globe },
   { id: 'account', get label() { return translateCurrent("账户管理") }, icon: User },
 ]
 
@@ -440,6 +442,7 @@ const [activeTab, setActiveTab] = useState<SettingsTab>('general')
         )}
 
         {/* ==================== TAB 2: 账户管理 ==================== */}
+        {activeTab === 'mcp' && <McpConnections key="mcp" />}
         {activeTab === 'account' && (
           <motion.div
             key="account"

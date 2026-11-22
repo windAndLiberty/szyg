@@ -69,10 +69,10 @@ export default function Sidebar() {
   }
 
   return <aside
-    className="fixed inset-y-0 left-0 z-40 flex flex-col overflow-hidden border-r border-[#1E293B] bg-[#111827] transition-[width] duration-150 ease-out [contain:layout_paint]"
+    className="fixed inset-y-0 left-0 z-40 flex flex-col overflow-hidden border-r bg-card transition-[width] duration-150 ease-out [contain:layout_paint]"
     style={{ width: collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED }}
   >
-    <div className={cn('flex h-16 shrink-0 items-center border-b border-[#1E293B]', collapsed ? 'justify-center px-2' : 'px-4')}>
+    <div className={cn('flex h-16 shrink-0 items-center', collapsed ? 'justify-center px-2' : 'px-4')}>
       <Link to="/" className="flex min-w-0 items-center gap-3" title={collapsed ? t(product.name) : undefined}>
         <img src={product.logoUrl} alt={t(product.name)} className="h-8 w-8 shrink-0 rounded-md object-cover" />
         {!collapsed && <div className="min-w-0"><p className="whitespace-nowrap font-display text-xl font-bold text-[#F1F5F9]">{t(product.name)}</p><p className="-mt-0.5 whitespace-nowrap text-[10px] text-[#64748B]">{t('navigation.superWorkforce')}</p></div>}
@@ -80,12 +80,12 @@ export default function Sidebar() {
     </div>
 
     <nav className={cn('min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-3', collapsed ? 'px-2' : 'px-3')} aria-label={t('navigation.main')}>
-      <div className="space-y-2">
+      <div className="space-y-1">
         {navGroups.map((group) => {
           const isExpanded = expandedGroups.has(group.id) && !collapsed
           const isGroupActive = activeGroup?.id === group.id
           const GroupIcon = group.icon
-          return <section key={group.id} className={cn('overflow-hidden rounded-lg', isGroupActive ? 'bg-[#6366F1]/[0.06]' : 'bg-transparent')}>
+          return <section key={group.id} className={cn('overflow-hidden rounded-lg', isGroupActive ? 'bg-muted/50' : 'bg-transparent')}>
             <button
               type="button"
               onClick={() => toggleGroup(group.id, group.defaultChild)}

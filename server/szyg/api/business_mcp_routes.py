@@ -65,7 +65,7 @@ def _tool_catalog() -> list[dict[str, Any]]:
     return tools
 
 
-async def _dispatch(payload: dict[str, Any]) -> dict[str, Any] | None:
+async def _dispatch(payload: dict[str, Any], *, allowed: set[str] | None = None) -> dict[str, Any] | None:
     request_id = payload.get("id")
     method = str(payload.get("method") or "")
     params = payload.get("params") if isinstance(payload.get("params"), dict) else {}
@@ -73,7 +73,7 @@ async def _dispatch(payload: dict[str, Any]) -> dict[str, Any] | None:
     if method == "initialize":
         return _result(request_id, {
             "protocolVersion": _PROTOCOL_VERSION,
-            "serverInfo": {"name": "szyg-business", "version": "1.0.0"},
+            "serverInfo": {"name": "xiaoyu" if allowed is not None else "szyg-business", "version": "1.0.0"},
             "capabilities": {"tools": {"listChanged": False}},
             "instructions": (
                 "小妤本地业务能力。真实外发、发布、任务恢复等能力必须先取得用户明确确认，"
@@ -85,20 +85,36 @@ async def _dispatch(payload: dict[str, Any]) -> dict[str, Any] | None:
     if method == "ping":
         return _result(request_id, {})
     if method == "tools/list":
-        return _result(request_id, {"tools": _tool_catalog()})
+        tools = _tool_catalog()
+        if allowed is not None:
+            required = {"content.copy.generate": ["prompt"], "knowledge.ingest": ["text"], "knowledge.search": ["q"]}
+            for tool in tools:
+                if tool["name"] in required:
+                    tool["inputSchema"]["required"] = required[tool["name"]]
+            tools = [tool | {"name": tool["name"].replace(".", "_")} for tool in tools if tool["name"] in allowed]
+        return _result(request_id, {"tools": tools})
     if method == "tools/call":
         name = str(params.get("name") or "")
+        if allowed is not None:
+            names = {tool.replace(".", "_"): tool for tool in allowed}
+            if name not in names:
+                return _error(request_id, -32602, "Unknown or unauthorized tool")
+            name = names[name]
+            if not isinstance(params.get("arguments", {}), dict):
+                return _error(request_id, -32602, "Expected an arguments object")
         arguments = params.get("arguments") if isinstance(params.get("arguments"), dict) else {}
         known = {item["name"] for item in get_hermes_capability_registry().list()}
         if name not in known:
             return _error(request_id, -32601, f"Unknown business tool: {name}")
         desktop_token = (os.environ.get("SZYG_DESKTOP_TOKEN", "") or "").strip()
         headers = {"X-SZYG-Desktop-Token": desktop_token} if desktop_token else {}
-        raw = await get_hermes_capability_registry().execute(name, arguments, headers)
+        raw = await get_hermes_capability_registry().execute(name, arguments, headers, max_chars=None)
         try:
             structured = json.loads(raw)
         except (TypeError, json.JSONDecodeError):
             structured = {"result": str(raw)}
+        if not isinstance(structured, dict):
+            structured = {"result": structured}
         is_error = structured.get("ok") is False
         return _result(request_id, {
             "content": [{"type": "text", "text": json.dumps(structured, ensure_ascii=False)}],

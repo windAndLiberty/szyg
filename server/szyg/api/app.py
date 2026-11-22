@@ -74,6 +74,9 @@ def create_app() -> FastAPI:
 
     configure_background_workers(app)
 
+    from szyg.api.external_mcp_routes import ENDPOINT as external_mcp_endpoint, router as external_mcp_router
+    app.include_router(external_mcp_router)
+
     desktop_token = os.environ.get("SZYG_DESKTOP_TOKEN", "").strip()
     business_mcp_token = os.environ.get("SZYG_BUSINESS_MCP_TOKEN", "").strip()
     openclaw_model_token = os.environ.get("SZYG_OPENCLAW_MODEL_TOKEN", "").strip()
@@ -82,7 +85,7 @@ def create_app() -> FastAPI:
     async def protect_desktop_api(request: Request, call_next):
         """Keep the loopback API private to the Electron session in production."""
         protected = request.url.path.startswith(("/api/", "/v1/"))
-        exempt = request.url.path == "/api/health" or request.method == "OPTIONS"
+        exempt = request.url.path in {"/api/health", external_mcp_endpoint} or request.method == "OPTIONS"
         if request.url.path.startswith("/api/internal/hermes/"):
             from szyg.hermes_process_manager import hermes_process_manager
             internal_token = request.headers.get("X-SZYG-Hermes-Token", "")

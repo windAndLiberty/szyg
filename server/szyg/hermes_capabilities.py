@@ -254,7 +254,7 @@ class HermesCapabilityRegistry:
             items.append(item.public_dict())
         return sorted(items, key=lambda row: (row["domain"], row["name"]))
 
-    async def execute(self, name: str, args: dict[str, Any], auth_headers: dict[str, str] | None = None) -> str:
+    async def execute(self, name: str, args: dict[str, Any], auth_headers: dict[str, str] | None = None, *, max_chars: int | None = 12000) -> str:
         item = self._items.get(name)
         if item is None:
             return json.dumps({"ok": False, "error": "未知业务能力", "capability": name}, ensure_ascii=False)
@@ -270,7 +270,7 @@ class HermesCapabilityRegistry:
                 result = await self._execute_custom(item, args, auth_headers)
             else:
                 result = await self._request(item, args, auth_headers)
-            return json.dumps(result, ensure_ascii=False)[:12000]
+            return json.dumps(result, ensure_ascii=False)[:max_chars]
         except ValueError as exc:
             return json.dumps({"ok": False, "error": str(exc), "capability": name}, ensure_ascii=False)
         except Exception as exc:
