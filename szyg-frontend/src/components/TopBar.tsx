@@ -89,7 +89,7 @@ export default function TopBar() {
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
             className="flex items-center gap-2"
           >
-            <h1 className="text-lg font-semibold text-[#F1F5F9]">{t('navigation.superAgent')}</h1>
+            <h1 className="text-base font-semibold text-foreground">{t('navigation.superAgent')}</h1>
             <button
               type="button"
               onClick={toggleSuperAgentHistory}
@@ -109,11 +109,11 @@ export default function TopBar() {
             className="flex items-center gap-2"
           >
             {PageIcon && (
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#6366F1]/15 text-[#A5B4FC]">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                 <PageIcon className="h-4 w-4" />
               </span>
             )}
-            <h1 className="text-lg font-semibold text-[#F1F5F9]">{pageTitle}</h1>
+            <h1 className="text-base font-semibold text-foreground">{pageTitle}</h1>
           </motion.div>
         )}
 

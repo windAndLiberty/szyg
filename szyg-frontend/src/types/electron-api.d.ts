@@ -65,6 +65,8 @@ declare global {
       close?: () => void
       isMaximized?: () => Promise<boolean>
       getVersion?: () => Promise<string>
+      savedAppearance?: 'light' | 'dark' | 'system' | null
+      setAppearance?: (preference: 'system' | 'dark' | 'light') => Promise<void>
       setLocale?: (locale: 'zh-CN' | 'en-US') => Promise<{ ok: boolean; locale: string; name: string }>
       browserSetVisible?: (visible: boolean) => Promise<Record<string, unknown>>
       browserSetBounds?: (bounds: { x: number; y: number; width: number; height: number }) => Promise<Record<string, unknown>>

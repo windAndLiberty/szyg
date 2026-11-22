@@ -488,3 +488,54 @@ html.theme-light .employee-desk {
   --foreground: 220 8% 14%;
   --muted-foreground: 220 6% 42%;
 }
+
+/* Shared desktop chrome and preference pages. */
+:root {
+  --background: 225 5% 12%; --foreground: 0 0% 94%;
+  --card: 220 4% 15%; --card-foreground: 0 0% 94%;
+  --muted: 220 4% 21%; --muted-foreground: 220 5% 70%;
+  --border: 220 4% 27%; --input: 220 4% 26%;
+}
+html.theme-light {
+  --background: 0 0% 100%; --foreground: 220 7% 14%;
+  --card: 220 10% 98%; --card-foreground: 220 7% 14%;
+  --muted: 220 8% 93%; --muted-foreground: 220 6% 39%;
+  --border: 220 8% 86%; --input: 220 8% 86%;
+}
+.settings-shell { display: grid; grid-template-columns: minmax(138px,172px) minmax(0,680px); gap: clamp(24px,4vw,64px); max-width: 980px; margin: 0 auto; width: 100%; color: hsl(var(--foreground)); }
+.settings-nav { align-self: start; position: sticky; top: 82px; display: grid; gap: 3px; padding-top: 4px; }
+.settings-nav a { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; font-size: 14px; color: hsl(var(--muted-foreground)); }
+.settings-nav a:hover, .settings-nav a[aria-current] { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
+.settings-nav a[aria-current] { font-weight: 600; }
+.settings-panel { min-width: 0; font-size: 14px; padding-bottom: 40px; }
+.settings-heading { margin-bottom: 28px; font-weight: 650; font-size: clamp(23px,2.2vw,30px); line-height: 1.25; letter-spacing: -.035em; }
+.settings-title { margin-bottom: 12px; font-size: 16px; font-weight: 600; }
+.settings-group { border: 1px solid hsl(var(--border)); border-radius: 12px; background: hsl(var(--background)); }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 15px 18px; }
+.settings-row + .settings-row { border-top: 1px solid hsl(var(--border)); }
+.settings-select { padding: 7px 12px; border-radius: 7px; border: 1px solid hsl(var(--border)); background: hsl(var(--background)); color: inherit; }
+.theme-choices { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+.theme-choice { position: relative; min-width: 0; display: grid; gap: 10px; padding: 8px 8px 10px; font-size: 13px; border: 1px solid hsl(var(--border)); border-radius: 12px; cursor: pointer; }
+.theme-choice > span:last-child { padding-inline: 3px; }
+.theme-choice input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.theme-choice:has(:checked) { border-color: hsl(var(--foreground)); box-shadow: inset 0 0 0 1px hsl(var(--foreground)); }
+.theme-choice:has(:focus-visible), .settings-nav a:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
+.theme-preview { height: 70px; position: relative; overflow: hidden; border-radius: 6px; border: 1px solid #80808040; }
+.preview-light { background: linear-gradient(90deg,#e3e4e7 26%,#fafafa 26%); color: #c3c5ca; }
+.preview-dark { background: linear-gradient(90deg,#27282a 26%,#37383a 26%); color: #6b6e75; }
+.preview-system { background: linear-gradient(90deg,#e3e4e7 26%,#fafafa 26% 52%,#37383a 52%); color: #9b9da4; }
+.theme-preview i, .theme-preview b, .theme-preview em { position: absolute; left: 36%; right: 12%; top: 22%; height: 4px; border-radius: 3px; background: currentColor; }
+.theme-preview b { top: 39%; right: 25%; opacity: .6; }
+.theme-preview em { top: auto; bottom: 12%; right: 9%; height: 11px; background: transparent; border: 1px solid currentColor; }
+.auth-shell { min-height: 100dvh; display: grid; place-items: center; padding: 76px 20px; background: hsl(var(--background)); color: hsl(var(--foreground)); }
+.auth-panel { width: min(100%,390px); }
+@media (max-width: 1050px) {
+  .settings-shell { grid-template-columns: minmax(0,1fr); gap: 24px; }
+  .settings-nav { position: static; display: flex; overflow-x: auto; padding-bottom: 10px; border-bottom: 1px solid hsl(var(--border)); }
+  .settings-nav a { white-space: nowrap; }
+}
+@media (max-width: 640px) {
+  .theme-choices { gap: 6px; } .theme-preview { height: 46px; }
+  .theme-choice { padding: 5px; } .theme-choice > span:last-child { gap: 3px; flex-wrap: wrap; }
+  .settings-row { padding: 12px; flex-wrap: wrap; }
+}

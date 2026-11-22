@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, session, shell, safeStorage } = require('electron')
+const { app, BrowserWindow, Tray, Menu, nativeImage, nativeTheme, session, shell, safeStorage } = require('electron')
 const { spawn } = require('child_process')
 const crypto = require('crypto')
 const fs = require('fs')
@@ -38,6 +38,7 @@ let backendProcess = null
 let backendWatcher = null
 let backendRestartTimer = null
 let isQuitting = false
+let savedAppearance = null
 let backendReady = false
 let backendLaunchError = ''
 let wechatWorker = null
@@ -184,13 +185,14 @@ async function loadStartupPage() {
     <html lang="${currentUiLocale}">
       <head>
         <meta charset="utf-8">
-        <meta name="color-scheme" content="dark">
+        <meta name="color-scheme" content="light dark">
         <style>
-          *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;overflow:hidden;background:radial-gradient(circle at 70% 20%,rgba(79,70,229,.18),transparent 36%),#080d17;color:#e5e7eb;font-family:'Microsoft YaHei',Inter,system-ui,sans-serif}
-          .shell{width:min(560px,calc(100vw - 48px));padding:42px;border:1px solid rgba(99,102,241,.22);border-radius:24px;background:rgba(15,23,42,.86);box-shadow:0 28px 80px rgba(0,0,0,.38);backdrop-filter:blur(16px)}
-          .brand{display:flex;align-items:center;gap:10px;color:#a5b4fc;font-size:13px;letter-spacing:.12em;text-transform:uppercase}.mark{width:10px;height:10px;border-radius:50%;background:#6366f1;box-shadow:0 0 20px #818cf8}
-          h1{margin:24px 0 10px;font-size:28px;line-height:1.25}.status{margin:0;color:#c7d2fe;font-size:16px}.detail{margin:18px 0 0;color:#94a3b8;font-size:14px;line-height:1.8}.note{margin:24px 0 0;color:#64748b;font-size:12px}
-          .track{height:4px;margin-top:30px;overflow:hidden;border-radius:99px;background:#1e293b}.bar{width:38%;height:100%;border-radius:inherit;background:linear-gradient(90deg,#4f46e5,#67e8f9);animation:move 1.7s ease-in-out infinite}
+          :root{color-scheme:light dark;font:14px/1.5 system-ui,sans-serif;background:Canvas;color:CanvasText}
+          *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center}
+          .shell{width:min(480px,calc(100vw - 48px));padding:32px}
+          .brand{display:flex;align-items:center;gap:8px;font-weight:600}.mark{width:8px;height:8px;border-radius:50%;background:currentColor}
+          h1{margin:24px 0 8px;font-size:28px;line-height:1.25}.status{margin:0}.detail,.note{color:color-mix(in srgb,CanvasText 72%,Canvas)}.note{font-size:12px}
+          .track{height:3px;margin-top:24px;overflow:hidden;border-radius:8px;background:color-mix(in srgb,CanvasText 18%,Canvas)}.bar{width:38%;height:100%;background:currentColor;animation:move 1.7s ease-in-out infinite}
           @keyframes move{0%{transform:translateX(-105%)}50%{transform:translateX(175%)}100%{transform:translateX(-105%)}}
           @media (prefers-reduced-motion:reduce){.bar{animation:none;width:100%;opacity:.65}}
         </style>
@@ -632,7 +634,7 @@ async function createWindow() {
     show: false,
     title: productWindowTitle(),
     icon: APP_ICON_PATH,
-    backgroundColor: '#0a0e14',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#202123' : '#ffffff',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -716,6 +718,16 @@ function createTray() {
 
 // ── IPC handlers (for preload.js) ──
 const { ipcMain } = require('electron')
+// Port changes create a fresh web origin. Keep the user's desktop preference across origins.
+ipcMain.on('get-appearance', (event) => {
+  event.returnValue = savedAppearance
+})
+ipcMain.handle('set-appearance', (_event, preference) => {
+  if (!['system', 'dark', 'light'].includes(preference) || savedAppearance === preference) return
+  nativeTheme.themeSource = preference
+  fs.writeFileSync(path.join(app.getPath('userData'), 'appearance'), preference)
+  savedAppearance = preference
+})
 ipcMain.on('window-minimize', () => mainWindow?.minimize())
 ipcMain.on('window-maximize', () => {
   if (mainWindow?.isMaximized()) mainWindow.restore()
@@ -856,6 +868,13 @@ function monitorWechat(layout) {
 
 // ── App lifecycle ──
 app.whenReady().then(async () => {
+  try {
+    const preference = fs.readFileSync(path.join(app.getPath('userData'), 'appearance'), 'utf8')
+    if (['system', 'dark', 'light'].includes(preference)) {
+      savedAppearance = preference
+      nativeTheme.themeSource = preference
+    }
+  } catch { /* The first launch uses the system setting. */ }
   currentUiLocale = app.getLocale().toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US'
   app.setName(productDisplayName())
   createTray()

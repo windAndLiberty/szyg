@@ -75,7 +75,7 @@ export default function Sidebar() {
     <div className={cn('flex h-16 shrink-0 items-center', collapsed ? 'justify-center px-2' : 'px-4')}>
       <Link to="/" className="flex min-w-0 items-center gap-3" title={collapsed ? t(product.name) : undefined}>
         <img src={product.logoUrl} alt={t(product.name)} className="h-8 w-8 shrink-0 rounded-md object-cover" />
-        {!collapsed && <div className="min-w-0"><p className="whitespace-nowrap font-display text-xl font-bold text-[#F1F5F9]">{t(product.name)}</p><p className="-mt-0.5 whitespace-nowrap text-[10px] text-[#64748B]">{t('navigation.superWorkforce')}</p></div>}
+        {!collapsed && <div className="min-w-0"><p className="whitespace-nowrap font-display text-xl font-bold text-foreground">{t(product.name)}</p><p className="-mt-0.5 whitespace-nowrap text-[10px] text-muted-foreground">{t('navigation.superWorkforce')}</p></div>}
       </Link>
     </div>
 
@@ -89,13 +89,13 @@ export default function Sidebar() {
             <button
               type="button"
               onClick={() => toggleGroup(group.id, group.defaultChild)}
-              className={cn('flex h-11 w-full items-center text-left outline-none transition-colors duration-100 hover:bg-white/[0.035] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#6366F1]', collapsed ? 'justify-center px-2' : 'gap-3 px-3')}
+              className={cn('flex h-11 w-full items-center text-left outline-none transition-colors duration-100 hover:bg-muted focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#6366F1]', collapsed ? 'justify-center px-2' : 'gap-3 px-3')}
               aria-expanded={isExpanded}
               aria-controls={`sidebar-group-${group.id}`}
               title={collapsed ? t(group.label) : undefined}
             >
-              <GroupIcon className={cn('h-5 w-5 shrink-0', isGroupActive ? 'text-[#818CF8]' : 'text-[#94A3B8]')} />
-              {!collapsed && <><span className={cn('min-w-0 flex-1 truncate text-sm font-medium', isGroupActive ? 'text-[#F1F5F9]' : 'text-[#CBD5E1]')}>{t(group.label)}</span><ChevronDown className={cn('h-4 w-4 shrink-0 text-[#64748B] transition-transform duration-150', !isExpanded && '-rotate-90')} /></>}
+              <GroupIcon className={cn('h-5 w-5 shrink-0', isGroupActive ? 'text-foreground' : 'text-muted-foreground')} />
+              {!collapsed && <><span className={cn('min-w-0 flex-1 truncate text-sm font-medium', isGroupActive ? 'text-foreground' : 'text-foreground')}>{t(group.label)}</span><ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150', !isExpanded && '-rotate-90')} /></>}
             </button>
 
             <div id={`sidebar-group-${group.id}`} className={cn('grid transition-[grid-template-rows,opacity] duration-150 ease-out', isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0')} aria-hidden={!isExpanded}>
@@ -107,10 +107,10 @@ export default function Sidebar() {
                     return <Link
                       key={child.path}
                       to={child.path}
+                      onClick={() => { if (window.matchMedia('(max-width: 760px)').matches) setCollapsed(true) }}
                       tabIndex={isExpanded ? 0 : -1}
-                      className={cn('relative flex h-9 items-center gap-2.5 rounded-md px-3 text-[13px] transition-colors duration-100', isActive ? 'bg-[#6366F1]/10 text-[#A5B4FC]' : 'text-[#94A3B8] hover:bg-white/[0.035] hover:text-[#F1F5F9]')}
+                      className={cn('relative flex h-9 items-center gap-2.5 rounded-md px-3 text-[13px] transition-colors duration-100', isActive ? 'bg-muted text-foreground font-semibold' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}
                     >
-                      {isActive && <span className="absolute bottom-2 left-0 top-2 w-[3px] rounded-r-full bg-[#6366F1]" />}
                       <ChildIcon className="h-4 w-4 shrink-0" />
                       <span className="min-w-0 flex-1 truncate">{t(child.label)}</span>
                       {workDone.has(child.path) && <span title={t('navigation.completedWork')} className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#10B981] shadow-[0_0_6px_rgba(16,185,129,0.8)]" />}
@@ -125,7 +125,7 @@ export default function Sidebar() {
     </nav>
 
     <div className="shrink-0 border-t border-[#1E293B] p-3">
-      <button type="button" onClick={() => setCollapsed(!collapsed)} className="flex h-10 w-full items-center justify-center rounded-lg text-[#64748B] outline-none transition-colors duration-100 hover:bg-white/[0.035] hover:text-[#CBD5E1] focus-visible:ring-1 focus-visible:ring-[#6366F1]" aria-label={t(collapsed ? 'navigation.expandSidebar' : 'navigation.collapseSidebar')}>
+      <button type="button" onClick={() => setCollapsed(!collapsed)} className="flex h-10 w-full items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors duration-100 hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-[#6366F1]" aria-label={t(collapsed ? 'navigation.expandSidebar' : 'navigation.collapseSidebar')}>
         {collapsed ? <ChevronRight className="h-5 w-5" /> : <span className="flex items-center gap-2 text-sm"><ChevronLeft className="h-5 w-5" />{t('common.collapse')}</span>}
       </button>
     </div>

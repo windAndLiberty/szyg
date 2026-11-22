@@ -14,7 +14,7 @@ GitHub 的 `main` 是公域源码的主线。历史私域产品「数字员工�
 
 在 x86-64 Linux 构建机上准备 npm、uv 管理的 Python 3.12、Git、rsync、curl、unzip、zstd 和 dpkg-deb。从仓库根目录运行 `npm --prefix electron run build:linux`，安装包将写入 `electron/dist/`。首次构建需要联网下载锁定的依赖。
 
-运行 `sudo apt install ./electron/dist/szyg_1.1.13_amd64.deb`，然后从应用菜单打开「小妤 AI」，也可以在终端运行 `szyg`。安装包包含 Electron、Python 后端、OpenClaw、Hermes 和发布用 Chromium。FFmpeg 由 apt 安装。微信桌面 UI 自动化和 Windows CUA 驱动仅适用于 Windows。
+运行 `sudo apt install ./electron/dist/szyg_1.1.14_amd64.deb`，然后从应用菜单打开「小妤 AI」，也可以在终端运行 `szyg`。安装包包含 Electron、Python 后端、OpenClaw、Hermes 和发布用 Chromium。FFmpeg 由 apt 安装。微信桌面 UI 自动化和 Windows CUA 驱动仅适用于 Windows。
 
 ### 把小妤 AI 接入本机智能体
 

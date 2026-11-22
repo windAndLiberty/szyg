@@ -13,9 +13,12 @@ const THEME_STORAGE_KEY = 'szyg-theme'
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
 function readStoredTheme(): ThemePreference {
-  if (typeof window === 'undefined') return 'dark'
-  const stored = window.localStorage.getItem(THEME_STORAGE_KEY)
-  return stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'dark'
+  try {
+    if (window.electronAPI?.savedAppearance) return window.electronAPI.savedAppearance
+    const stored = window.localStorage.getItem(THEME_STORAGE_KEY)
+    if (stored === 'light' || stored === 'dark') return stored
+  } catch { /* Use the system preference if storage is unavailable. */ }
+  return 'system'
 }
 
 function systemTheme(): ResolvedTheme {
@@ -36,10 +39,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => theme === 'system' ? systemTheme() : theme)
 
   useLayoutEffect(() => {
+    void window.electronAPI?.setAppearance?.(theme).catch(() => {})
     const next = theme === 'system' ? systemTheme() : theme
     setResolvedTheme(next)
     applyTheme(next)
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme)
+    try { window.localStorage.setItem(THEME_STORAGE_KEY, theme) } catch { /* Session-only preference. */ }
   }, [theme])
 
   useEffect(() => {
@@ -50,6 +54,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setResolvedTheme(next)
       applyTheme(next)
     }
+    handleChange()
     query.addEventListener('change', handleChange)
     return () => query.removeEventListener('change', handleChange)
   }, [theme])

@@ -17,13 +17,13 @@ class LoginBody(BaseModel):
 class ActivateBody(BaseModel):
     invitation_code: str
     display_name: str
-    password: str = Field(min_length=10)
+    password: str = Field(min_length=6)
 
 
 class RegisterBody(BaseModel):
     email: str = Field(min_length=3, max_length=320)
     display_name: str = Field(min_length=1, max_length=120)
-    password: str = Field(min_length=10, max_length=200)
+    password: str = Field(min_length=6, max_length=200)
     verification_id: str = Field(min_length=8, max_length=80)
     verification_code: str = Field(pattern="^[0-9]{6}$")
 
@@ -55,7 +55,7 @@ class FeedbackBody(BaseModel):
 
 class ChangePasswordBody(BaseModel):
     email: str = Field(min_length=3, max_length=320)
-    new_password: str = Field(min_length=10, max_length=200)
+    new_password: str = Field(min_length=6, max_length=200)
     verification_id: str = Field(min_length=8, max_length=80)
     verification_code: str = Field(pattern="^[0-9]{6}$")
 

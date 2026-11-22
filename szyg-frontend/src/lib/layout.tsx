@@ -1,7 +1,7 @@
 /**
  * 布局常量与共享状态 — Sidebar/TopBar/Layout/App 共用，避免硬编码偏移值不一致。
  */
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 
 // 侧边栏宽度常量（DESIGN_SYSTEM.md 规范）
 export const SIDEBAR_WIDTH_EXPANDED = 260
@@ -19,17 +19,27 @@ interface LayoutState {
 const LayoutContext = createContext<LayoutState | null>(null)
 
 export function LayoutProvider({ children }: { children: ReactNode }) {
-  const [collapsed, setCollapsedState] = useState(() => {
+  const [savedCollapsed, setCollapsedState] = useState(() => {
     try {
       const stored = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY)
       return stored === null ? window.location.pathname === '/' : stored === '1'
     } catch { return false }
   })
+  const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 760px)').matches)
+  const [narrowExpanded, setNarrowExpanded] = useState(false)
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 760px)')
+    const update = () => { setNarrow(query.matches); setNarrowExpanded(false) }
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
+  const collapsed = narrow ? !narrowExpanded : savedCollapsed
   const setCollapsed = useCallback((value: boolean) => {
+    if (narrow) { setNarrowExpanded(!value); return }
     setCollapsedState(value)
     try { window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, value ? '1' : '0') } catch { /* localStorage may be disabled */ }
-  }, [])
-  const sidebarWidth = collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED
+  }, [narrow])
+  const sidebarWidth = narrow || collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED
   return (
     <LayoutContext.Provider value={{ collapsed, setCollapsed, sidebarWidth }}>
       {children}

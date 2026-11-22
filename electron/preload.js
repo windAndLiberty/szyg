@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   close: () => ipcRenderer.send('window-close'),
   isMaximized: () => ipcRenderer.invoke('window-is-maximized'),
   getVersion: () => ipcRenderer.invoke('get-version'),
+  savedAppearance: ipcRenderer.sendSync('get-appearance'),
+  setAppearance: (preference) => ipcRenderer.invoke('set-appearance', preference),
   setLocale: (locale) => ipcRenderer.invoke('branding-set-locale', locale),
 
   // Managed browser used by the super employee work view.
