@@ -23,7 +23,8 @@
     "build:zip": "npm run audit:source && npm run build:runtime && electron-builder --win zip --config electron-builder.config.cjs && npm run audit:dist",
     "build:release": "node scripts/assert-signing.cjs && npm run build",
     "prepare:product": "node scripts/prepare-product.cjs",
-    "build:store": "npm run build:dir && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-store-msix.ps1"
+    "build:store": "npm run build:dir && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-store-msix.ps1",
+    "build:linux": "bash scripts/build-linux.sh"
   },
   "build": {
     "appId": "com.yusetech.xiaoyuai",

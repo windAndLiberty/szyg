@@ -453,7 +453,10 @@ async function startBackend() {
   const projectRoot = getProjectRoot()
   const serverDir = path.join(projectRoot, 'server')
   const bundledFfmpegPath = getBundledFfmpegPath(projectRoot)
-  const backendExecutable = path.join(process.resourcesPath, 'backend', 'szyg-backend.exe')
+  const linuxBundle = !isDev && process.platform === 'linux'
+  const backendExecutable = linuxBundle
+    ? path.join(process.resourcesPath, 'python', 'bin', 'python3')
+    : path.join(process.resourcesPath, 'backend', 'szyg-backend.exe')
   const env = {
     ...process.env,
     PYTHONPATH: serverDir,
@@ -484,11 +487,11 @@ async function startBackend() {
       ? path.join(projectRoot, 'runtime', 'llama')
       : path.join(process.resourcesPath, 'runtime', 'llama'),
     SZYG_LOCAL_MODEL_DIR: path.join(runtimeDataDir, 'local_models'),
-    SZYG_CHROMIUM_DIR: isDev
+    SZYG_CHROMIUM_DIR: linuxBundle ? path.join(projectRoot, 'browsers') : isDev
       ? path.join(projectRoot, 'server', 'szyg', 'storage', 'chromium')
       : path.join(process.resourcesPath, 'backend', '_internal', 'playwright', 'driver', 'package', '.local-browsers'),
     SZYG_NODE_EXECUTABLE: isDev ? (process.env.SZYG_NODE_EXECUTABLE || '') : process.execPath,
-    SZYG_HERMES_RUNTIME_EXECUTABLE: isDev
+    SZYG_HERMES_RUNTIME_EXECUTABLE: linuxBundle ? path.join(projectRoot, 'hermes-runtime') : isDev
       ? (process.env.SZYG_HERMES_RUNTIME_EXECUTABLE || '')
       : path.join(process.resourcesPath, 'runtime', 'hermes', 'hermes-runtime.exe'),
     SZYG_CUA_DRIVER_PATH: isDev
@@ -498,7 +501,7 @@ async function startBackend() {
       ? 'http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:8000'
       : `http://127.0.0.1:${PORT}`,
     // Resolve the frozen Playwright driver and its matching browser together.
-    PLAYWRIGHT_BROWSERS_PATH: isDev ? (process.env.PLAYWRIGHT_BROWSERS_PATH || '') : '0',
+    PLAYWRIGHT_BROWSERS_PATH: linuxBundle ? path.join(projectRoot, 'browsers') : isDev ? (process.env.PLAYWRIGHT_BROWSERS_PATH || '') : '0',
   }
 
   let command
@@ -515,7 +518,7 @@ async function startBackend() {
       throw new Error('The bundled backend runtime is missing')
     }
     command = backendExecutable
-    args = []
+    args = linuxBundle ? [path.join(serverDir, 'szyg_backend_entry.py')] : []
   }
 
   console.log(`Starting backend: ${command}`)

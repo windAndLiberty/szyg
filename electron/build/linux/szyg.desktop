@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=小妤 AI
+Exec=/opt/szyg/szyg
+Icon=szyg
+Terminal=false
+Categories=Office;

@@ -45,9 +45,10 @@ def _resolve_chromium_dir() -> Path | None:
             if d.is_dir() and d.name.startswith("chromium-"):
                 chrome_exe = d / "chrome-win" / "chrome.exe"
                 chrome_exe64 = d / "chrome-win64" / "chrome.exe"
-                chrome_linux = d / "chrome-linux" / "chrome"
+                linux_layouts = ("chrome-linux64", "chrome-linux")
+                has_linux = any((d / name / "chrome").is_file() for name in linux_layouts)
                 chrome_mac = d / "chrome-mac" / "Chromium.app"
-                if chrome_exe.exists() or chrome_exe64.exists() or chrome_linux.exists() or chrome_mac.exists():
+                if chrome_exe.exists() or chrome_exe64.exists() or has_linux or chrome_mac.exists():
                     logger.info(f"Using bundled Chromium: {d}")
                     return d
 
@@ -64,9 +65,10 @@ def _resolve_chromium_dir() -> Path | None:
             for m in matches:
                 chrome_exe = m / "chrome-win" / "chrome.exe"
                 chrome_exe64 = m / "chrome-win64" / "chrome.exe"
-                chrome_linux = m / "chrome-linux" / "chrome"
+                linux_layouts = ("chrome-linux64", "chrome-linux")
+                has_linux = any((m / name / "chrome").is_file() for name in linux_layouts)
                 chrome_mac = m / "chrome-mac" / "Chromium.app"
-                if chrome_exe.exists() or chrome_exe64.exists() or chrome_linux.exists() or chrome_mac.exists():
+                if chrome_exe.exists() or chrome_exe64.exists() or has_linux or chrome_mac.exists():
                     logger.info(f"Found system Chromium: {m}")
                     return m
         except Exception:
@@ -114,9 +116,10 @@ def get_chromium_executable_path() -> str | None:
         if app.exists():
             return str(app)
     else:
-        exe = d / "chrome-linux" / "chrome"
-        if exe.exists():
-            return str(exe)
+        for name in ("chrome-linux64", "chrome-linux"):
+            exe = d / name / "chrome"
+            if exe.is_file():
+                return str(exe)
     return None
 
 

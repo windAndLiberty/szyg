@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+resources=$(dirname "$(realpath "$0")")
+export PYTHONPATH="$resources/hermes-site:$resources/server"
+exec "$resources/python/bin/python3" "$resources/server/hermes_runtime_entry.py" "$@"

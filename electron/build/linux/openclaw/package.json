@@ -1,0 +1,7 @@
+{
+  "name": "szyg-linux-openclaw",
+  "private": true,
+  "dependencies": {
+    "openclaw": "2026.10.5"
+  }
+}

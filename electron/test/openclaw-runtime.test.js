@@ -1,3 +1,4 @@
+const nodeBinary = process.platform === 'win32' ? 'node.exe' : 'node'
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const os = require('node:os')
@@ -157,7 +158,7 @@ test('runtime layout requires pinned compatible versions and hashes', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'xiaoyu-openclaw-layout-'))
   try {
     fs.mkdirSync(path.join(root, 'app', 'node_modules', 'openclaw'), { recursive: true })
-    fs.writeFileSync(path.join(root, 'node.exe'), 'node')
+    fs.writeFileSync(path.join(root, nodeBinary), 'node')
     fs.writeFileSync(path.join(root, 'app', 'node_modules', 'openclaw', 'openclaw.mjs'), 'entry')
     fs.writeFileSync(path.join(root, 'app', 'node_modules', 'openclaw', 'package.json'), JSON.stringify({ version: '2026.10.5' }))
     fs.writeFileSync(path.join(root, 'manifest.json'), JSON.stringify({
@@ -166,10 +167,10 @@ test('runtime layout requires pinned compatible versions and hashes', () => {
       protocolVersion: '2026.10.5',
       wireVersion: 4,
       nodeVersion: '24.16.0',
-      files: [{ path: 'node.exe', sha256: sha256FileSync(path.join(root, 'node.exe')) }],
+      files: [{ path: nodeBinary, sha256: sha256FileSync(path.join(root, nodeBinary)) }],
     }))
     assert.ok(resolveRuntimeLayout(root))
-    fs.writeFileSync(path.join(root, 'node.exe'), 'tampered')
+    fs.writeFileSync(path.join(root, nodeBinary), 'tampered')
     assert.equal(resolveRuntimeLayout(root), null)
   } finally {
     fs.rmSync(root, { recursive: true, force: true })
@@ -181,7 +182,7 @@ test('runtime layout accepts a PowerShell UTF-8 BOM manifest', () => {
   try {
     const packageRoot = path.join(root, 'app', 'node_modules', 'openclaw')
     fs.mkdirSync(packageRoot, { recursive: true })
-    fs.writeFileSync(path.join(root, 'node.exe'), 'node')
+    fs.writeFileSync(path.join(root, nodeBinary), 'node')
     fs.writeFileSync(path.join(packageRoot, 'openclaw.mjs'), 'entry')
     fs.writeFileSync(path.join(packageRoot, 'package.json'), JSON.stringify({ version: '2026.10.5' }))
     const manifest = JSON.stringify({
@@ -190,7 +191,7 @@ test('runtime layout accepts a PowerShell UTF-8 BOM manifest', () => {
       protocolVersion: '2026.10.5',
       wireVersion: 4,
       nodeVersion: '24.16.0',
-      files: [{ path: 'node.exe', sha256: sha256FileSync(path.join(root, 'node.exe')) }],
+      files: [{ path: nodeBinary, sha256: sha256FileSync(path.join(root, nodeBinary)) }],
     })
     fs.writeFileSync(path.join(root, 'manifest.json'), `\uFEFF${manifest}`, 'utf8')
     assert.ok(resolveRuntimeLayout(root))

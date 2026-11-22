@@ -150,7 +150,7 @@ function resolveRuntimeCandidates({ isDev, projectRoot, resourcesPath, dataDir }
 }
 
 function resolveRuntimeLayout(root) {
-  const nodeExecutable = path.join(root, 'node.exe')
+  const nodeExecutable = path.join(root, process.platform === 'win32' ? 'node.exe' : 'node')
   const packageRoot = path.join(root, 'app', 'node_modules', 'openclaw')
   const entry = path.join(packageRoot, 'openclaw.mjs')
   const openclawPackagePath = path.join(packageRoot, 'package.json')

@@ -39,9 +39,9 @@ platforms = [
     "loguru==0.7.3",            # 社媒上传器结构化日志
     "opencv-python==4.13.0.92",  # 社媒登录二维码识别
     "segno==1.6.6",             # 终端二维码渲染
-    "uiautomation>=2.0",         # Windows UI Automation (微信桌面版)
-    "comtypes>=1.4.0",           # UIAutomation COM bindings
-    "pywin32>=306",              # Windows API (剪贴板操作)
+    "uiautomation>=2.0; sys_platform == 'win32'",         # Windows UI Automation (微信桌面版)
+    "comtypes>=1.4.0; sys_platform == 'win32'",           # UIAutomation COM bindings
+    "pywin32>=306; sys_platform == 'win32'",              # Windows API (剪贴板操作)
     "pyperclip>=1.9.0",          # wxauto clipboard support
     "py-mini-racer>=0.6.0",      # V8 JS引擎 (反爬签名)
     "psutil>=5.9.0",             # 进程管理

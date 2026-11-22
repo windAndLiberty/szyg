@@ -69,8 +69,8 @@ class HermesProcessManager:
             self._contexts.pop(context_id, None)
 
     def _command(self) -> list[str]:
-        if getattr(sys, "frozen", False):
-            configured = os.environ.get("SZYG_HERMES_RUNTIME_EXECUTABLE", "").strip()
+        configured = os.environ.get("SZYG_HERMES_RUNTIME_EXECUTABLE", "").strip()
+        if configured or getattr(sys, "frozen", False):
             runtime = Path(configured) if configured else Path(sys.executable).with_name("hermes-runtime.exe")
             if not runtime.is_file():
                 raise RuntimeError("智能员工运行组件缺失，请重新安装应用")
