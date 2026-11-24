@@ -112,10 +112,10 @@ const REFERENCE_LABELS: Record<GenerationHistoryType, string> = {
 }
 
 const REFERENCE_STYLES: Record<GenerationHistoryType, string> = {
-  image: 'border-[#22C55E]/35 bg-[#22C55E]/10 text-[#BBF7D0]',
-  video: 'border-[#6366F1]/35 bg-[#6366F1]/10 text-[#C4B5FD]',
-  audio: 'border-[#F59E0B]/35 bg-[#F59E0B]/10 text-[#FDE68A]',
-  text: 'border-[#38BDF8]/35 bg-[#38BDF8]/10 text-[#BAE6FD]',
+  image: 'border-[#22C55E]/35 bg-[#22C55E]/10 text-success-ink',
+  video: 'border-[#6366F1]/35 bg-[#6366F1]/10 text-accent-ink',
+  audio: 'border-[#F59E0B]/35 bg-[#F59E0B]/10 text-warning-ink',
+  text: 'border-[#38BDF8]/35 bg-[#38BDF8]/10 text-info-ink',
 }
 
 function AdoptionActionButton({
@@ -138,8 +138,8 @@ function AdoptionActionButton({
       onClick={onClick}
       className={`inline-flex min-w-[86px] shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-body-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
         adopted
-          ? 'border border-[#334155] bg-[#1E293B] text-[#CBD5E1] hover:bg-[#263449] hover:text-white'
-          : 'bg-[#6366F1] text-white hover:bg-[#5558E6]'
+          ? 'border border-border bg-muted text-foreground hover:bg-muted hover:text-foreground'
+          : 'bg-primary text-primary-foreground hover:brightness-90'
       } ${className}`}
     >
       <Check className="h-3.5 w-3.5" />
@@ -149,10 +149,10 @@ function AdoptionActionButton({
 }
 
 function adoptionCardClass(adopted?: boolean): string {
-  const hoverClass = 'transition-all duration-200 hover:-translate-y-0.5 hover:border-[#6366F1]/45 hover:bg-[#111827] hover:shadow-[0_18px_45px_rgba(15,23,42,0.28)]'
+  const hoverClass = 'transition-all duration-200 hover:-translate-y-0.5 hover:border-[#6366F1]/45 hover:bg-card hover:shadow-[0_18px_45px_rgba(15,23,42,0.28)]'
   return adopted
     ? `border-[#10B981]/45 bg-[#10B981]/[0.04] shadow-[0_0_0_1px_rgba(16,185,129,0.08)] ${hoverClass}`
-    : `border-[#1E293B] ${hoverClass}`
+    : `border-border ${hoverClass}`
 }
 
 type ReferenceAsset = {
@@ -430,16 +430,16 @@ function ReferenceTextarea({
       onDragOver={(event) => { if (uploadMode) event.preventDefault() }}
       onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false) }}
       onDrop={handleDrop}
-      className={`relative rounded-lg border bg-[#0B0F1A] transition-colors focus-within:border-[#6366F1] ${dragging ? 'border-[#818CF8] ring-2 ring-[#6366F1]/25' : 'border-[#1E293B]'}`}
+      className={`relative rounded-lg border bg-background transition-colors focus-within:border-[#6366F1] ${dragging ? 'border-[#818CF8] ring-2 ring-[#6366F1]/25' : 'border-border'}`}
     >
       {dragging && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-[#111827]/95 text-body-sm font-medium text-[#C4B5FD]">
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-card/95 text-body-sm font-medium text-accent-ink">
 
           {t("松开即可添加参考素材")}
         </div>
       )}
       {references.length > 0 && (
-        <div className="flex flex-wrap gap-2 border-b border-[#1E293B] px-3 py-2">
+        <div className="flex flex-wrap gap-2 border-b border-border px-3 py-2">
           {references.map((ref, index) => (
             <button
               key={`${ref.type}-${ref.title}-${index}`}
@@ -458,7 +458,7 @@ function ReferenceTextarea({
       )}
       <div className="flex items-stretch">
         {uploadMode && (
-          <label className={`group m-3 mr-0 flex w-[76px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed text-center transition-colors ${uploading ? 'cursor-wait border-[#6366F1]/40 bg-[#6366F1]/10 text-[#A5B4FC]' : 'border-[#334155] bg-[#111827] text-[#64748B] hover:border-[#6366F1]/70 hover:text-[#C4B5FD]'}`}>
+          <label className={`group m-3 mr-0 flex w-[76px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed text-center transition-colors ${uploading ? 'cursor-wait border-[#6366F1]/40 bg-[#6366F1]/10 text-accent-ink' : 'border-border bg-card text-muted-foreground hover:border-[#6366F1]/70 hover:text-accent-ink'}`}>
             {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
             <span className="text-[11px]">{uploading ? t("上传中") : t("参考内容")}</span>
             <input
@@ -479,11 +479,11 @@ function ReferenceTextarea({
           onChange={(event) => onChange(event.target.value)}
           onPaste={handlePaste}
           placeholder={placeholder}
-          className={`min-w-0 flex-1 resize-none border-0 bg-transparent px-4 py-3 text-body-md text-[#F1F5F9] placeholder:text-[#475569] focus:outline-none ${className}`}
+          className={`min-w-0 flex-1 resize-none border-0 bg-transparent px-4 py-3 text-body-md text-foreground placeholder:text-muted-foreground focus:outline-none ${className}`}
         />
       </div>
       {(message || uploadMode) && (
-        <div className={`border-t border-[#1E293B] px-3 py-2 text-body-xs ${message ? 'text-[#FCA5A5]' : 'text-[#64748B]'}`}>
+        <div className={`border-t border-border px-3 py-2 text-body-xs ${message ? 'text-danger-ink' : 'text-muted-foreground'}`}>
           {message || (uploadMode ? t("{v0}；也可将文件拖到此处", { v0: REFERENCE_UPLOAD_RULES[uploadMode].hint }) : '')}
         </div>
       )}
@@ -530,7 +530,7 @@ export default function ContentProduction() {
       className="flex flex-col h-full"
     >
       {/* Tabs */}
-      <div className="flex items-center justify-between gap-3 px-6 py-3 border-b border-[#1E293B]">
+      <div className="flex items-center justify-between gap-3 px-6 py-3 border-b border-border">
         <div className="flex gap-1">
           {TABS.map((tab) => (
             <button
@@ -539,8 +539,8 @@ export default function ContentProduction() {
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-body-sm transition-all ${
                 activeTab === tab.key
-                  ? 'bg-[#6366F1]/20 text-[#6366F1] border border-[#6366F1]/30'
-                  : 'text-[#94A3B8] hover:bg-[#1E293B] hover:text-[#F1F5F9]'
+                  ? 'bg-[#6366F1]/20 text-accent-ink border border-[#6366F1]/30'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
               <tab.icon className="w-4 h-4" />
@@ -551,7 +551,7 @@ export default function ContentProduction() {
         {activeTab !== 'performance' && <button
           type="button"
           onClick={() => setHistoryOpen(true)}
-          className="inline-flex items-center gap-2 rounded-lg border border-[#334155] bg-[#101827] px-4 py-2 text-body-sm text-[#CBD5E1] transition-colors hover:border-[#6366F1]/60 hover:text-white"
+          className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-body-sm text-foreground transition-colors hover:border-[#6366F1]/60 hover:text-foreground"
         >
           <History className="h-4 w-4" />
 
@@ -573,14 +573,14 @@ export default function ContentProduction() {
         onClose={() => setHistoryOpen(false)}
       />
       {referenceToast && (
-        <div className="fixed bottom-6 right-6 z-[60] max-w-sm rounded-xl border border-[#6366F1]/40 bg-[#0B1220] px-4 py-3 shadow-2xl shadow-black/40">
+        <div className="fixed bottom-6 right-6 z-[60] max-w-sm rounded-xl border border-[#6366F1]/40 bg-background px-4 py-3 shadow-2xl shadow-black/40">
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 rounded-lg bg-[#6366F1]/20 p-1.5 text-[#C4B5FD]">
+            <div className="mt-0.5 rounded-lg bg-[#6366F1]/20 p-1.5 text-accent-ink">
               <Copy className="h-4 w-4" />
             </div>
             <div>
-              <div className="text-body-sm font-medium text-[#F8FAFC]">{referenceToast}</div>
-              <div className="mt-1 text-body-xs leading-5 text-[#94A3B8]">
+              <div className="text-body-sm font-medium text-foreground">{referenceToast}</div>
+              <div className="mt-1 text-body-xs leading-5 text-muted-foreground">
 
                 {t("可在任意描述文本框中按 Ctrl+V 粘贴引用素材。")}
               </div>
@@ -711,15 +711,15 @@ function GenerationHistoryDrawer({
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/45 backdrop-blur-sm">
       <button className="absolute inset-0 cursor-default" onClick={onClose} aria-label={t("关闭历史记录")} />
-      <div className="relative flex h-full w-full max-w-5xl flex-col border-l border-[#1E293B] bg-[#020617] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[#1E293B] px-6 py-4">
+      <div className="relative flex h-full w-full max-w-5xl flex-col border-l border-border bg-background shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <div className="flex items-center gap-2 text-heading-md text-[#F8FAFC]">
-              <History className="h-5 w-5 text-[#A5B4FC]" />
+            <div className="flex items-center gap-2 text-heading-md text-foreground">
+              <History className="h-5 w-5 text-accent-ink" />
 
               {t("生成历史")}
             </div>
-            <div className="mt-1 text-body-xs text-[#64748B]">
+            <div className="mt-1 text-body-xs text-muted-foreground">
 
               {t("仅展示本机仍然存在的生成内容。采纳后会进入素材管理，取消采纳不会删除原文件。")}
             </div>
@@ -727,13 +727,13 @@ function GenerationHistoryDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-[#334155] bg-[#0B0F1A] p-2 text-[#94A3B8] transition-colors hover:text-white"
+            className="rounded-lg border border-border bg-background p-2 text-muted-foreground transition-colors hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="flex gap-2 border-b border-[#1E293B] px-6 py-3">
+        <div className="flex gap-2 border-b border-border px-6 py-3">
           {HISTORY_TABS.map((tab) => (
             <button
               key={tab.key}
@@ -741,8 +741,8 @@ function GenerationHistoryDrawer({
               onClick={() => setActiveType(tab.key)}
               className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-body-sm transition-colors ${
                 activeType === tab.key
-                  ? 'border border-[#6366F1]/40 bg-[#6366F1]/15 text-[#C4B5FD]'
-                  : 'text-[#94A3B8] hover:bg-[#0F172A] hover:text-white'
+                  ? 'border border-[#6366F1]/40 bg-[#6366F1]/15 text-accent-ink'
+                  : 'text-muted-foreground hover:bg-background hover:text-foreground'
               }`}
             >
               <tab.icon className="h-4 w-4" />
@@ -753,22 +753,22 @@ function GenerationHistoryDrawer({
 
         <div className="flex-1 overflow-auto p-6">
           {error && (
-            <div className="mb-4 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-3 text-body-sm text-[#FCA5A5]">
+            <div className="mb-4 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-3 text-body-sm text-danger-ink">
               {error}
             </div>
           )}
 
           {loading ? (
-            <div className="flex h-64 items-center justify-center text-[#94A3B8]">
+            <div className="flex h-64 items-center justify-center text-muted-foreground">
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
 
               {t("正在读取历史记录")}
             </div>
           ) : items.length === 0 ? (
-            <div className="flex h-64 flex-col items-center justify-center rounded-xl border border-dashed border-[#334155] bg-[#0B0F1A] text-center">
-              <History className="mb-3 h-8 w-8 text-[#475569]" />
-              <div className="text-body-sm text-[#CBD5E1]">{t("暂无")}{historyKindLabel(activeType)}{t("历史")}</div>
-              <div className="mt-1 text-body-xs text-[#64748B]">{t("生成内容后会自动保存到这里。")}</div>
+            <div className="flex h-64 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-background text-center">
+              <History className="mb-3 h-8 w-8 text-muted-foreground" />
+              <div className="text-body-sm text-foreground">{t("暂无")}{historyKindLabel(activeType)}{t("历史")}</div>
+              <div className="mt-1 text-body-xs text-muted-foreground">{t("生成内容后会自动保存到这里。")}</div>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -782,14 +782,14 @@ function GenerationHistoryDrawer({
                     onOpen={() => setSelectedTextItem(item)}
                   />
                 ) : (
-                  <div key={item.id} className={`relative overflow-hidden rounded-xl border bg-[#0B0F1A] ${adoptionCardClass(item.adopted)}`}>
+                  <div key={item.id} className={`relative overflow-hidden rounded-xl border bg-background ${adoptionCardClass(item.adopted)}`}>
                     <HistoryPreview item={item} />
                     <div className="space-y-3 p-4">
                       <div>
-                        <div className="line-clamp-1 text-body-sm font-medium text-[#F1F5F9]">{item.title || item.filename}</div>
-                        <div className="mt-1 text-body-xs text-[#64748B]">{formatHistoryTime(historyUpdatedTime(item))}</div>
+                        <div className="line-clamp-1 text-body-sm font-medium text-foreground">{item.title || item.filename}</div>
+                        <div className="mt-1 text-body-xs text-muted-foreground">{formatHistoryTime(historyUpdatedTime(item))}</div>
                       </div>
-                      {item.prompt && <div className="line-clamp-2 text-body-xs leading-5 text-[#94A3B8]">{item.prompt}</div>}
+                      {item.prompt && <div className="line-clamp-2 text-body-xs leading-5 text-muted-foreground">{item.prompt}</div>}
                       <HistoryActions item={item} onAdopt={handleAdopt} onUnadopt={handleUnadopt} />
                     </div>
                   </div>
@@ -853,7 +853,7 @@ function HistoryActions({
             title: item.title || item.filename,
           })
         }}
-        className="inline-flex items-center gap-1.5 rounded-md bg-[#1E293B] px-3 py-1.5 text-body-xs text-[#94A3B8] transition-colors hover:bg-[#334155] hover:text-white"
+        className="inline-flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-body-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
         <Copy className="h-3.5 w-3.5" />
 
@@ -865,7 +865,7 @@ function HistoryActions({
           event.stopPropagation()
           openGeneratedMedia({ path: item.path, url: item.url })
         }}
-        className="inline-flex items-center gap-1.5 rounded-md bg-[#1E293B] px-3 py-1.5 text-body-xs text-[#94A3B8] transition-colors hover:bg-[#334155] hover:text-white"
+        className="inline-flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-body-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
         <ExternalLink className="h-3.5 w-3.5" />
 
@@ -885,8 +885,8 @@ function HistoryPreview({ item }: { item: GenerationHistoryItem }) {
   }
   if (item.type === 'audio') {
     return (
-      <div className="flex h-52 flex-col justify-center gap-4 bg-[#111827] p-4">
-        <MicIcon className="h-8 w-8 text-[#A5B4FC]" />
+      <div className="flex h-52 flex-col justify-center gap-4 bg-card p-4">
+        <MicIcon className="h-8 w-8 text-accent-ink" />
         <audio src={url} controls className="w-full" />
       </div>
     )
@@ -945,12 +945,12 @@ function TextHistoryCard({
     <button
       type="button"
       onClick={onOpen}
-      className={`group relative min-h-60 rounded-xl border p-6 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[#6366F1]/45 hover:bg-[#111827] hover:shadow-[0_18px_45px_rgba(15,23,42,0.35)] ${adoptionCardClass(item.adopted)}`}
+      className={`group relative min-h-60 rounded-xl border p-6 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[#6366F1]/45 hover:bg-card hover:shadow-[0_18px_45px_rgba(15,23,42,0.35)] ${adoptionCardClass(item.adopted)}`}
     >
-      <div className="line-clamp-6 whitespace-pre-wrap text-[15px] leading-8 tracking-[0.01em] text-[#F1F5F9] transition-colors group-hover:text-white">
+      <div className="line-clamp-6 whitespace-pre-wrap text-[15px] leading-8 tracking-[0.01em] text-foreground transition-colors group-hover:text-foreground">
         {displayText || t("文案内容读取中...")}
       </div>
-      <div className="mt-6 text-body-xs tracking-[0.01em] text-[#64748B]">{formatHistoryTime(historyUpdatedTime(item))}</div>
+      <div className="mt-6 text-body-xs tracking-[0.01em] text-muted-foreground">{formatHistoryTime(historyUpdatedTime(item))}</div>
     </button>
   )
 }
@@ -1007,13 +1007,13 @@ function TextHistoryDetailModal({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 px-4 backdrop-blur-sm">
       <button className="absolute inset-0 cursor-default" onClick={onClose} aria-label={t("关闭文案详情")} />
-      <div className="relative w-full max-w-3xl rounded-2xl border border-[#1E293B] bg-[#020617] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[#1E293B] px-6 py-4">
-          <div className="text-body-sm font-medium text-[#F8FAFC]">{t("文案详情")}</div>
+      <div className="relative w-full max-w-3xl rounded-2xl border border-border bg-background shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <div className="text-body-sm font-medium text-foreground">{t("文案详情")}</div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-[#334155] bg-[#0B0F1A] p-2 text-[#94A3B8] transition-colors hover:text-white"
+            className="rounded-lg border border-border bg-background p-2 text-muted-foreground transition-colors hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>
@@ -1021,23 +1021,23 @@ function TextHistoryDetailModal({
         <div className="max-h-[78vh] overflow-auto p-6">
           <div className="space-y-5">
             <div>
-              <div className="mb-2 text-[11px] text-[#64748B]">{t("文案内容")}</div>
+              <div className="mb-2 text-[11px] text-muted-foreground">{t("文案内容")}</div>
               <textarea
                 value={text}
                 onChange={(event) => setText(event.target.value)}
-                className="min-h-60 w-full resize-y rounded-xl border border-[#1E293B] bg-[#0B0F1A] px-4 py-4 text-[15px] leading-8 tracking-[0.01em] text-[#F1F5F9] outline-none transition-colors focus:border-[#6366F1]"
+                className="min-h-60 w-full resize-y rounded-xl border border-border bg-background px-4 py-4 text-[15px] leading-8 tracking-[0.01em] text-foreground outline-none transition-colors focus:border-[#6366F1]"
               />
-              {dirty && <div className="mt-2 text-[11px] text-[#64748B]">{t("内容已修改，点击下方保存后才会写入文件。")}</div>}
-              {error && <div className="mt-2 text-body-xs text-[#FCA5A5]">{error}</div>}
+              {dirty && <div className="mt-2 text-[11px] text-muted-foreground">{t("内容已修改，点击下方保存后才会写入文件。")}</div>}
+              {error && <div className="mt-2 text-body-xs text-danger-ink">{error}</div>}
             </div>
 
-            <div className="rounded-xl border border-[#1E293B] bg-[#0B0F1A] p-4">
-              <div className="mb-2 text-[11px] text-[#64748B]">{t("生成需求")}</div>
-              <div className="whitespace-pre-wrap text-body-xs leading-6 text-[#CBD5E1]">{item.prompt || t("暂无生成需求")}</div>
+            <div className="rounded-xl border border-border bg-background p-4">
+              <div className="mb-2 text-[11px] text-muted-foreground">{t("生成需求")}</div>
+              <div className="whitespace-pre-wrap text-body-xs leading-6 text-foreground">{item.prompt || t("暂无生成需求")}</div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#1E293B] pt-4">
-              <span className="text-body-xs text-[#64748B]">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+              <span className="text-body-xs text-muted-foreground">
                 {(item.title || t("文案素材"))} · {formatHistoryTime(historyUpdatedTime(item))}
               </span>
               <div className="flex flex-wrap gap-2">
@@ -1046,7 +1046,7 @@ function TextHistoryDetailModal({
                     type="button"
                     onClick={saveText}
                     disabled={saving || !text.trim()}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-[#6366F1] px-3 py-1.5 text-body-xs text-white transition-colors hover:bg-[#5558E6] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-body-xs text-primary-foreground transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
 
@@ -1067,10 +1067,10 @@ function HistoryTextPreview({ prompt }: { prompt: string }) {
   const { t } = useI18n();
 
   return (
-    <div className="h-52 bg-[#111827] p-4">
-      <TextIcon className="mb-3 h-7 w-7 text-[#A5B4FC]" />
-      <div className="mb-2 text-[11px] text-[#64748B]">{t("生成需求")}</div>
-      <p className="line-clamp-6 whitespace-pre-wrap text-body-xs leading-5 text-[#CBD5E1]">
+    <div className="h-52 bg-card p-4">
+      <TextIcon className="mb-3 h-7 w-7 text-accent-ink" />
+      <div className="mb-2 text-[11px] text-muted-foreground">{t("生成需求")}</div>
+      <p className="line-clamp-6 whitespace-pre-wrap text-body-xs leading-5 text-foreground">
         {prompt || t("暂无生成需求")}
       </p>
     </div>
@@ -1152,8 +1152,8 @@ function ImageGeneration() {
   return (
     <div className="space-y-6">
       {/* Input */}
-      <div className="glass-card rounded-card-lg border border-[#1E293B] p-6">
-        <label className="text-body-sm text-[#94A3B8] mb-2 block">{t("描述图片内容")}</label>
+      <div className="glass-card rounded-card-lg border border-border p-6">
+        <label className="text-body-sm text-muted-foreground mb-2 block">{t("描述图片内容")}</label>
         <ReferenceTextarea
           value={prompt}
           onChange={setPrompt}
@@ -1167,11 +1167,11 @@ function ImageGeneration() {
 
         <div className="mt-4 grid gap-4 md:grid-cols-3">
           <label>
-            <span className="text-body-xs text-[#64748B] mb-1 block">{t("风格")}</span>
+            <span className="text-body-xs text-muted-foreground mb-1 block">{t("风格")}</span>
             <select
               value={style}
               onChange={(event) => setStyle(event.target.value as ImageStyle)}
-              className="w-full rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 py-2 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
             >
               {IMAGE_STYLES.map((option) => (
                 <option key={option.key} value={option.key}>{option.label}</option>
@@ -1180,11 +1180,11 @@ function ImageGeneration() {
           </label>
 
           <label>
-            <span className="text-body-xs text-[#64748B] mb-1 block">{t("分辨率")}</span>
+            <span className="text-body-xs text-muted-foreground mb-1 block">{t("分辨率")}</span>
             <select
               value={size}
               onChange={(event) => setSize(event.target.value as ImageSize)}
-              className="w-full rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 py-2 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
             >
               {IMAGE_SIZES.map((option) => (
                 <option key={option.key} value={option.key}>{option.label}</option>
@@ -1193,11 +1193,11 @@ function ImageGeneration() {
           </label>
 
           <label>
-            <span className="text-body-xs text-[#64748B] mb-1 block">{t("生成张数")}</span>
+            <span className="text-body-xs text-muted-foreground mb-1 block">{t("生成张数")}</span>
             <select
               value={count}
               onChange={(event) => setCount(Number(event.target.value))}
-              className="w-full rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 py-2 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
             >
               {[1, 2, 3, 4].map((value) => (
                 <option key={value} value={value}>{value}  {t("张")}</option>
@@ -1209,7 +1209,7 @@ function ImageGeneration() {
         <button
           onClick={handleGenerate}
           disabled={generation.loading || !prompt.trim()}
-          className="mt-4 flex items-center gap-2 px-6 py-2.5 bg-[#6366F1] hover:bg-[#5558E6] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-body-sm text-white transition-colors"
+          className="mt-4 flex items-center gap-2 px-6 py-2.5 bg-primary hover:brightness-90 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-body-sm text-primary-foreground transition-colors"
         >
           {generation.loading ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -1224,10 +1224,10 @@ function ImageGeneration() {
       {generation.loading && (
         <div className="glass-card rounded-card-lg border border-[#6366F1]/30 bg-[#6366F1]/10 p-4">
           <div className="flex items-center gap-3">
-            <Loader2 className="h-5 w-5 animate-spin text-[#6366F1]" />
+            <Loader2 className="h-5 w-5 animate-spin text-accent-ink" />
             <div>
-              <div className="text-body-sm font-medium text-[#F1F5F9]">{t("图片生成中")}</div>
-              <div className="mt-1 text-body-xs text-[#94A3B8]">
+              <div className="text-body-sm font-medium text-foreground">{t("图片生成中")}</div>
+              <div className="mt-1 text-body-xs text-muted-foreground">
 
                 {t("生成任务已在后台继续执行，切换到发布中心或其他页面不会中断。")}
               </div>
@@ -1238,7 +1238,7 @@ function ImageGeneration() {
 
       {/* Error */}
       {generation.error && (
-        <div className="glass-card rounded-card-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-4 text-[#EF4444] text-body-sm">
+        <div className="glass-card rounded-card-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-4 text-danger-ink text-body-sm">
           {generation.error}
         </div>
       )}
@@ -1248,8 +1248,8 @@ function ImageGeneration() {
         <div className="space-y-4">
           <div className="glass-card rounded-card-lg border border-[#10B981]/30 bg-[#10B981]/10 p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <div className="text-body-sm text-[#F1F5F9] font-medium">{t("已生成图片")}</div>
-              <div className="mt-1 text-body-xs text-[#94A3B8]">{t("文件已自动保存。采纳需要使用的图片后，它们会进入素材管理。")}</div>
+              <div className="text-body-sm text-foreground font-medium">{t("已生成图片")}</div>
+              <div className="mt-1 text-body-xs text-muted-foreground">{t("文件已自动保存。采纳需要使用的图片后，它们会进入素材管理。")}</div>
             </div>
             <Link
               to="/content/assets"
@@ -1276,7 +1276,7 @@ function ImageGeneration() {
                 />
                 <button
                   onClick={() => handleOpenAsset(asset)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1E293B] hover:bg-[#334155] text-[#94A3B8] hover:text-[#F1F5F9] text-body-xs transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted hover:bg-muted text-muted-foreground hover:text-foreground text-body-xs transition-colors"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
 
@@ -1289,7 +1289,7 @@ function ImageGeneration() {
                     url: asset.url,
                     title: asset.path ? asset.path.split(/[\\/]/).pop() : t("生成图片 {v0}", { v0: i + 1 }),
                   })}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1E293B] hover:bg-[#334155] text-[#94A3B8] hover:text-[#F1F5F9] text-body-xs transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted hover:bg-muted text-muted-foreground hover:text-foreground text-body-xs transition-colors"
                 >
                   <Copy className="w-3.5 h-3.5" />
 
@@ -1297,7 +1297,7 @@ function ImageGeneration() {
                 </button>
                 <button
                   onClick={() => handleDeleteAsset(asset)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1E293B] hover:bg-[#7F1D1D] text-[#94A3B8] hover:text-white text-body-xs transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted hover:bg-danger-soft text-muted-foreground hover:text-foreground text-body-xs transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
 
@@ -1691,15 +1691,15 @@ function VideoGeneration() {
 
   return (
     <div className="space-y-6">
-      <div className="glass-card rounded-card-lg border border-[#1E293B] p-6">
+      <div className="glass-card rounded-card-lg border border-border p-6">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <label className="text-body-sm text-[#94A3B8]">{t("描述视频内容")}</label>
+          <label className="text-body-sm text-muted-foreground">{t("描述视频内容")}</label>
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
               onClick={handleOptimizePrompt}
               disabled={optimizing || !prompt.trim()}
-              className="inline-flex h-9 w-32 items-center justify-center gap-1.5 rounded-lg border border-[#6366F1]/40 bg-[#6366F1]/10 px-3 text-body-xs text-[#C4B5FD] transition-colors hover:bg-[#6366F1]/20 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-9 w-32 items-center justify-center gap-1.5 rounded-lg border border-[#6366F1]/40 bg-[#6366F1]/10 px-3 text-body-xs text-accent-ink transition-colors hover:bg-[#6366F1]/20 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {optimizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Lightbulb className="h-3.5 w-3.5" />}
               <span>{optimizing ? t("优化中") : t("优化提示")}</span>
@@ -1708,7 +1708,7 @@ function VideoGeneration() {
               type="button"
               onClick={handleCreateStoryboard}
               disabled={storyboarding || !prompt.trim()}
-              className="inline-flex h-9 w-28 items-center justify-center gap-1.5 rounded-lg border border-[#6366F1]/40 bg-[#6366F1]/10 px-3 text-body-xs text-[#C4B5FD] transition-colors hover:bg-[#6366F1]/20 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-9 w-28 items-center justify-center gap-1.5 rounded-lg border border-[#6366F1]/40 bg-[#6366F1]/10 px-3 text-body-xs text-accent-ink transition-colors hover:bg-[#6366F1]/20 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {storyboarding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
 
@@ -1729,11 +1729,11 @@ function VideoGeneration() {
 
         <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-5">
           <label>
-            <span className="text-body-xs text-[#64748B] mb-1 block">{t("生成模式")}</span>
+            <span className="text-body-xs text-muted-foreground mb-1 block">{t("生成模式")}</span>
             <select
               value={videoModel}
               onChange={(event) => setVideoModel(event.target.value as VideoModel)}
-              className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+              className="h-10 w-full rounded-lg border border-border bg-background px-3 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
             >
               {(videoModels.length ? videoModels : Object.values(FALLBACK_VIDEO_MODEL_PROFILES)).map((model) => (
                 <option key={model.id} value={model.id} disabled={model.available === false}>
@@ -1744,7 +1744,7 @@ function VideoGeneration() {
           </label>
 
           <label>
-            <span className="text-body-xs text-[#64748B] mb-1 block">{t("分辨率")}</span>
+            <span className="text-body-xs text-muted-foreground mb-1 block">{t("分辨率")}</span>
             <select
               value={videoSize}
               onChange={(event) => {
@@ -1752,7 +1752,7 @@ function VideoGeneration() {
                 setVideoSize(nextSize)
                 if (nextSize === '4K' && professionalAvailable) setVideoModel('doubao-seedance-2.5')
               }}
-              className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+              className="h-10 w-full rounded-lg border border-border bg-background px-3 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
             >
               <option value="720p">720p</option>
               <option value="1080p">1080p</option>
@@ -1761,12 +1761,12 @@ function VideoGeneration() {
           </label>
 
           <label>
-            <span className="text-body-xs text-[#64748B] mb-1 block">{t("原生声音")}</span>
+            <span className="text-body-xs text-muted-foreground mb-1 block">{t("原生声音")}</span>
             <select
               value={nativeAudio ? 'on' : 'off'}
               onChange={(event) => setNativeAudio(event.target.value === 'on')}
               disabled={!currentVideoProfile.native_audio}
-              className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 text-body-sm text-[#F1F5F9] outline-none transition-colors focus:border-[#6366F1] disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-10 w-full rounded-lg border border-border bg-background px-3 text-body-sm text-foreground outline-none transition-colors focus:border-[#6366F1] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <option value="on">{t("开启")}</option>
               <option value="off">{t("关闭")}</option>
@@ -1774,11 +1774,11 @@ function VideoGeneration() {
           </label>
 
           <label>
-            <span className="text-body-xs text-[#64748B] mb-1 block">{t("视频比例")}</span>
+            <span className="text-body-xs text-muted-foreground mb-1 block">{t("视频比例")}</span>
             <select
               value={ratio}
               onChange={(event) => setRatio(event.target.value as VideoRatio)}
-              className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+              className="h-10 w-full rounded-lg border border-border bg-background px-3 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
             >
               <option value="9:16">{t("9:16 竖屏")}</option>
               <option value="16:9">{t("16:9 横屏")}</option>
@@ -1787,11 +1787,11 @@ function VideoGeneration() {
           </label>
 
           <label>
-            <span className="text-body-xs text-[#64748B] mb-1 block">{t("生成数量")}</span>
+            <span className="text-body-xs text-muted-foreground mb-1 block">{t("生成数量")}</span>
             <select
               value={count}
               onChange={(event) => setCount(Number(event.target.value))}
-              className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+              className="h-10 w-full rounded-lg border border-border bg-background px-3 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
             >
               {[1, 2, 3, 4].map((value) => (
                 <option key={value} value={value}>{value}  {t("个")}</option>
@@ -1800,10 +1800,10 @@ function VideoGeneration() {
           </label>
         </div>
 
-        <div className="mt-4 rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-4 py-3">
+        <div className="mt-4 rounded-lg border border-border bg-background px-4 py-3">
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-body-xs text-[#64748B]">{t("视频时长")}</span>
-            <span className="text-body-xs text-[#F1F5F9]">{duration}  {t("秒")}</span>
+            <span className="text-body-xs text-muted-foreground">{t("视频时长")}</span>
+            <span className="text-body-xs text-foreground">{duration}  {t("秒")}</span>
           </div>
           <input
             type="range"
@@ -1814,38 +1814,38 @@ function VideoGeneration() {
             onChange={(event) => setDuration(Number(event.target.value))}
             className="w-full accent-[#6366F1]"
           />
-          <div className="mt-1 flex justify-between text-[11px] text-[#64748B]">
+          <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
             <span>{minDuration}{t("秒")}</span>
             <span>{maxDuration}{t("秒")}</span>
           </div>
         </div>
 
         {(showFinalPrompt || finalPrompt) && (
-          <div className="mt-4 rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
+          <div className="mt-4 rounded-lg border border-border bg-background p-4">
             <div className="mb-2 flex items-center justify-between gap-3">
               <div>
-                <p className="text-body-xs text-[#94A3B8]">{t("最终提示词")}</p>
-                {promptSummary && <p className="mt-1 text-[11px] text-[#64748B]">{promptSummary}</p>}
+                <p className="text-body-xs text-muted-foreground">{t("最终提示词")}</p>
+                {promptSummary && <p className="mt-1 text-[11px] text-muted-foreground">{promptSummary}</p>}
               </div>
-              <button onClick={() => navigator.clipboard.writeText(finalPrompt)} className="text-body-xs text-[#818CF8] hover:text-white">{t("复制")}</button>
+              <button onClick={() => navigator.clipboard.writeText(finalPrompt)} className="text-body-xs text-accent-ink hover:text-foreground">{t("复制")}</button>
             </div>
             <textarea
               ref={finalPromptTextareaRef}
               value={finalPrompt}
               onChange={(event) => setFinalPrompt(event.target.value)}
-              className="w-full min-h-32 max-h-[420px] resize-none rounded-lg border border-[#1E293B] bg-[#111827] px-4 py-3 text-[15px] leading-8 tracking-[0.01em] text-[#F1F5F9] outline-none transition-colors focus:border-[#6366F1]"
+              className="w-full min-h-32 max-h-[420px] resize-none rounded-lg border border-border bg-card px-4 py-3 text-[15px] leading-8 tracking-[0.01em] text-foreground outline-none transition-colors focus:border-[#6366F1]"
             />
             {(negativePrompt || audioPrompt) && (
               <div className="mt-3 grid gap-3 text-body-xs md:grid-cols-2">
-                {negativePrompt && <div className="text-[#64748B]">{t("负向约束：")}{negativePrompt}</div>}
-                {audioPrompt && <div className="text-[#64748B]">{t("声音提示：")}{audioPrompt}</div>}
+                {negativePrompt && <div className="text-muted-foreground">{t("负向约束：")}{negativePrompt}</div>}
+                {audioPrompt && <div className="text-muted-foreground">{t("声音提示：")}{audioPrompt}</div>}
               </div>
             )}
           </div>
         )}
 
         {videoSize === '4K' && (
-          <div className="mt-4 rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/10 p-3 text-body-xs text-[#FCD34D]">
+          <div className="mt-4 rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/10 p-3 text-body-xs text-warning-ink">
 
             {t("4K 画质需要专业生成能力；服务暂未开放时将无法提交。")}
           </div>
@@ -1854,7 +1854,7 @@ function VideoGeneration() {
         <button
           onClick={handleGenerate}
           disabled={loading || !prompt.trim() || currentVideoProfile.available === false}
-          className="mt-4 flex items-center gap-2 px-6 py-2.5 bg-[#6366F1] hover:bg-[#5558E6] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-body-sm text-white transition-colors"
+          className="mt-4 flex items-center gap-2 px-6 py-2.5 bg-primary hover:brightness-90 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-body-sm text-primary-foreground transition-colors"
         >
           {loading || optimizing ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -1866,19 +1866,19 @@ function VideoGeneration() {
       </div>
 
       {loading && (
-        <div className="glass-card rounded-card-lg border border-[#1E293B] p-6">
+        <div className="glass-card rounded-card-lg border border-border p-6">
           <div className="flex items-center gap-3 mb-3">
-            <Loader2 className="w-5 h-5 text-[#6366F1] animate-spin" />
-            <span className="text-body-sm text-[#F1F5F9]">{t("正在生成")} {tasks.length || count}  {t("个视频...")}</span>
+            <Loader2 className="w-5 h-5 text-accent-ink animate-spin" />
+            <span className="text-body-sm text-foreground">{t("正在生成")} {tasks.length || count}  {t("个视频...")}</span>
           </div>
           <div className="space-y-2">
             {(tasks.length ? tasks : Array.from({ length: count }, (_, index) => ({ taskId: `pending-${index}`, progress: 0, status: 'queued' }))).map((task, index) => (
               <div key={task.taskId}>
-                <div className="mb-1 flex justify-between text-[11px] text-[#64748B]">
+                <div className="mb-1 flex justify-between text-[11px] text-muted-foreground">
                   <span>{t("视频")} {index + 1}</span>
                   <span>{task.progress || 0}%</span>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-[#1E293B]">
+                <div className="h-2 overflow-hidden rounded-full bg-muted">
                   <motion.div className="h-full bg-gradient-to-r from-[#6366F1] to-[#8B5CF6]" animate={{ width: `${task.progress || 0}%` }} />
                 </div>
               </div>
@@ -1888,7 +1888,7 @@ function VideoGeneration() {
       )}
 
       {error && (
-        <div className="glass-card rounded-card-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-4 text-[#EF4444] text-body-sm">
+        <div className="glass-card rounded-card-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-4 text-danger-ink text-body-sm">
           {error}
         </div>
       )}
@@ -1900,10 +1900,10 @@ function VideoGeneration() {
             const ready = status === 'succeeded' && task.videoUrl
             return (
               <div key={task.taskId} className={`glass-card relative overflow-hidden rounded-card-lg border ${adoptionCardClass(task.adopted)}`}>
-                <div className="flex items-center justify-between border-b border-[#1E293B] px-4 py-3">
-                  <span className="text-body-sm text-[#F1F5F9]">{t("视频")} {index + 1}</span>
+                <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                  <span className="text-body-sm text-foreground">{t("视频")} {index + 1}</span>
                   {status !== 'succeeded' && (
-                    <span className={`text-body-xs ${status === 'failed' ? 'text-[#EF4444]' : 'text-[#94A3B8]'}`}>
+                    <span className={`text-body-xs ${status === 'failed' ? 'text-danger-ink' : 'text-muted-foreground'}`}>
                       {status === 'failed' ? t("失败") : t("生成中")}
                     </span>
                   )}
@@ -1911,7 +1911,7 @@ function VideoGeneration() {
                 {ready ? (
                   <video src={task.videoUrl} controls className="w-full max-h-[360px] bg-black" />
                 ) : (
-                  <div className="flex h-48 items-center justify-center bg-[#0B0F1A] text-body-sm text-[#64748B]">
+                  <div className="flex h-48 items-center justify-center bg-background text-body-sm text-muted-foreground">
                     {status === 'failed' ? (task.error || t("视频生成失败")) : t("等待生成结果...")}
                   </div>
                 )}
@@ -1921,7 +1921,7 @@ function VideoGeneration() {
                     disabled={!ready}
                     onClick={() => (task.adopted ? handleUnadoptVideo(task) : handleAdoptVideo(task))}
                   />
-                  <button disabled={!ready} onClick={() => handleOpenVideo(task)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1E293B] hover:bg-[#334155] disabled:opacity-40 text-[#94A3B8] hover:text-[#F1F5F9] text-body-xs transition-colors">
+                  <button disabled={!ready} onClick={() => handleOpenVideo(task)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted hover:bg-muted disabled:opacity-40 text-muted-foreground hover:text-foreground text-body-xs transition-colors">
                     <ExternalLink className="w-3.5 h-3.5" />
 
                     {t("打开")}
@@ -1931,12 +1931,12 @@ function VideoGeneration() {
                     path: task.localPath,
                     url: task.videoUrl,
                     title: t("视频 {v0}", { v0: index + 1 }),
-                  })} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1E293B] hover:bg-[#334155] disabled:opacity-40 text-[#94A3B8] hover:text-[#F1F5F9] text-body-xs transition-colors">
+                  })} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted hover:bg-muted disabled:opacity-40 text-muted-foreground hover:text-foreground text-body-xs transition-colors">
                     <Copy className="w-3.5 h-3.5" />
 
                     {t("引用")}
                   </button>
-                  <button onClick={() => handleDeleteVideo(task)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1E293B] hover:bg-[#7F1D1D] text-[#94A3B8] hover:text-white text-body-xs transition-colors">
+                  <button onClick={() => handleDeleteVideo(task)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted hover:bg-danger-soft text-muted-foreground hover:text-foreground text-body-xs transition-colors">
                     <Trash2 className="w-3.5 h-3.5" />
 
                     {t("删除")}
@@ -2125,8 +2125,8 @@ function CopyGeneration() {
   return (
     <div className="space-y-6">
       {/* Input */}
-      <div className="glass-card rounded-card-lg border border-[#1E293B] p-6">
-        <label className="text-body-sm text-[#94A3B8] mb-2 block">{t("输入文案需求")}</label>
+      <div className="glass-card rounded-card-lg border border-border p-6">
+        <label className="text-body-sm text-muted-foreground mb-2 block">{t("输入文案需求")}</label>
         <ReferenceTextarea
           value={prompt}
           onChange={setPrompt}
@@ -2138,7 +2138,7 @@ function CopyGeneration() {
         />
         <div className="mt-4 grid gap-4 md:grid-cols-4">
           <label>
-            <span className="text-body-xs text-[#64748B] mb-1 block">{t("文案类型")}</span>
+            <span className="text-body-xs text-muted-foreground mb-1 block">{t("文案类型")}</span>
             <select
               value={copyType}
               onChange={(event) => {
@@ -2146,7 +2146,7 @@ function CopyGeneration() {
                 setCopyType(nextType)
                 setLengthKey(defaultCopyLengthForType(nextType))
               }}
-              className="w-full rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 py-2 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
             >
               {['未定义类型', '小红书文案', '抖音标题', '朋友圈文案', '企业宣传', '评论区回复', '私信话术'].map((option) => (
                 <option key={option} value={option}>{t(option)}</option>
@@ -2154,11 +2154,11 @@ function CopyGeneration() {
             </select>
           </label>
           <label>
-            <span className="text-body-xs text-[#64748B] mb-1 block">{t("生成数量")}</span>
+            <span className="text-body-xs text-muted-foreground mb-1 block">{t("生成数量")}</span>
             <select
               value={copyCount}
               onChange={(event) => setCopyCount(Number(event.target.value))}
-              className="w-full rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 py-2 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
             >
               {[1, 2, 3, 4, 5].map((value) => (
                 <option key={value} value={value}>{value}  {t("条")}</option>
@@ -2167,8 +2167,8 @@ function CopyGeneration() {
           </label>
           <div className="md:col-span-2">
             <div className="mb-2 flex items-center justify-between gap-3">
-              <span className="text-body-xs text-[#64748B]">{t("篇幅：")}{selectedLength.label}</span>
-              <span className="text-[11px] text-[#94A3B8]">{t("约")} {selectedLength.min}-{selectedLength.max}  {t("字")}</span>
+              <span className="text-body-xs text-muted-foreground">{t("篇幅：")}{selectedLength.label}</span>
+              <span className="text-[11px] text-muted-foreground">{t("约")} {selectedLength.min}-{selectedLength.max}  {t("字")}</span>
             </div>
             <input
               type="range"
@@ -2182,27 +2182,27 @@ function CopyGeneration() {
               }}
               className="w-full accent-[#6366F1]"
             />
-            <div className="mt-2 grid grid-cols-5 gap-1 text-center text-[11px] text-[#64748B]">
+            <div className="mt-2 grid grid-cols-5 gap-1 text-center text-[11px] text-muted-foreground">
               {COPY_LENGTH_OPTIONS.map((item) => (
                 <button
                   key={item.key}
                   type="button"
                   onClick={() => setLengthKey(item.key)}
                   className={`rounded-md px-1 py-1 transition-colors ${
-                    item.key === lengthKey ? 'bg-[#6366F1]/15 text-[#C4B5FD]' : 'hover:bg-[#1E293B] hover:text-[#CBD5E1]'
+                    item.key === lengthKey ? 'bg-[#6366F1]/15 text-accent-ink' : 'hover:bg-muted hover:text-foreground'
                   }`}
                 >
                   {item.shortLabel}
                 </button>
               ))}
             </div>
-            <div className="mt-2 text-[11px] text-[#64748B]">{selectedLength.description}</div>
+            <div className="mt-2 text-[11px] text-muted-foreground">{selectedLength.description}</div>
           </div>
         </div>
         <button
           onClick={handleGenerate}
           disabled={loading || !prompt.trim()}
-          className="mt-4 flex items-center gap-2 px-6 py-2.5 bg-[#6366F1] hover:bg-[#5558E6] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-body-sm text-white transition-colors"
+          className="mt-4 flex items-center gap-2 px-6 py-2.5 bg-primary hover:brightness-90 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-body-sm text-primary-foreground transition-colors"
         >
           {loading ? (
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -2216,7 +2216,7 @@ function CopyGeneration() {
 
       {/* Error */}
       {error && (
-        <div className="glass-card rounded-card-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-4 text-[#EF4444] text-body-sm">
+        <div className="glass-card rounded-card-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-4 text-danger-ink text-body-sm">
           {error}
         </div>
       )}
@@ -2225,8 +2225,8 @@ function CopyGeneration() {
       {copyItems.length > 0 && (
         <div className="space-y-3">
           <div className="glass-card rounded-card-lg border border-[#10B981]/30 bg-[#10B981]/10 p-4">
-            <div className="text-body-sm font-medium text-[#D1FAE5]">{t("文案已自动保存")}</div>
-            <div className="mt-1 text-body-xs text-[#94A3B8]">
+            <div className="text-body-sm font-medium text-success-ink">{t("文案已自动保存")}</div>
+            <div className="mt-1 text-body-xs text-muted-foreground">
 
               {t("已生成")} {copyItems.length}  {t("条独立文案。按需采纳后，它们会分别进入素材管理。")}
             </div>
@@ -2236,19 +2236,19 @@ function CopyGeneration() {
               <div className="mb-3 flex items-start justify-between gap-4">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="text-body-xs text-[#94A3B8]">{item.title}</div>
-                    <span className="rounded-md bg-[#1E293B] px-2 py-0.5 text-[11px] text-[#94A3B8]">
+                    <div className="text-body-xs text-muted-foreground">{item.title}</div>
+                    <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
 
                       {t("约")} {item.charCount}  {t("字 ·")} {selectedLength.label}
                     </span>
                   </div>
-                  <div className="mt-1 max-w-3xl truncate text-[11px] text-[#64748B]">{item.path}</div>
+                  <div className="mt-1 max-w-3xl truncate text-[11px] text-muted-foreground">{item.path}</div>
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
                   {item.text.trim() !== item.savedText.trim() && (
                     <button
                       onClick={() => handleSaveCopyEdit(item)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#6366F1] hover:bg-[#5558E6] text-white text-body-xs transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary hover:brightness-90 text-primary-foreground text-body-xs transition-colors"
                     >
                       <Check className="w-3.5 h-3.5" />
 
@@ -2273,16 +2273,16 @@ function CopyGeneration() {
                           handleSaveCopyEdit(item)
                         }
                       }}
-                      className="min-h-32 w-full resize-y rounded-lg border border-[#6366F1]/40 bg-[#0B0F1A] px-3 py-2 text-body-md leading-7 text-[#F1F5F9] outline-none focus:border-[#818CF8]"
+                      className="min-h-32 w-full resize-y rounded-lg border border-[#6366F1]/40 bg-background px-3 py-2 text-body-md leading-7 text-foreground outline-none focus:border-[#818CF8]"
                     />
                   ) : (
                     <button
                       type="button"
                       onClick={() => setEditingCopyId(item.id)}
-                      className="group w-full rounded-lg border border-transparent p-2 text-left transition-colors hover:border-[#334155] hover:bg-[#0B0F1A]"
+                      className="group w-full rounded-lg border border-transparent p-2 text-left transition-colors hover:border-border hover:bg-background"
                     >
-                      <p className="whitespace-pre-wrap text-body-md leading-7 text-[#F1F5F9]">{item.text}</p>
-                      <div className="mt-2 text-[11px] text-[#475569] opacity-0 transition-opacity group-hover:opacity-100">
+                      <p className="whitespace-pre-wrap text-body-md leading-7 text-foreground">{item.text}</p>
+                      <div className="mt-2 text-[11px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
 
                         {t("点击编辑")}
                       </div>
@@ -2298,7 +2298,7 @@ function CopyGeneration() {
                       title: item.title,
                       text: item.text,
                     })}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1E293B] hover:bg-[#334155] text-[#94A3B8] hover:text-[#F1F5F9] text-body-xs transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted hover:bg-muted text-muted-foreground hover:text-foreground text-body-xs transition-colors"
                   >
                     <Copy className="w-3.5 h-3.5" />
 
@@ -2306,10 +2306,10 @@ function CopyGeneration() {
                   </button>
                   <button
                     onClick={() => handleCopy(item.text, i)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#1E293B] hover:bg-[#334155] text-[#94A3B8] hover:text-[#F1F5F9] text-body-xs transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted hover:bg-muted text-muted-foreground hover:text-foreground text-body-xs transition-colors"
                   >
                     {copiedIdx === i ? (
-                      <><Check className="w-3.5 h-3.5 text-[#10B981]" />  {t("已复制")}</>
+                      <><Check className="w-3.5 h-3.5 text-success-ink" />  {t("已复制")}</>
                     ) : (
                       <><Copy className="w-3.5 h-3.5" />  {t("复制")}</>
                     )}
@@ -2589,10 +2589,10 @@ function VoiceSynthesis() {
 
   return (
     <div className="space-y-6">
-      <div className="glass-card rounded-card-lg border border-[#1E293B] p-6">
+      <div className="glass-card rounded-card-lg border border-border p-6">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <label className="text-body-sm text-[#94A3B8]">{t("配音文案")}</label>
-          <span className="text-body-xs text-[#64748B]">{text.trim().length}  {t("字 · 预计")} {estimatedDuration}  {t("秒")}</span>
+          <label className="text-body-sm text-muted-foreground">{t("配音文案")}</label>
+          <span className="text-body-xs text-muted-foreground">{text.trim().length}  {t("字 · 预计")} {estimatedDuration}  {t("秒")}</span>
         </div>
         <ReferenceTextarea
           value={text}
@@ -2606,45 +2606,45 @@ function VoiceSynthesis() {
 
         <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
           <div>
-            <label className="mb-2 block text-body-sm text-[#94A3B8]">{t("声音描述")}</label>
+            <label className="mb-2 block text-body-sm text-muted-foreground">{t("声音描述")}</label>
             <div className="flex gap-2">
               <input
                 value={voicePrompt}
                 onChange={(event) => setVoicePrompt(event.target.value)}
                 placeholder={t("例如：年轻女性，温柔自然，适合小红书种草，语速稍慢")}
-                className="h-10 min-w-0 flex-1 rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+                className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
               />
               <button
                 type="button"
                 onClick={handleInterpret}
                 disabled={interpreting || !voicePrompt.trim()}
-                className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-[#6366F1]/40 bg-[#6366F1]/10 px-3 text-body-sm text-[#C4B5FD] transition-colors hover:bg-[#6366F1]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-[#6366F1]/40 bg-[#6366F1]/10 px-3 text-body-sm text-accent-ink transition-colors hover:bg-[#6366F1]/20 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {interpreting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
 
                 {t("解析声音")}
               </button>
             </div>
-            {summary && <div className="mt-2 text-body-xs text-[#64748B]">{summary}</div>}
+            {summary && <div className="mt-2 text-body-xs text-muted-foreground">{summary}</div>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <label>
-              <span className="mb-1 block text-body-xs text-[#64748B]">{t("用途")}</span>
+              <span className="mb-1 block text-body-xs text-muted-foreground">{t("用途")}</span>
               <select
                 value={scene}
                 onChange={(event) => setScene(event.target.value)}
-                className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+                className="h-10 w-full rounded-lg border border-border bg-background px-3 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
               >
                 {VOICE_SCENES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
               </select>
             </label>
             <label>
-              <span className="mb-1 block text-body-xs text-[#64748B]">{t("情绪")}</span>
+              <span className="mb-1 block text-body-xs text-muted-foreground">{t("情绪")}</span>
               <select
                 value={emotion}
                 onChange={(event) => setEmotion(event.target.value)}
-                className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+                className="h-10 w-full rounded-lg border border-border bg-background px-3 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
               >
                 {VOICE_EMOTIONS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
               </select>
@@ -2653,7 +2653,7 @@ function VoiceSynthesis() {
         </div>
 
         <div className="mt-5">
-          <div className="mb-3 text-body-sm text-[#94A3B8]">{t("选择声音风格")}</div>
+          <div className="mb-3 text-body-sm text-muted-foreground">{t("选择声音风格")}</div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {voices.map((item) => {
               const selected = voice === item.id
@@ -2665,20 +2665,20 @@ function VoiceSynthesis() {
                   className={`rounded-lg border p-4 text-left transition-all ${
                     selected
                       ? 'border-[#6366F1]/70 bg-[#6366F1]/15 shadow-[0_0_0_1px_rgba(99,102,241,0.2)]'
-                      : 'border-[#1E293B] bg-[#0B0F1A] hover:border-[#475569] hover:bg-[#111827]'
+                      : 'border-border bg-background hover:border-border hover:bg-card'
                   }`}
                 >
                   <div className="mb-2 flex items-start justify-between gap-3">
                     <div>
-                      <div className="text-body-sm font-medium text-[#F1F5F9]">{item.name}</div>
-                      <div className="mt-1 text-[11px] text-[#64748B]">{item.scene}</div>
+                      <div className="text-body-sm font-medium text-foreground">{item.name}</div>
+                      <div className="mt-1 text-[11px] text-muted-foreground">{item.scene}</div>
                     </div>
-                    {selected && <Check className="h-4 w-4 text-[#A5B4FC]" />}
+                    {selected && <Check className="h-4 w-4 text-accent-ink" />}
                   </div>
-                  <div className="mb-3 line-clamp-2 text-body-xs text-[#94A3B8]">{item.description}</div>
+                  <div className="mb-3 line-clamp-2 text-body-xs text-muted-foreground">{item.description}</div>
                   <div className="flex flex-wrap gap-1.5">
                     {item.tags.map((tag) => (
-                      <span key={tag} className="rounded-md bg-[#1E293B] px-2 py-0.5 text-[11px] text-[#94A3B8]">{t(tag)}</span>
+                      <span key={tag} className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{t(tag)}</span>
                     ))}
                   </div>
                 </button>
@@ -2690,8 +2690,8 @@ function VoiceSynthesis() {
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-body-xs text-[#64748B]">{t("语速")}</span>
-              <span className="text-body-xs text-[#F1F5F9]">{speed.toFixed(1)}x</span>
+              <span className="text-body-xs text-muted-foreground">{t("语速")}</span>
+              <span className="text-body-xs text-foreground">{speed.toFixed(1)}x</span>
             </div>
             <input
               type="range"
@@ -2705,8 +2705,8 @@ function VoiceSynthesis() {
           </div>
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-body-xs text-[#64748B]">{t("音调")}</span>
-              <span className="text-body-xs text-[#F1F5F9]">{pitch > 0 ? `+${pitch}` : pitch}</span>
+              <span className="text-body-xs text-muted-foreground">{t("音调")}</span>
+              <span className="text-body-xs text-foreground">{pitch > 0 ? `+${pitch}` : pitch}</span>
             </div>
             <input
               type="range"
@@ -2725,7 +2725,7 @@ function VoiceSynthesis() {
             type="button"
             onClick={handlePreviewVoice}
             disabled={previewLoading !== null || generating || !selectedVoice}
-            className="inline-flex items-center gap-2 rounded-lg border border-[#334155] bg-[#1E293B] px-4 py-2.5 text-body-sm text-[#CBD5E1] transition-colors hover:border-[#6366F1] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted px-4 py-2.5 text-body-sm text-foreground transition-colors hover:border-[#6366F1] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
             {previewLoading === 'voice' ? <Loader2 className="h-4 w-4 animate-spin" /> : <MicIcon className="h-4 w-4" />}
 
@@ -2735,7 +2735,7 @@ function VoiceSynthesis() {
             type="button"
             onClick={handlePreviewText}
             disabled={previewLoading !== null || generating || !text.trim()}
-            className="inline-flex items-center gap-2 rounded-lg border border-[#334155] bg-[#1E293B] px-4 py-2.5 text-body-sm text-[#CBD5E1] transition-colors hover:border-[#6366F1] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted px-4 py-2.5 text-body-sm text-foreground transition-colors hover:border-[#6366F1] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
             {previewLoading === 'text' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
 
@@ -2745,7 +2745,7 @@ function VoiceSynthesis() {
             type="button"
             onClick={handleGenerate}
             disabled={generating || previewLoading !== null || !text.trim()}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#6366F1] px-5 py-2.5 text-body-sm text-white transition-colors hover:bg-[#5558E6] disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-body-sm text-primary-foreground transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
 
@@ -2755,7 +2755,7 @@ function VoiceSynthesis() {
       </div>
 
       {error && (
-        <div className="glass-card rounded-card-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-4 text-[#EF4444] text-body-sm">
+        <div className="glass-card rounded-card-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-4 text-danger-ink text-body-sm">
           {error}
         </div>
       )}
@@ -2767,12 +2767,12 @@ function VoiceSynthesis() {
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className={`rounded-md px-2 py-0.5 text-[11px] ${item.kind === 'preview' ? 'bg-[#334155] text-[#CBD5E1]' : 'bg-[#6366F1]/20 text-[#C4B5FD]'}`}>
+                    <span className={`rounded-md px-2 py-0.5 text-[11px] ${item.kind === 'preview' ? 'bg-muted text-foreground' : 'bg-[#6366F1]/20 text-accent-ink'}`}>
                       {item.kind === 'preview' ? t("试听") : t("完整生成")}
                     </span>
-                    <span className="text-body-sm font-medium text-[#F1F5F9]">{item.title}</span>
+                    <span className="text-body-sm font-medium text-foreground">{item.title}</span>
                   </div>
-                  <div className="mt-1 text-body-xs text-[#64748B]">
+                  <div className="mt-1 text-body-xs text-muted-foreground">
                     {item.createdAt} · {item.filename}  {t("· 约")} {item.estimated_duration}  {t("秒")}
                   </div>
                 </div>
@@ -2781,7 +2781,7 @@ function VoiceSynthesis() {
                     adopted={item.adopted}
                     onClick={() => (item.adopted ? handleUnadoptVoice(item) : handleAdoptVoice(item))}
                   />
-                  <button onClick={() => handleOpen(item)} className="inline-flex items-center gap-1.5 rounded-md bg-[#1E293B] px-3 py-1.5 text-body-xs text-[#94A3B8] transition-colors hover:bg-[#334155] hover:text-[#F1F5F9]">
+                  <button onClick={() => handleOpen(item)} className="inline-flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-body-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
                     <ExternalLink className="h-3.5 w-3.5" />
 
                     {t("打开")}
@@ -2791,12 +2791,12 @@ function VoiceSynthesis() {
                     path: item.path,
                     url: item.url,
                     title: item.title,
-                  })} className="inline-flex items-center gap-1.5 rounded-md bg-[#1E293B] px-3 py-1.5 text-body-xs text-[#94A3B8] transition-colors hover:bg-[#334155] hover:text-[#F1F5F9]">
+                  })} className="inline-flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-body-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
                     <Copy className="h-3.5 w-3.5" />
 
                     {t("引用")}
                   </button>
-                  <button onClick={() => handleDelete(item)} className="inline-flex items-center gap-1.5 rounded-md bg-[#1E293B] px-3 py-1.5 text-body-xs text-[#94A3B8] transition-colors hover:bg-[#7F1D1D] hover:text-white">
+                  <button onClick={() => handleDelete(item)} className="inline-flex items-center gap-1.5 rounded-md bg-muted px-3 py-1.5 text-body-xs text-muted-foreground transition-colors hover:bg-danger-soft hover:text-foreground">
                     <Trash2 className="h-3.5 w-3.5" />
 
                     {t("删除")}
@@ -2804,7 +2804,7 @@ function VoiceSynthesis() {
                 </div>
               </div>
               <audio src={resolveGeneratedAssetUrl(item.url, item.path)} controls className="w-full" />
-              <div className="mt-2 truncate text-body-xs text-[#64748B]">{t("保存到：")}{item.path}</div>
+              <div className="mt-2 truncate text-body-xs text-muted-foreground">{t("保存到：")}{item.path}</div>
             </div>
           ))}
         </div>

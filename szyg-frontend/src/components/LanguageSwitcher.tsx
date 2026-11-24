@@ -10,7 +10,7 @@ export default function LanguageSwitcher({ className }: { className?: string }) 
     <button
       type="button"
       onClick={() => setLocale(nextLocale)}
-      className={cn('inline-flex h-9 items-center gap-1.5 rounded-lg border border-[#334155] bg-[#0B0F1A]/80 px-2.5 text-xs font-semibold text-[#CBD5E1] transition-colors hover:border-[#6366F1]/70 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366F1]', className)}
+      className={cn('inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-background/80 px-2.5 text-xs font-semibold text-foreground transition-colors hover:border-[#6366F1]/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366F1]', className)}
       aria-label={t(locale === 'zh-CN' ? 'common.switchToEnglish' : 'common.switchToChinese')}
       title={t('common.switchLanguage')}
     >

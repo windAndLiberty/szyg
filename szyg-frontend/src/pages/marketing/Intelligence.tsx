@@ -114,11 +114,11 @@ function Metric({
     <div className="group relative min-w-0 px-5 py-4">
       <span className="absolute inset-x-5 top-0 h-px opacity-70" style={{ backgroundColor: accent }} />
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-medium text-[#94A3B8]">{label}</p>
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
         <Icon className="h-4 w-4" style={{ color: accent }} />
       </div>
-      <p className="mt-3 text-2xl font-semibold text-[#F8FAFC]">{value}</p>
-      <p className="mt-1 truncate text-xs text-[#64748B]">{hint}</p>
+      <p className="mt-3 text-2xl font-semibold text-foreground">{value}</p>
+      <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p>
     </div>
   )
 }
@@ -137,14 +137,14 @@ function IntelligenceCard({
   className?: string
 }) {
   return (
-    <section className={`overflow-hidden rounded-lg border border-[#1E293B] bg-[#0F1625] ${className}`}>
-      <div className="flex items-start gap-3 border-b border-[#1E293B] px-5 py-4">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#182238] text-[#A5B4FC]">
+    <section className={`overflow-hidden rounded-lg border border-border bg-card ${className}`}>
+      <div className="flex items-start gap-3 border-b border-border px-5 py-4">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-accent-ink">
           <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-[#F1F5F9]">{title}</h3>
-          {description && <p className="mt-1 text-xs leading-5 text-[#64748B]">{description}</p>}
+          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+          {description && <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>}
         </div>
       </div>
       <div className="p-5">{children}</div>
@@ -319,12 +319,12 @@ export default function Intelligence() {
     >
       <section className="pb-2">
         <div className="mx-auto max-w-6xl">
-          <div className="mb-3 flex items-center gap-2 text-xs font-medium text-[#64748B]">
-            <Radar className="h-3.5 w-3.5 text-[#818CF8]" />
+          <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <Radar className="h-3.5 w-3.5 text-accent-ink" />
 
             {t("从一个具体问题开始")}
           </div>
-          <div className="overflow-hidden rounded-lg border border-[#334155] bg-[#101827] transition-colors focus-within:border-[#6366F1] focus-within:shadow-[0_0_0_3px_rgba(99,102,241,0.08)]">
+          <div className="overflow-hidden rounded-lg border border-border bg-card transition-colors focus-within:border-[#6366F1] focus-within:shadow-[0_0_0_3px_rgba(99,102,241,0.08)]">
             <textarea
               value={query}
               onChange={(event) => setQuery(event.target.value.slice(0, 500))}
@@ -332,18 +332,18 @@ export default function Intelligence() {
                 if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') void discover()
               }}
               rows={3}
-              className="w-full resize-none bg-transparent px-5 py-4 text-base leading-7 text-[#F8FAFC] outline-none placeholder:text-[#475569]"
+              className="w-full resize-none bg-transparent px-5 py-4 text-base leading-7 text-foreground outline-none placeholder:text-muted-foreground"
               placeholder={t("例如：最近家长选择 AI 英语陪练时最关心什么？哪些内容方向值得我们下周重点测试？")}
             />
-            <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-t border-[#1E293B] bg-[#0D1422] px-4 py-2.5">
+            <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 border-t border-border bg-background px-4 py-2.5">
               <button
                 type="button"
                 role="switch"
                 aria-checked={useEnterprise}
                 onClick={() => setUseEnterprise((current) => !current)}
-                className="inline-flex items-center gap-2.5 text-sm text-[#CBD5E1]"
+                className="inline-flex items-center gap-2.5 text-sm text-foreground"
               >
-                <span className={`relative h-5 w-9 rounded-full transition-colors ${useEnterprise ? 'bg-[#6366F1]' : 'bg-[#334155]'}`}>
+                <span className={`relative h-5 w-9 rounded-full transition-colors ${useEnterprise ? 'bg-[#6366F1]' : 'bg-muted'}`}>
                   <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${useEnterprise ? 'translate-x-4' : 'translate-x-0'}`} />
                 </span>
 
@@ -363,22 +363,22 @@ export default function Intelligence() {
               </div>
             </div>
           </div>
-          {error && <p className="mt-3 text-sm text-[#FCA5A5]">{error}</p>}
+          {error && <p className="mt-3 text-sm text-danger-ink">{error}</p>}
         </div>
       </section>
 
       {loading && (
         <div className="mx-auto flex min-h-80 max-w-3xl flex-col items-center justify-center py-12 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#6366F1]/15 text-[#A5B4FC]">
+          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#6366F1]/15 text-accent-ink">
             <Search className="h-5 w-5 animate-pulse" />
           </div>
-          <p className="mt-5 text-base font-medium text-[#F1F5F9]">{t(loadingStages[loadingStage])}</p>
-          <p className="mt-2 text-sm text-[#64748B]">{t("正在把纷杂信息整理成与你的产品有关的判断")}</p>
+          <p className="mt-5 text-base font-medium text-foreground">{t(loadingStages[loadingStage])}</p>
+          <p className="mt-2 text-sm text-muted-foreground">{t("正在把纷杂信息整理成与你的产品有关的判断")}</p>
           <div className="mt-6 flex items-center gap-2">
             {loadingStages.map((stage, index) => (
               <span
                 key={stage}
-                className={`h-1.5 w-10 rounded-full transition-colors ${index <= loadingStage ? 'bg-[#6366F1]' : 'bg-[#1E293B]'}`}
+                className={`h-1.5 w-10 rounded-full transition-colors ${index <= loadingStage ? 'bg-[#6366F1]' : 'bg-muted'}`}
               />
             ))}
           </div>
@@ -394,36 +394,36 @@ export default function Intelligence() {
 
       {!loading && report && (
         <div className="space-y-5 pb-8">
-          <section className="overflow-hidden rounded-lg border border-[#25324A] bg-[#101827]">
+          <section className="overflow-hidden rounded-lg border border-border bg-card">
             <div className="grid gap-6 px-6 py-6 xl:grid-cols-[1fr_220px] xl:items-center">
               <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-[#64748B]">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span>{relativeTime(report.created_at)}</span>
                   <span>·</span>
                   <span>{report.plan.time_range || t("近期公开信息")}</span>
-                  <span className="rounded-md border border-[#34D399]/25 bg-[#34D399]/10 px-2 py-1 text-[#6EE7B7]">
+                  <span className="rounded-md border border-[#34D399]/25 bg-[#34D399]/10 px-2 py-1 text-success-ink">
                     {confidenceLabels[report.data_scope.confidence] || t("初步判断")}
                   </span>
                 </div>
-                <h2 className="mt-4 max-w-4xl text-xl font-semibold leading-8 text-[#F8FAFC]">{report.title || report.query}</h2>
-                {report.title && report.title !== report.query && <p className="mt-2 max-w-4xl text-sm leading-6 text-[#94A3B8]">{report.query}</p>}
+                <h2 className="mt-4 max-w-4xl text-xl font-semibold leading-8 text-foreground">{report.title || report.query}</h2>
+                {report.title && report.title !== report.query && <p className="mt-2 max-w-4xl text-sm leading-6 text-muted-foreground">{report.query}</p>}
                 <div className="mt-4 flex flex-wrap gap-2">
                   {(report.plan.search_keywords || []).slice(0, 5).map((keyword) => (
-                    <span key={keyword} className="rounded-md border border-[#334155] bg-[#0B111D] px-2.5 py-1 text-xs text-[#94A3B8]">{keyword}</span>
+                    <span key={keyword} className="rounded-md border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground">{keyword}</span>
                   ))}
                 </div>
               </div>
-              <div className="flex items-center gap-4 border-t border-[#1E293B] pt-4 xl:block xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
-                <div className="text-3xl font-semibold text-[#6EE7B7]">{confidenceScore}</div>
-                <div className="mt-1 text-xs text-[#64748B]">{t("情报可信度 / 100")}</div>
-                <div className="mt-3 h-1.5 flex-1 overflow-hidden rounded-full bg-[#1E293B] xl:w-full">
+              <div className="flex items-center gap-4 border-t border-border pt-4 xl:block xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+                <div className="text-3xl font-semibold text-success-ink">{confidenceScore}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{t("情报可信度 / 100")}</div>
+                <div className="mt-3 h-1.5 flex-1 overflow-hidden rounded-full bg-muted xl:w-full">
                   <div className="h-full rounded-full bg-[#34D399]" style={{ width: `${confidenceScore}%` }} />
                 </div>
               </div>
             </div>
           </section>
 
-          <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-[#1E293B] bg-[#0F1625] md:grid-cols-4 md:divide-x md:divide-[#1E293B]">
+          <div className="grid grid-cols-2 overflow-hidden rounded-lg border border-border bg-card md:grid-cols-4 md:divide-x md:divide-border">
             <Metric label={t("有效信号")} value={report.data_scope.relevant_samples} hint={t("过滤 {v0} 条噪声", { v0: report.data_scope.filtered_samples })} icon={ShieldCheck} accent="#34D399" />
             <Metric label={t("关键主题")} value={report.topic_trends.length} hint={t("按营销价值排序")} icon={Target} accent="#6366F1" />
             <Metric label={t("企业内容")} value={report.data_scope.published_records} hint={report.data_scope.use_enterprise_context ? t("已参与差距分析") : t("本次未关联")} icon={Layers3} accent="#22D3EE" />
@@ -431,30 +431,30 @@ export default function Intelligence() {
           </div>
 
           {sourceHealth.length > 0 && (
-            <section className="overflow-hidden rounded-lg border border-[#1E293B] bg-[#0F1625]">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1E293B] px-5 py-3.5">
+            <section className="overflow-hidden rounded-lg border border-border bg-card">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3.5">
                 <div>
-                  <h3 className="text-sm font-semibold text-[#F1F5F9]">{t("数据覆盖")}</h3>
-                  <p className="mt-1 text-xs text-[#64748B]">{t("每个渠道独立读取，单个渠道异常不会影响整份报告")}</p>
+                  <h3 className="text-sm font-semibold text-foreground">{t("数据覆盖")}</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">{t("每个渠道独立读取，单个渠道异常不会影响整份报告")}</p>
                 </div>
-                <span className="text-xs text-[#64748B]">{activeSourceCount}  {t("个来源可用")}</span>
+                <span className="text-xs text-muted-foreground">{activeSourceCount}  {t("个来源可用")}</span>
               </div>
               <div className="grid sm:grid-cols-2 xl:grid-cols-3">
                 {sourceHealth.map((item) => {
                   const healthy = item.status === 'success' || item.status === 'partial'
                   const StatusIcon = healthy ? CheckCircle2 : AlertCircle
                   return (
-                    <div key={item.source} className="flex min-w-0 items-start gap-3 border-b border-[#1E293B] px-5 py-4 sm:border-r last:border-r-0">
+                    <div key={item.source} className="flex min-w-0 items-start gap-3 border-b border-border px-5 py-4 sm:border-r last:border-r-0">
                       <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${sourceStatusClass(item.status)}`} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-3">
-                          <p className="truncate text-sm font-medium text-[#E2E8F0]">{item.label}</p>
-                          <span className={`inline-flex shrink-0 items-center gap-1 text-[11px] ${healthy ? 'text-[#6EE7B7]' : 'text-[#94A3B8]'}`}>
+                          <p className="truncate text-sm font-medium text-foreground">{item.label}</p>
+                          <span className={`inline-flex shrink-0 items-center gap-1 text-[11px] ${healthy ? 'text-success-ink' : 'text-muted-foreground'}`}>
                             <StatusIcon className="h-3 w-3" />
                             {sourceStatusLabels[item.status] || t("待确认")}
                           </span>
                         </div>
-                        <p className="mt-1 truncate text-xs text-[#64748B]">{item.item_count > 0 ? t("{v0} 条公开内容", { v0: item.item_count }) : item.message}</p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">{item.item_count > 0 ? t("{v0} 条公开内容", { v0: item.item_count }) : item.message}</p>
                       </div>
                     </div>
                   )
@@ -465,14 +465,14 @@ export default function Intelligence() {
 
           <div className="grid gap-5 xl:grid-cols-[1.45fr_0.55fr]">
             <IntelligenceCard title={t("今日判断")} description={t("把最值得关注的结论放在最前面")} icon={Zap}>
-              <div className="divide-y divide-[#1E293B]">
+              <div className="divide-y divide-border">
                 {report.executive_summary.map((item, index) => (
                   <div key={`${item.title}-${index}`} className="grid gap-3 py-4 first:pt-0 last:pb-0 md:grid-cols-[38px_1fr]">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-md border border-[#6366F1]/30 bg-[#6366F1]/10 text-xs font-semibold text-[#A5B4FC]">{String(index + 1).padStart(2, '0')}</div>
+                    <div className="flex h-8 w-8 items-center justify-center rounded-md border border-[#6366F1]/30 bg-[#6366F1]/10 text-xs font-semibold text-accent-ink">{String(index + 1).padStart(2, '0')}</div>
                     <div>
-                      <p className="text-sm font-semibold leading-6 text-[#F1F5F9]">{item.title}</p>
-                      <p className="mt-1 text-sm leading-6 text-[#CBD5E1]">{item.finding}</p>
-                      {item.why_it_matters && <p className="mt-2 border-l-2 border-[#334155] pl-3 text-xs leading-5 text-[#64748B]">{item.why_it_matters}</p>}
+                      <p className="text-sm font-semibold leading-6 text-foreground">{item.title}</p>
+                      <p className="mt-1 text-sm leading-6 text-foreground">{item.finding}</p>
+                      {item.why_it_matters && <p className="mt-2 border-l-2 border-border pl-3 text-xs leading-5 text-muted-foreground">{item.why_it_matters}</p>}
                     </div>
                   </div>
                 ))}
@@ -489,13 +489,13 @@ export default function Intelligence() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-2xl font-semibold text-[#F8FAFC]">{qualityRate}%</span>
-                  <span className="mt-1 text-[11px] text-[#64748B]">{t("有效占比")}</span>
+                  <span className="text-2xl font-semibold text-foreground">{qualityRate}%</span>
+                  <span className="mt-1 text-[11px] text-muted-foreground">{t("有效占比")}</span>
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap justify-center gap-2">
                 {report.data_scope.platforms.slice(0, 5).map((platform) => (
-                  <span key={platform} className="rounded-md bg-[#182238] px-2 py-1 text-[11px] text-[#94A3B8]">{platform}</span>
+                  <span key={platform} className="rounded-md bg-muted px-2 py-1 text-[11px] text-muted-foreground">{platform}</span>
                 ))}
               </div>
             </IntelligenceCard>
@@ -507,10 +507,10 @@ export default function Intelligence() {
                 <div className="h-[340px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={report.topic_trends.slice(0, 8)} layout="vertical" margin={{ top: 0, right: 22, left: 18, bottom: 0 }}>
-                      <CartesianGrid stroke="#1E293B" horizontal={false} strokeDasharray="3 5" />
+                      <CartesianGrid stroke="hsl(var(--border))" horizontal={false} strokeDasharray="3 5" />
                       <XAxis type="number" domain={[0, maxTopicScore]} hide />
-                      <YAxis type="category" dataKey="topic" width={150} tick={{ fill: '#94A3B8', fontSize: 12 }} axisLine={false} tickLine={false} />
-                      <Tooltip cursor={{ fill: '#18223888' }} contentStyle={{ background: '#0B111D', border: '1px solid #334155', borderRadius: 6, color: '#F8FAFC' }} />
+                      <YAxis type="category" dataKey="topic" width={150} tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} axisLine={false} tickLine={false} />
+                      <Tooltip cursor={{ fill: 'hsl(var(--muted) / .55)' }} contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 6, color: 'hsl(var(--foreground))' }} />
                       <Bar dataKey="score" radius={[0, 4, 4, 0]} barSize={12}>
                         {report.topic_trends.slice(0, 8).map((item, index) => <Cell key={item.topic} fill={accentPalette[index % accentPalette.length]} />)}
                       </Bar>
@@ -532,15 +532,15 @@ export default function Intelligence() {
               {report.customer_voice.length ? (
                 <div className="space-y-2">
                   {report.customer_voice.slice(0, 6).map((item, index) => (
-                    <div key={`${item.theme}-${index}`} className="group rounded-md border border-transparent px-3 py-3 transition-colors hover:border-[#2B3952] hover:bg-[#131D2E]">
+                    <div key={`${item.theme}-${index}`} className="group rounded-md border border-transparent px-3 py-3 transition-colors hover:border-border hover:bg-muted">
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-2.5">
                           <span className="h-2 w-2 shrink-0 rounded-sm" style={{ backgroundColor: accentPalette[index % accentPalette.length] }} />
-                          <p className="truncate text-sm font-medium text-[#F1F5F9]">{item.theme}</p>
+                          <p className="truncate text-sm font-medium text-foreground">{item.theme}</p>
                         </div>
-                        <span className="shrink-0 text-[11px] text-[#64748B]">{Number(item.count || 0) > 0 ? t("{v0} 条信号", { v0: item.count }) : item.type}</span>
+                        <span className="shrink-0 text-[11px] text-muted-foreground">{Number(item.count || 0) > 0 ? t("{v0} 条信号", { v0: item.count }) : item.type}</span>
                       </div>
-                      <p className="mt-2 pl-4 text-sm leading-6 text-[#94A3B8]">{item.summary}</p>
+                      <p className="mt-2 pl-4 text-sm leading-6 text-muted-foreground">{item.summary}</p>
                     </div>
                   ))}
                 </div>
@@ -551,14 +551,14 @@ export default function Intelligence() {
               {report.content_patterns.length ? (
                 <div className="grid gap-3 sm:grid-cols-2">
                   {report.content_patterns.slice(0, 6).map((item, index) => (
-                    <div key={`${item.pattern}-${index}`} className="relative overflow-hidden rounded-md border border-[#263247] bg-[#111B2B] p-4">
+                    <div key={`${item.pattern}-${index}`} className="relative overflow-hidden rounded-md border border-border bg-card p-4">
                       <span className="absolute inset-y-0 left-0 w-0.5" style={{ backgroundColor: accentPalette[(index + 2) % accentPalette.length] }} />
                       <div className="flex items-start justify-between gap-3">
-                        <p className="text-sm font-medium leading-6 text-[#F1F5F9]">{item.pattern}</p>
-                        <span className="text-[11px] font-semibold text-[#64748B]">{String(index + 1).padStart(2, '0')}</span>
+                        <p className="text-sm font-medium leading-6 text-foreground">{item.pattern}</p>
+                        <span className="text-[11px] font-semibold text-muted-foreground">{String(index + 1).padStart(2, '0')}</span>
                       </div>
-                      <p className="mt-2 text-xs leading-5 text-[#94A3B8]">{item.finding}</p>
-                      {item.recommendation && <p className="mt-3 border-t border-[#263247] pt-3 text-xs leading-5 text-[#A5B4FC]">{item.recommendation}</p>}
+                      <p className="mt-2 text-xs leading-5 text-muted-foreground">{item.finding}</p>
+                      {item.recommendation && <p className="mt-3 border-t border-border pt-3 text-xs leading-5 text-accent-ink">{item.recommendation}</p>}
                     </div>
                   ))}
                 </div>
@@ -569,24 +569,24 @@ export default function Intelligence() {
           <IntelligenceCard title={t("企业内容与市场差距")} description={t("同时比较市场关注度与企业现有覆盖，不再依赖难扫读的表格")} icon={Target}>
             {report.market_gap.length ? (
               <div className="space-y-1">
-                <div className="hidden grid-cols-[minmax(180px,1fr)_150px_150px_minmax(180px,1fr)] gap-5 border-b border-[#1E293B] px-3 pb-3 text-[11px] text-[#64748B] md:grid">
+                <div className="hidden grid-cols-[minmax(180px,1fr)_150px_150px_minmax(180px,1fr)] gap-5 border-b border-border px-3 pb-3 text-[11px] text-muted-foreground md:grid">
                   <span>{t("市场主题")}</span><span>{t("市场关注")}</span><span>{t("企业覆盖")}</span><span>{t("建议")}</span>
                 </div>
                 {report.market_gap.slice(0, 8).map((item, index) => (
-                  <div key={item.topic} className="grid gap-3 rounded-md px-3 py-3 transition-colors hover:bg-[#131D2E] md:grid-cols-[minmax(180px,1fr)_150px_150px_minmax(180px,1fr)] md:items-center md:gap-5">
+                  <div key={item.topic} className="grid gap-3 rounded-md px-3 py-3 transition-colors hover:bg-muted md:grid-cols-[minmax(180px,1fr)_150px_150px_minmax(180px,1fr)] md:items-center md:gap-5">
                     <div className="flex min-w-0 items-center gap-3">
-                      <span className="text-[11px] font-semibold text-[#475569]">{String(index + 1).padStart(2, '0')}</span>
-                      <span className="line-clamp-2 text-sm font-medium text-[#E2E8F0]">{item.topic}</span>
+                      <span className="text-[11px] font-semibold text-muted-foreground">{String(index + 1).padStart(2, '0')}</span>
+                      <span className="line-clamp-2 text-sm font-medium text-foreground">{item.topic}</span>
                     </div>
                     <div>
-                      <div className="mb-1.5 flex justify-between text-[11px] text-[#64748B]"><span>{t("关注")}</span><span>{item.market_score}</span></div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-[#1E293B]"><div className="h-full rounded-full bg-[#6366F1]" style={{ width: `${Math.min(100, item.market_score)}%` }} /></div>
+                      <div className="mb-1.5 flex justify-between text-[11px] text-muted-foreground"><span>{t("关注")}</span><span>{item.market_score}</span></div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-[#6366F1]" style={{ width: `${Math.min(100, item.market_score)}%` }} /></div>
                     </div>
                     <div>
-                      <div className="mb-1.5 flex justify-between text-[11px] text-[#64748B]"><span>{t("覆盖")}</span><span>{item.enterprise_coverage}%</span></div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-[#1E293B]"><div className="h-full rounded-full bg-[#22D3EE]" style={{ width: `${Math.min(100, item.enterprise_coverage)}%` }} /></div>
+                      <div className="mb-1.5 flex justify-between text-[11px] text-muted-foreground"><span>{t("覆盖")}</span><span>{item.enterprise_coverage}%</span></div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-[#22D3EE]" style={{ width: `${Math.min(100, item.enterprise_coverage)}%` }} /></div>
                     </div>
-                    <p className="text-xs leading-5 text-[#94A3B8]">{item.recommendation}</p>
+                    <p className="text-xs leading-5 text-muted-foreground">{item.recommendation}</p>
                   </div>
                 ))}
               </div>
@@ -598,11 +598,11 @@ export default function Intelligence() {
               {report.actions.length ? (
                 <div className="space-y-3">
                   {report.actions.map((item, index) => (
-                    <div key={`${item.title}-${index}`} className="flex gap-3 rounded-md border border-[#263247] bg-[#111B2B] p-4">
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#34D399]/10 text-xs font-semibold text-[#6EE7B7]">{index + 1}</span>
+                    <div key={`${item.title}-${index}`} className="flex gap-3 rounded-md border border-border bg-card p-4">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[#34D399]/10 text-xs font-semibold text-success-ink">{index + 1}</span>
                       <div>
-                        <p className="text-sm font-medium leading-6 text-[#F1F5F9]">{item.title}</p>
-                        <p className="mt-1 text-xs leading-5 text-[#94A3B8]">{item.description}</p>
+                        <p className="text-sm font-medium leading-6 text-foreground">{item.title}</p>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.description}</p>
                       </div>
                     </div>
                   ))}
@@ -612,24 +612,24 @@ export default function Intelligence() {
 
             <IntelligenceCard title={t("代表性证据")} description={t("只展示最相关的 {v0} 条，保留判断依据但不铺满原始数据", { v0: Math.min(5, report.evidence.length) })} icon={FileText}>
               {report.evidence.length ? (
-                <div className="divide-y divide-[#1E293B]">
+                <div className="divide-y divide-border">
                   {report.evidence.slice(0, 5).map((item, index) => (
                     <div key={item.id} className="group flex items-start gap-3 py-4 first:pt-0 last:pb-0">
-                      <span className="mt-0.5 text-[11px] font-semibold text-[#475569]">{String(index + 1).padStart(2, '0')}</span>
+                      <span className="mt-0.5 text-[11px] font-semibold text-muted-foreground">{String(index + 1).padStart(2, '0')}</span>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-md bg-[#182238] px-2 py-0.5 text-[11px] text-[#CBD5E1]">{relationLabels[item.relation_type] || t("公开信号")}</span>
-                          <span className="text-[11px] text-[#64748B]">{item.source}</span>
-                          <span className="text-[11px] text-[#34D399]">{t("价值")} {item.marketing_value || '-'}</span>
+                          <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-foreground">{relationLabels[item.relation_type] || t("公开信号")}</span>
+                          <span className="text-[11px] text-muted-foreground">{item.source}</span>
+                          <span className="text-[11px] text-success-ink">{t("价值")} {item.marketing_value || '-'}</span>
                         </div>
-                        <p className="mt-2 line-clamp-2 text-sm font-medium leading-6 text-[#E2E8F0]">{item.title}</p>
-                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-[#64748B]">{item.reason || item.summary}</p>
+                        <p className="mt-2 line-clamp-2 text-sm font-medium leading-6 text-foreground">{item.title}</p>
+                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.reason || item.summary}</p>
                       </div>
                       {item.source_url && (
                         <button
                           title={t("查看公开来源")}
                           onClick={() => window.open(item.source_url, '_blank', 'noopener,noreferrer')}
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[#334155] text-[#64748B] transition-colors hover:border-[#6366F1] hover:text-white"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:border-[#6366F1] hover:text-foreground"
                         >
                           <ArrowUpRight className="h-4 w-4" />
                         </button>
@@ -641,7 +641,7 @@ export default function Intelligence() {
             </IntelligenceCard>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-[#1E293B] pt-4 text-xs text-[#64748B]">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border pt-4 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5" />{t("已过滤")} {report.data_scope.filtered_samples}  {t("条低相关信息")}</span>
             {report.data_scope.knowledge_sources.length > 0 && <span className="inline-flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5" />{t("关联")} {report.data_scope.knowledge_sources.length}  {t("份企业资料")}</span>}
             <span className="inline-flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5" />{formatDateTime(report.updated_at)}</span>
@@ -651,17 +651,17 @@ export default function Intelligence() {
 
       {historyOpen && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/55" onMouseDown={() => setHistoryOpen(false)}>
-          <aside className="h-full w-full max-w-md overflow-y-auto border-l border-[#334155] bg-[#0B0F1A] shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#1E293B] bg-[#0B0F1A] px-5 py-4">
+          <aside className="h-full w-full max-w-md overflow-y-auto border-l border-border bg-background shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background px-5 py-4">
               <div>
-                <h2 className="text-sm font-semibold text-[#F1F5F9]">{t("历史报告")}</h2>
-                <p className="mt-1 text-xs text-[#64748B]">{t("保留最近 20 次情报判断")}</p>
+                <h2 className="text-sm font-semibold text-foreground">{t("历史报告")}</h2>
+                <p className="mt-1 text-xs text-muted-foreground">{t("保留最近 20 次情报判断")}</p>
               </div>
-              <button title={t("关闭")} onClick={() => setHistoryOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-md text-[#94A3B8] hover:bg-[#1E293B] hover:text-white">
+              <button title={t("关闭")} onClick={() => setHistoryOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="divide-y divide-[#1E293B] px-5">
+            <div className="divide-y divide-border px-5">
               {history.map((item) => (
                 <button
                   key={item.id}
@@ -673,15 +673,15 @@ export default function Intelligence() {
                   }}
                   className="group flex w-full items-center gap-3 py-4 text-left"
                 >
-                  <FileText className="h-4 w-4 shrink-0 text-[#64748B] group-hover:text-[#A5B4FC]" />
+                  <FileText className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-accent-ink" />
                   <div className="min-w-0 flex-1">
-                    <p className="line-clamp-2 text-sm leading-5 text-[#CBD5E1] group-hover:text-white">{item.query}</p>
-                    <p className="mt-1 text-xs text-[#64748B]">{relativeTime(item.created_at)} · {item.data_scope.relevant_samples}  {t("条有效样本")}</p>
+                    <p className="line-clamp-2 text-sm leading-5 text-foreground group-hover:text-foreground">{item.query}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{relativeTime(item.created_at)} · {item.data_scope.relevant_samples}  {t("条有效样本")}</p>
                   </div>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-[#475569]" />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </button>
               ))}
-              {!history.length && <div className="py-12 text-center text-sm text-[#64748B]">{t("还没有历史报告")}</div>}
+              {!history.length && <div className="py-12 text-center text-sm text-muted-foreground">{t("还没有历史报告")}</div>}
             </div>
           </aside>
         </div>

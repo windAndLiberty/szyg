@@ -219,9 +219,9 @@ function TextAssetPreview({ asset, mode, version = 0 }: { asset: Asset; mode: 'c
 
   if (mode === 'card') {
     return (
-      <div className="flex h-full w-full flex-col justify-between rounded-lg bg-[#0B0F1A] p-4">
-        <FileText className="h-8 w-8 text-[#6366F1]" />
-        <p className="mt-3 line-clamp-5 text-[15px] leading-8 tracking-[0.01em] text-[#F1F5F9]">
+      <div className="flex h-full w-full flex-col justify-between rounded-lg bg-background p-4">
+        <FileText className="h-8 w-8 text-accent-ink" />
+        <p className="mt-3 line-clamp-5 text-[15px] leading-8 tracking-[0.01em] text-foreground">
           {error || content || t("文案内容读取中...")}
         </p>
       </div>
@@ -229,17 +229,17 @@ function TextAssetPreview({ asset, mode, version = 0 }: { asset: Asset; mode: 'c
   }
 
   return (
-    <div className="w-[min(760px,80vw)] rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-5">
-      <div className="mb-2 text-[11px] text-[#64748B]">{t("文案内容")}</div>
+    <div className="w-[min(760px,80vw)] rounded-lg border border-border bg-background p-5">
+      <div className="mb-2 text-[11px] text-muted-foreground">{t("文案内容")}</div>
       <textarea
         value={error ? error : content}
         disabled={Boolean(error)}
         onChange={(event) => setContent(event.target.value)}
-        className="min-h-[320px] w-full resize-y rounded-xl border border-[#1E293B] bg-[#020617] px-4 py-4 text-[15px] leading-8 tracking-[0.01em] text-[#F1F5F9] outline-none transition-colors focus:border-[#6366F1] disabled:opacity-70"
+        className="min-h-[320px] w-full resize-y rounded-xl border border-border bg-background px-4 py-4 text-[15px] leading-8 tracking-[0.01em] text-foreground outline-none transition-colors focus:border-[#6366F1] disabled:opacity-70"
         placeholder={t("文案内容读取中...")}
       />
       <div className="mt-3 flex items-center justify-between gap-3">
-        <div className="text-[11px] text-[#64748B]">
+        <div className="text-[11px] text-muted-foreground">
           {dirty ? t("内容已修改，点击保存后才会写入文件。") : t("已保存")}
         </div>
         {dirty && (
@@ -247,7 +247,7 @@ function TextAssetPreview({ asset, mode, version = 0 }: { asset: Asset; mode: 'c
             type="button"
             onClick={saveContent}
             disabled={saving || !content.trim()}
-            className="inline-flex items-center gap-1.5 rounded-md bg-[#6366F1] px-3 py-1.5 text-body-xs text-white transition-colors hover:bg-[#5558E6] disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-body-xs text-primary-foreground transition-colors hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
 
@@ -330,25 +330,25 @@ function GraphicDraftPreview({
 
   if (mode === 'card') {
     return (
-      <div className="flex h-full w-full flex-col justify-between overflow-hidden rounded-lg border border-[#38BDF8]/20 bg-gradient-to-br from-[#082F49]/70 via-[#0B1220] to-[#111827] p-4">
+      <div className="flex h-full w-full flex-col justify-between overflow-hidden rounded-lg border border-[#38BDF8]/20 bg-gradient-to-br from-info-soft/70 via-background to-card p-4">
         <div>
           <div className="mb-3 flex items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#38BDF8]/30 bg-[#0EA5E9]/10 px-2 py-1 text-[11px] text-[#BAE6FD]">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#38BDF8]/30 bg-[#0EA5E9]/10 px-2 py-1 text-[11px] text-info-ink">
               <Newspaper className="h-3.5 w-3.5" />
 
               {t("图文草稿")}
             </span>
             {visualAssets.length > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#1E293B]/80 px-2 py-1 text-[11px] text-[#94A3B8]">
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted/80 px-2 py-1 text-[11px] text-muted-foreground">
                 <Images className="h-3.5 w-3.5" />
                 {visualAssets.length}
               </span>
             )}
           </div>
-          <h3 className="line-clamp-2 text-[15px] font-semibold leading-6 text-[#F8FAFC]">
+          <h3 className="line-clamp-2 text-[15px] font-semibold leading-6 text-foreground">
             {error || parsed.title || asset.name.replace(/\.[^.]+$/, '') || t("图文草稿")}
           </h3>
-          <p className="mt-2 line-clamp-4 text-[13px] leading-6 text-[#CBD5E1]">
+          <p className="mt-2 line-clamp-4 text-[13px] leading-6 text-foreground">
             {error || parsed.body || t("图文内容读取中...")}
           </p>
         </div>
@@ -357,7 +357,7 @@ function GraphicDraftPreview({
           {visualAssets.length > 0 ? (
             <div className="grid grid-cols-3 gap-1.5">
               {visualAssets.slice(0, 3).map((visual) => (
-                <div key={visual.id} className="aspect-square overflow-hidden rounded-md border border-[#1E293B] bg-[#020617]">
+                <div key={visual.id} className="aspect-square overflow-hidden rounded-md border border-border bg-background">
                   {visual.type === 'image' ? (
                     <img src={assetUrl(visual)} alt={visual.name} className="h-full w-full object-cover" />
                   ) : (
@@ -367,7 +367,7 @@ function GraphicDraftPreview({
               ))}
             </div>
           ) : (
-            <div className="rounded-md border border-dashed border-[#334155] px-3 py-2 text-[11px] text-[#64748B]">
+            <div className="rounded-md border border-dashed border-border px-3 py-2 text-[11px] text-muted-foreground">
 
               {t("暂无配图引用")}
             </div>
@@ -375,7 +375,7 @@ function GraphicDraftPreview({
           {parsed.tags.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
               {parsed.tags.slice(0, 3).map((tag) => (
-                <span key={tag} className="rounded-full bg-[#6366F1]/15 px-2 py-0.5 text-[10px] text-[#C7D2FE]">
+                <span key={tag} className="rounded-full bg-[#6366F1]/15 px-2 py-0.5 text-[10px] text-accent-ink">
                   #{tag}
                 </span>
               ))}
@@ -387,23 +387,23 @@ function GraphicDraftPreview({
   }
 
   return (
-    <div className="w-[min(860px,82vw)] rounded-xl border border-[#1E293B] bg-[#0B0F1A]">
-      <div className="border-b border-[#1E293B] px-5 py-4">
-        <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-[#38BDF8]/30 bg-[#0EA5E9]/10 px-2.5 py-1 text-[11px] text-[#BAE6FD]">
+    <div className="w-[min(860px,82vw)] rounded-xl border border-border bg-background">
+      <div className="border-b border-border px-5 py-4">
+        <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-[#38BDF8]/30 bg-[#0EA5E9]/10 px-2.5 py-1 text-[11px] text-info-ink">
           <Newspaper className="h-3.5 w-3.5" />
 
           {t("图文发布草稿")}
         </div>
-        <h2 className="text-[22px] font-semibold leading-8 text-[#F8FAFC]">
+        <h2 className="text-[22px] font-semibold leading-8 text-foreground">
           {error || parsed.title || asset.name.replace(/\.[^.]+$/, '') || t("图文草稿")}
         </h2>
         {(parsed.platformSuggestion.length > 0 || visualAssets.length > 0) && (
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-[#94A3B8]">
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
             {parsed.platformSuggestion.map((platform) => (
-              <span key={platform} className="rounded-full bg-[#1E293B] px-2 py-1">{platform}</span>
+              <span key={platform} className="rounded-full bg-muted px-2 py-1">{platform}</span>
             ))}
             {visualAssets.length > 0 && (
-              <span className="rounded-full bg-[#1E293B] px-2 py-1">{visualAssets.length}  {t("个配图素材")}</span>
+              <span className="rounded-full bg-muted px-2 py-1">{visualAssets.length}  {t("个配图素材")}</span>
             )}
           </div>
         )}
@@ -413,22 +413,22 @@ function GraphicDraftPreview({
         {visualAssets.length > 0 && (
           <div className="mb-5 grid gap-3" style={{ gridTemplateColumns: visualAssets.length === 1 ? '1fr' : 'repeat(3, minmax(0, 1fr))' }}>
             {visualAssets.slice(0, 6).map((visual) => (
-              <figure key={visual.id} className="overflow-hidden rounded-xl border border-[#1E293B] bg-[#111827]">
-                <div className="aspect-[4/3] bg-[#020617]">
+              <figure key={visual.id} className="overflow-hidden rounded-xl border border-border bg-card">
+                <div className="aspect-[4/3] bg-background">
                   {visual.type === 'image' ? (
                     <img src={assetUrl(visual)} alt={visual.name} className="h-full w-full object-cover" />
                   ) : (
                     <video src={assetUrl(visual)} muted preload="metadata" className="h-full w-full object-cover" />
                   )}
                 </div>
-                <figcaption className="truncate px-3 py-2 text-[11px] text-[#94A3B8]">{visual.name}</figcaption>
+                <figcaption className="truncate px-3 py-2 text-[11px] text-muted-foreground">{visual.name}</figcaption>
               </figure>
             ))}
           </div>
         )}
 
-        <article className="rounded-xl border border-[#1E293B] bg-[#111827] p-5">
-          <div className="space-y-4 text-[15px] leading-8 tracking-[0.01em] text-[#CBD5E1]">
+        <article className="rounded-xl border border-border bg-card p-5">
+          <div className="space-y-4 text-[15px] leading-8 tracking-[0.01em] text-foreground">
             {paragraphs.length > 0 ? paragraphs.map((paragraph, index) => (
               <p key={`${index}-${paragraph.slice(0, 16)}`} className="whitespace-pre-wrap break-words">{paragraph}</p>
             )) : <p>{error || t("图文内容读取中...")}</p>}
@@ -436,7 +436,7 @@ function GraphicDraftPreview({
           {parsed.tags.length > 0 && (
             <div className="mt-5 flex flex-wrap gap-2">
               {parsed.tags.map((tag) => (
-                <span key={tag} className="rounded-full bg-[#6366F1]/15 px-2.5 py-1 text-[11px] text-[#C7D2FE]">#{tag}</span>
+                <span key={tag} className="rounded-full bg-[#6366F1]/15 px-2.5 py-1 text-[11px] text-accent-ink">#{tag}</span>
               ))}
             </div>
           )}
@@ -445,15 +445,15 @@ function GraphicDraftPreview({
         {(parsed.imageAnchorsText || parsed.publishNotes) && (
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {parsed.imageAnchorsText && (
-              <section className="rounded-xl border border-[#1E293B] bg-[#111827] p-4">
-                <div className="mb-2 text-body-xs text-[#64748B]">{t("配图位置")}</div>
-                <p className="whitespace-pre-wrap text-body-sm leading-6 text-[#CBD5E1]">{parsed.imageAnchorsText}</p>
+              <section className="rounded-xl border border-border bg-card p-4">
+                <div className="mb-2 text-body-xs text-muted-foreground">{t("配图位置")}</div>
+                <p className="whitespace-pre-wrap text-body-sm leading-6 text-foreground">{parsed.imageAnchorsText}</p>
               </section>
             )}
             {parsed.publishNotes && (
-              <section className="rounded-xl border border-[#1E293B] bg-[#111827] p-4">
-                <div className="mb-2 text-body-xs text-[#64748B]">{t("发布建议")}</div>
-                <p className="whitespace-pre-wrap text-body-sm leading-6 text-[#CBD5E1]">{parsed.publishNotes}</p>
+              <section className="rounded-xl border border-border bg-card p-4">
+                <div className="mb-2 text-body-xs text-muted-foreground">{t("发布建议")}</div>
+                <p className="whitespace-pre-wrap text-body-sm leading-6 text-foreground">{parsed.publishNotes}</p>
               </section>
             )}
           </div>
@@ -927,47 +927,47 @@ export function PublishSelectedDrawer({
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/55 backdrop-blur-sm">
       <button className="min-w-0 flex-1" aria-label={t("关闭发布确认")} onClick={onClose} />
-      <aside className="flex h-full w-full max-w-[760px] flex-col border-l border-[#1E293B] bg-[#0B1120] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[#1E293B] px-5 py-4">
+      <aside className="flex h-full w-full max-w-[760px] flex-col border-l border-border bg-background shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-[#F8FAFC]">{t("确认发布")}</h2>
-            <p className="mt-1 text-sm text-[#64748B]">{t("素材路径已自动带入，只需确认渠道、标题和正文。")}</p>
+            <h2 className="text-lg font-semibold text-foreground">{t("确认发布")}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t("素材路径已自动带入，只需确认渠道、标题和正文。")}</p>
           </div>
-          <button onClick={onClose} className="rounded-md p-2 text-[#64748B] transition-colors hover:bg-[#111827] hover:text-[#F8FAFC]">
+          <button onClick={onClose} className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-card hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-5">
           <div className="space-y-5">
-            <section className="rounded-lg border border-[#1E293B] bg-[#0F172A] p-4">
-              <div className="mb-3 text-body-sm font-medium text-[#E2E8F0]">{t("已选素材")}</div>
+            <section className="rounded-lg border border-border bg-background p-4">
+              <div className="mb-3 text-body-sm font-medium text-foreground">{t("已选素材")}</div>
               <div className="grid grid-cols-3 gap-2">
                 {assets.map((asset) => (
-                  <div key={asset.id} className="overflow-hidden rounded-lg border border-[#1E293B] bg-[#020617]">
+                  <div key={asset.id} className="overflow-hidden rounded-lg border border-border bg-background">
                     <div className="aspect-square">{asset.type === 'text' ? <TextAssetPreview asset={asset} mode="card" /> : (
                       asset.type === 'image'
                         ? <img src={assetUrl(asset)} className="h-full w-full object-cover" alt={asset.name} />
                         : asset.type === 'video'
                           ? <video src={assetUrl(asset)} muted preload="metadata" className="h-full w-full object-cover" />
-                          : <div className="flex h-full items-center justify-center"><FileAudio className="h-8 w-8 text-[#6366F1]" /></div>
+                          : <div className="flex h-full items-center justify-center"><FileAudio className="h-8 w-8 text-accent-ink" /></div>
                     )}</div>
-                    <div className="truncate px-2 py-1.5 text-[11px] text-[#94A3B8]">{asset.name}</div>
+                    <div className="truncate px-2 py-1.5 text-[11px] text-muted-foreground">{asset.name}</div>
                   </div>
                 ))}
               </div>
-              {videos.length > 1 && <div className="mt-3 text-body-xs text-[#F59E0B]">{t("视频发布会使用第一条视频，其余素材可作为下次发布使用。")}</div>}
-              {assets.some((asset) => asset.type === 'audio') && <div className="mt-3 text-body-xs text-[#94A3B8]">{t("音频素材暂不直接提交给发布平台，可作为内容制作参考。")}</div>}
+              {videos.length > 1 && <div className="mt-3 text-body-xs text-warning-ink">{t("视频发布会使用第一条视频，其余素材可作为下次发布使用。")}</div>}
+              {assets.some((asset) => asset.type === 'audio') && <div className="mt-3 text-body-xs text-muted-foreground">{t("音频素材暂不直接提交给发布平台，可作为内容制作参考。")}</div>}
             </section>
 
-            <section className="rounded-lg border border-[#1E293B] bg-[#0F172A] p-4">
-              <div className="mb-3 text-body-sm font-medium text-[#E2E8F0]">{t("发布类型")}</div>
+            <section className="rounded-lg border border-border bg-background p-4">
+              <div className="mb-3 text-body-sm font-medium text-foreground">{t("发布类型")}</div>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setMode('note')}
                   disabled={!canNote}
-                  className={`rounded-lg border px-3 py-2 text-body-sm transition-colors ${mode === 'note' ? 'border-[#6366F1] bg-[#6366F1]/20 text-[#C4B5FD]' : 'border-[#334155] text-[#94A3B8] hover:bg-[#1E293B] disabled:cursor-not-allowed disabled:opacity-40'}`}
+                  className={`rounded-lg border px-3 py-2 text-body-sm transition-colors ${mode === 'note' ? 'border-[#6366F1] bg-[#6366F1]/20 text-accent-ink' : 'border-border text-muted-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40'}`}
                 >
 
                   {t("图文发布")}
@@ -976,7 +976,7 @@ export function PublishSelectedDrawer({
                   type="button"
                   onClick={() => setMode('video')}
                   disabled={!canVideo}
-                  className={`rounded-lg border px-3 py-2 text-body-sm transition-colors ${mode === 'video' ? 'border-[#6366F1] bg-[#6366F1]/20 text-[#C4B5FD]' : 'border-[#334155] text-[#94A3B8] hover:bg-[#1E293B] disabled:cursor-not-allowed disabled:opacity-40'}`}
+                  className={`rounded-lg border px-3 py-2 text-body-sm transition-colors ${mode === 'video' ? 'border-[#6366F1] bg-[#6366F1]/20 text-accent-ink' : 'border-border text-muted-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40'}`}
                 >
 
                   {t("视频发布")}
@@ -984,14 +984,14 @@ export function PublishSelectedDrawer({
               </div>
             </section>
 
-            <section className="rounded-lg border border-[#1E293B] bg-[#0F172A] p-4">
+            <section className="rounded-lg border border-border bg-background p-4">
               <div className="mb-3 flex items-center justify-between gap-3">
-                <div className="text-body-sm font-medium text-[#E2E8F0]">{t("发布账号")}</div>
-                <div className="text-[11px] text-[#64748B]">{t("已选")} {selectedTargets.length}  {t("个账号")}</div>
+                <div className="text-body-sm font-medium text-foreground">{t("发布账号")}</div>
+                <div className="text-[11px] text-muted-foreground">{t("已选")} {selectedTargets.length}  {t("个账号")}</div>
               </div>
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#1E293B] bg-[#020617] px-3 py-2">
-                <div className="flex min-w-0 items-center gap-2 text-[11px] text-[#94A3B8]">
-                  {targetsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#818CF8]" /> : <Check className="h-3.5 w-3.5 text-[#10B981]" />}
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-background px-3 py-2">
+                <div className="flex min-w-0 items-center gap-2 text-[11px] text-muted-foreground">
+                  {targetsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-accent-ink" /> : <Check className="h-3.5 w-3.5 text-success-ink" />}
                   <span className="truncate">
                     {targetsLoading
                       ? t("正在从渠道账号同步最新登录状态和档案")
@@ -1004,7 +1004,7 @@ export function PublishSelectedDrawer({
                   type="button"
                   onClick={() => refreshPublishTargets(false)}
                   disabled={targetsLoading}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-[#334155] bg-[#0B1120] px-2.5 py-1.5 text-[11px] text-[#CBD5E1] transition-colors hover:border-[#6366F1] hover:text-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-[11px] text-foreground transition-colors hover:border-[#6366F1] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {targetsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
 
@@ -1024,13 +1024,13 @@ export function PublishSelectedDrawer({
                         setPlatform(item.id)
                         setTargetMode('accounts')
                       }}
-                      className={`rounded-lg border px-3 py-2 text-left transition-colors ${platform === item.id ? 'border-[#6366F1] bg-[#6366F1]/20' : 'border-[#334155] bg-[#020617] hover:bg-[#1E293B]'}`}
+                      className={`rounded-lg border px-3 py-2 text-left transition-colors ${platform === item.id ? 'border-[#6366F1] bg-[#6366F1]/20' : 'border-border bg-background hover:bg-muted'}`}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <div className="text-body-sm text-[#F1F5F9]">{item.label}</div>
-                        {item.note && <span className="rounded-full bg-[#111827] px-2 py-0.5 text-[10px] text-[#94A3B8]">{item.note}</span>}
+                        <div className="text-body-sm text-foreground">{item.label}</div>
+                        {item.note && <span className="rounded-full bg-card px-2 py-0.5 text-[10px] text-muted-foreground">{item.note}</span>}
                       </div>
-                      <div className={`mt-1 text-[11px] ${validCount > 0 || assistCount > 0 ? 'text-[#86EFAC]' : 'text-[#F59E0B]'}`}>
+                      <div className={`mt-1 text-[11px] ${validCount > 0 || assistCount > 0 ? 'text-success-ink' : 'text-warning-ink'}`}>
                         {item.id === 'tencent'
                           ? assistCount > 0 ? t("{v0}/{v1} 在线", { v0: assistCount, v1: count || 10 }) : t("需要打开助手登录")
                           : validCount > 0 ? t("{v0}/{v1} 可用", { v0: validCount, v1: count || 10 }) : t("需要登录账号")}
@@ -1039,7 +1039,7 @@ export function PublishSelectedDrawer({
                   )
                 })}
               </div>
-              <div className="mb-3 rounded-lg border border-[#1E293B] bg-[#020617] px-3 py-2 text-[11px] leading-5 text-[#94A3B8]">
+              <div className="mb-3 rounded-lg border border-border bg-background px-3 py-2 text-[11px] leading-5 text-muted-foreground">
                 {mode === 'note'
                   ? t("图文发布支持抖音、小红书、快手、视频号和微博；视频号与微博会使用真实桌面浏览器辅助发布。")
                   : platform === 'tencent' || platform === 'weibo'
@@ -1050,7 +1050,7 @@ export function PublishSelectedDrawer({
                 <button
                   type="button"
                   onClick={() => setTargetMode('accounts')}
-                  className={`rounded-lg border px-3 py-2 text-body-sm transition-colors ${targetMode === 'accounts' ? 'border-[#6366F1] bg-[#6366F1]/20 text-[#C4B5FD]' : 'border-[#334155] text-[#94A3B8] hover:bg-[#1E293B]'}`}
+                  className={`rounded-lg border px-3 py-2 text-body-sm transition-colors ${targetMode === 'accounts' ? 'border-[#6366F1] bg-[#6366F1]/20 text-accent-ink' : 'border-border text-muted-foreground hover:bg-muted'}`}
                 >
 
                   {t("选择账号")}
@@ -1058,7 +1058,7 @@ export function PublishSelectedDrawer({
                 <button
                   type="button"
                   onClick={() => setTargetMode('profile')}
-                  className={`rounded-lg border px-3 py-2 text-body-sm transition-colors ${targetMode === 'profile' ? 'border-[#6366F1] bg-[#6366F1]/20 text-[#C4B5FD]' : 'border-[#334155] text-[#94A3B8] hover:bg-[#1E293B]'}`}
+                  className={`rounded-lg border px-3 py-2 text-body-sm transition-colors ${targetMode === 'profile' ? 'border-[#6366F1] bg-[#6366F1]/20 text-accent-ink' : 'border-border text-muted-foreground hover:bg-muted'}`}
                 >
 
                   {t("发布配置档案")}
@@ -1067,7 +1067,7 @@ export function PublishSelectedDrawer({
               {targetMode === 'accounts' ? (
                 <div className="space-y-2">
                   {platformAccounts.length === 0 ? (
-                    <div className="rounded-lg border border-[#334155] bg-[#020617] p-3 text-body-xs text-[#94A3B8]">
+                    <div className="rounded-lg border border-border bg-background p-3 text-body-xs text-muted-foreground">
 
                       {t("当前平台暂无账号，请先到“渠道账号”添加并登录。")}
                     </div>
@@ -1082,25 +1082,25 @@ export function PublishSelectedDrawer({
                         onClick={() => {
                           setSelectedAccountIds((prev) => checked ? prev.filter((id) => id !== account.id) : [...prev, account.id])
                         }}
-                        className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${checked ? 'border-[#10B981] bg-[#10B981]/10' : 'border-[#334155] bg-[#020617] hover:bg-[#1E293B]'}`}
+                        className={`flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${checked ? 'border-[#10B981] bg-[#10B981]/10' : 'border-border bg-background hover:bg-muted'}`}
                       >
                         <div className="flex min-w-0 items-center gap-2">
                           {account.avatar_url ? (
-                            <img src={accountAvatarUrl(account)} alt={displayName} className="h-8 w-8 shrink-0 rounded-full border border-[#334155] object-cover" />
+                            <img src={accountAvatarUrl(account)} alt={displayName} className="h-8 w-8 shrink-0 rounded-full border border-border object-cover" />
                           ) : (
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#334155] bg-[#111827] text-xs text-[#94A3B8]">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-card text-xs text-muted-foreground">
                               {displayName.slice(0, 1)}
                             </div>
                           )}
                           <div className="min-w-0">
-                          <div className="truncate text-body-sm text-[#F1F5F9]">{displayName}</div>
-                          <div className="mt-0.5 truncate text-[11px] text-[#64748B]">{secondary}</div>
-                          <div className={`mt-1 text-[11px] ${account.session?.valid ? 'text-[#86EFAC]' : 'text-[#F59E0B]'}`}>
+                          <div className="truncate text-body-sm text-foreground">{displayName}</div>
+                          <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{secondary}</div>
+                          <div className={`mt-1 text-[11px] ${account.session?.valid ? 'text-success-ink' : 'text-warning-ink'}`}>
                             {isAccountReady(account) ? t("账号可用") : t("需要登录")}
                           </div>
                           </div>
                         </div>
-                        {checked && <Check className="h-4 w-4 shrink-0 text-[#10B981]" />}
+                        {checked && <Check className="h-4 w-4 shrink-0 text-success-ink" />}
                       </button>
                     )
                   })}
@@ -1108,7 +1108,7 @@ export function PublishSelectedDrawer({
               ) : (
                 <div className="space-y-2">
                   {profiles.length === 0 ? (
-                    <div className="rounded-lg border border-[#334155] bg-[#020617] p-3 text-body-xs text-[#94A3B8]">
+                    <div className="rounded-lg border border-border bg-background p-3 text-body-xs text-muted-foreground">
 
                       {t("暂无发布配置档案，请先到“渠道账号”创建账号组。")}
                     </div>
@@ -1123,17 +1123,17 @@ export function PublishSelectedDrawer({
                         key={profile.id}
                         type="button"
                         onClick={() => setSelectedProfileId(profile.id)}
-                        className={`w-full rounded-lg border px-3 py-3 text-left transition-colors ${checked ? 'border-[#10B981] bg-[#10B981]/10' : 'border-[#334155] bg-[#020617] hover:bg-[#1E293B]'}`}
+                        className={`w-full rounded-lg border px-3 py-3 text-left transition-colors ${checked ? 'border-[#10B981] bg-[#10B981]/10' : 'border-border bg-background hover:bg-muted'}`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <div className="truncate text-body-sm text-[#F1F5F9]">{profile.name}</div>
-                            <div className="mt-1 text-[11px] text-[#94A3B8]">
+                            <div className="truncate text-body-sm text-foreground">{profile.name}</div>
+                            <div className="mt-1 text-[11px] text-muted-foreground">
 
                               {t("当前渠道")} {currentPlatformAccounts.length}  {t("个账号 ·")} {onlineCount}  {t("个可用")}{platformNames.length > 0 ? t("· 全组含 {v0}", { v0: platformNames.join(' / ') }) : ''}
                             </div>
                           </div>
-                          {checked && <Check className="h-4 w-4 shrink-0 text-[#10B981]" />}
+                          {checked && <Check className="h-4 w-4 shrink-0 text-success-ink" />}
                         </div>
                         {currentPlatformAccounts.length > 0 ? (
                           <div className="mt-3 flex flex-wrap gap-1.5">
@@ -1144,8 +1144,8 @@ export function PublishSelectedDrawer({
                                   key={account.id}
                                   className={`max-w-[150px] truncate rounded-full border px-2 py-1 text-[11px] ${
                                     isAccountReady(account)
-                                      ? 'border-[#10B981]/25 bg-[#10B981]/10 text-[#86EFAC]'
-                                      : 'border-[#F59E0B]/25 bg-[#F59E0B]/10 text-[#FDE68A]'
+                                      ? 'border-[#10B981]/25 bg-[#10B981]/10 text-success-ink'
+                                      : 'border-[#F59E0B]/25 bg-[#F59E0B]/10 text-warning-ink'
                                   }`}
                                   title={name}
                                 >
@@ -1155,7 +1155,7 @@ export function PublishSelectedDrawer({
                             })}
                           </div>
                         ) : (
-                          <div className="mt-3 rounded-lg border border-[#F59E0B]/25 bg-[#F59E0B]/10 px-3 py-2 text-[11px] text-[#FDE68A]">
+                          <div className="mt-3 rounded-lg border border-[#F59E0B]/25 bg-[#F59E0B]/10 px-3 py-2 text-[11px] text-warning-ink">
 
                             {t("这组里暂时没有当前渠道账号，切换渠道或回到“渠道账号”补充账号即可。")}
                           </div>
@@ -1166,7 +1166,7 @@ export function PublishSelectedDrawer({
                 </div>
               )}
                 {!loggedIn && (
-                <div className="mt-3 flex gap-2 rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/10 p-3 text-body-xs text-[#FDE68A]">
+                <div className="mt-3 flex gap-2 rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/10 p-3 text-body-xs text-warning-ink">
                   <AlertCircle className="h-4 w-4 shrink-0" />
                   {isTencentDesktopAssist
                     ? t("请先到“渠道账号”点击视频号的“打开助手”，在普通浏览器中完成登录后再回来发布。")
@@ -1176,24 +1176,24 @@ export function PublishSelectedDrawer({
             </section>
 
             {isTencentDesktopAssist && (
-              <section className="rounded-lg border border-[#1E293B] bg-[#0F172A] p-4">
+              <section className="rounded-lg border border-border bg-background p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-body-sm font-medium text-[#E2E8F0]">{t("视频号发布方式")}</div>
-                    <div className="mt-1 text-body-xs text-[#64748B]">{t("位置、链接、合集、音乐、活动和定时发表属于可选运营项。")}</div>
+                    <div className="text-body-sm font-medium text-foreground">{t("视频号发布方式")}</div>
+                    <div className="mt-1 text-body-xs text-muted-foreground">{t("位置、链接、合集、音乐、活动和定时发表属于可选运营项。")}</div>
                   </div>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <button
                     type="button"
                     onClick={() => setTencentPublishMode('auto')}
-                    className={`rounded-lg border px-3 py-3 text-left transition-colors ${tencentPublishMode === 'auto' ? 'border-[#10B981] bg-[#10B981]/10' : 'border-[#334155] bg-[#020617] hover:bg-[#1E293B]'}`}
+                    className={`rounded-lg border px-3 py-3 text-left transition-colors ${tencentPublishMode === 'auto' ? 'border-[#10B981] bg-[#10B981]/10' : 'border-border bg-background hover:bg-muted'}`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-body-sm font-medium text-[#F8FAFC]">{t("一键发布")}</span>
-                      {tencentPublishMode === 'auto' && <Check className="h-4 w-4 text-[#10B981]" />}
+                      <span className="text-body-sm font-medium text-foreground">{t("一键发布")}</span>
+                      {tencentPublishMode === 'auto' && <Check className="h-4 w-4 text-success-ink" />}
                     </div>
-                    <p className="mt-1 text-body-xs leading-5 text-[#94A3B8]">
+                    <p className="mt-1 text-body-xs leading-5 text-muted-foreground">
 
                       {t("自动上传素材、填写标题和正文，并点击发表。适合不需要补充位置、链接、音乐的内容。")}
                     </p>
@@ -1201,20 +1201,20 @@ export function PublishSelectedDrawer({
                   <button
                     type="button"
                     onClick={() => setTencentPublishMode('manual')}
-                    className={`rounded-lg border px-3 py-3 text-left transition-colors ${tencentPublishMode === 'manual' ? 'border-[#6366F1] bg-[#6366F1]/15' : 'border-[#334155] bg-[#020617] hover:bg-[#1E293B]'}`}
+                    className={`rounded-lg border px-3 py-3 text-left transition-colors ${tencentPublishMode === 'manual' ? 'border-[#6366F1] bg-[#6366F1]/15' : 'border-border bg-background hover:bg-muted'}`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-body-sm font-medium text-[#F8FAFC]">{t("填好后我来确认")}</span>
-                      {tencentPublishMode === 'manual' && <Check className="h-4 w-4 text-[#A5B4FC]" />}
+                      <span className="text-body-sm font-medium text-foreground">{t("填好后我来确认")}</span>
+                      {tencentPublishMode === 'manual' && <Check className="h-4 w-4 text-accent-ink" />}
                     </div>
-                    <p className="mt-1 text-body-xs leading-5 text-[#94A3B8]">
+                    <p className="mt-1 text-body-xs leading-5 text-muted-foreground">
 
                       {t("只填写图片/视频、标题和正文，然后停在视频号页面，方便你补位置、链接等信息后手动发表。")}
                     </p>
                   </button>
                 </div>
                 {tencentPublishMode === 'manual' && (
-                  <div className="mt-3 rounded-lg border border-[#6366F1]/25 bg-[#6366F1]/10 px-3 py-2 text-body-xs leading-5 text-[#C4B5FD]">
+                  <div className="mt-3 rounded-lg border border-[#6366F1]/25 bg-[#6366F1]/10 px-3 py-2 text-body-xs leading-5 text-accent-ink">
 
                     {t("发布看板会显示“需处理”，表示数字员工已完成必要信息填写，正在等待你在视频号页面确认。")}
                   </div>
@@ -1222,12 +1222,12 @@ export function PublishSelectedDrawer({
               </section>
             )}
 
-            <section className="space-y-3 rounded-lg border border-[#1E293B] bg-[#0F172A] p-4">
+            <section className="space-y-3 rounded-lg border border-border bg-background p-4">
               <label>
-                <span className="mb-1 flex items-center justify-between gap-3 text-body-xs text-[#64748B]">
+                <span className="mb-1 flex items-center justify-between gap-3 text-body-xs text-muted-foreground">
                   <span>{t("标题短语")}</span>
                   {titleLimit > 0 && (
-                    <span className={titleError ? 'text-[#FCA5A5]' : 'text-[#64748B]'}>
+                    <span className={titleError ? 'text-danger-ink' : 'text-muted-foreground'}>
                       {titleLength}/{titleLimit}
                     </span>
                   )}
@@ -1257,7 +1257,7 @@ export function PublishSelectedDrawer({
                   onBlur={(event) => {
                     applyTitleInput(event.target.value)
                   }}
-                  className={`h-10 w-full rounded-lg border bg-[#020617] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1] ${titleError ? 'border-[#EF4444]' : 'border-[#1E293B]'}`}
+                  className={`h-10 w-full rounded-lg border bg-background px-3 text-body-sm text-foreground outline-none focus:border-[#6366F1] ${titleError ? 'border-[#EF4444]' : 'border-border'}`}
                 />
                 {canRegeneratePublishCopy && (
                   <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -1265,7 +1265,7 @@ export function PublishSelectedDrawer({
                       type="button"
                       onClick={() => requestGeneratedTitle(true)}
                       disabled={titleGenerating || !titleContext}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-[#334155] bg-[#111827] px-2.5 py-1.5 text-body-xs text-[#CBD5E1] transition-colors hover:border-[#6366F1] hover:text-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-body-xs text-foreground transition-colors hover:border-[#6366F1] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {titleGenerating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                       {titleGenerating ? t("生成中") : t("重新生成文案")}
@@ -1279,7 +1279,7 @@ export function PublishSelectedDrawer({
                           setTitleNotice('')
                           setTitleTouched(true)
                         }}
-                        className="max-w-full truncate rounded-md border border-[#1E293B] bg-[#020617] px-2.5 py-1.5 text-body-xs text-[#94A3B8] transition-colors hover:border-[#6366F1] hover:text-[#E0E7FF]"
+                        className="max-w-full truncate rounded-md border border-border bg-background px-2.5 py-1.5 text-body-xs text-muted-foreground transition-colors hover:border-[#6366F1] hover:text-accent-ink"
                         title={candidate}
                       >
                         {candidate}
@@ -1287,45 +1287,45 @@ export function PublishSelectedDrawer({
                     ))}
                   </div>
                 )}
-                {titleNotice && <div className="mt-1 text-body-xs text-[#FBBF24]">{titleNotice}</div>}
-                {titleError && <div className="mt-1 text-body-xs text-[#FCA5A5]">{titleError}</div>}
+                {titleNotice && <div className="mt-1 text-body-xs text-warning-ink">{titleNotice}</div>}
+                {titleError && <div className="mt-1 text-body-xs text-danger-ink">{titleError}</div>}
               </label>
               <label>
-                <span className="mb-1 block text-body-xs text-[#64748B]">{t("正文 / 描述")}</span>
+                <span className="mb-1 block text-body-xs text-muted-foreground">{t("正文 / 描述")}</span>
                 <textarea
                   value={body}
                   onChange={(event) => setBody(event.target.value)}
                   rows={9}
                   placeholder={loadingText ? t("正在读取文案素材...") : t("补充发布正文、视频描述或产品卖点")}
-                  className="min-h-[220px] w-full resize-y rounded-lg border border-[#1E293B] bg-[#020617] px-3 py-3 text-body-sm leading-7 text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+                  className="min-h-[220px] w-full resize-y rounded-lg border border-border bg-background px-3 py-3 text-body-sm leading-7 text-foreground outline-none focus:border-[#6366F1]"
                 />
               </label>
               {mode === 'note' && images.length > 0 && (
-                <section className="rounded-xl border border-[#1E293B] bg-[#020617] p-3">
+                <section className="rounded-xl border border-border bg-background p-3">
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <span className="text-body-xs font-medium text-[#94A3B8]">{t("图文预览")}</span>
-                    <span className="text-[11px] text-[#475569]">
+                    <span className="text-body-xs font-medium text-muted-foreground">{t("图文预览")}</span>
+                    <span className="text-[11px] text-muted-foreground">
                       {publishImageAnchors.length > 0 ? t("图片已按 AI 建议插入") : t("图片会随图文一起发布")}
                     </span>
                   </div>
-                  <article className="max-h-[420px] overflow-auto rounded-lg border border-[#111827] bg-[#0B1120] p-4">
+                  <article className="max-h-[420px] overflow-auto rounded-lg border border-border bg-background p-4">
                     {(bodyParagraphs.length > 0 ? bodyParagraphs : [t("正文内容将在这里预览。")]).map((paragraph, index) => {
                       const after = index + 1
                       const inserted = anchoredImages.groups.get(after) || []
                       return (
                         <div key={`${after}-${paragraph.slice(0, 16)}`} className="mb-4 last:mb-0">
-                          <p className="whitespace-pre-wrap break-words text-[14px] leading-7 tracking-[0.01em] text-[#CBD5E1]">
+                          <p className="whitespace-pre-wrap break-words text-[14px] leading-7 tracking-[0.01em] text-foreground">
                             {paragraph}
                           </p>
                           {inserted.length > 0 && (
                             <div className="mt-3 grid gap-2 sm:grid-cols-2">
                               {inserted.map(({ asset, caption }) => (
-                                <figure key={asset.id} className="overflow-hidden rounded-lg border border-[#1E293B] bg-[#020617]">
-                                  <div className="aspect-[4/3] bg-[#111827]">
+                                <figure key={asset.id} className="overflow-hidden rounded-lg border border-border bg-background">
+                                  <div className="aspect-[4/3] bg-card">
                                     <img src={assetUrl(asset)} alt={asset.name} className="h-full w-full object-cover" />
                                   </div>
                                   {(caption || asset.name) && (
-                                    <figcaption className="truncate px-3 py-2 text-[11px] text-[#64748B]">
+                                    <figcaption className="truncate px-3 py-2 text-[11px] text-muted-foreground">
                                       {caption || asset.name}
                                     </figcaption>
                                   )}
@@ -1337,17 +1337,17 @@ export function PublishSelectedDrawer({
                       )
                     })}
                     {unanchoredImages.length > 0 && (
-                      <div className="mt-4 border-t border-[#1E293B] pt-4">
-                        <div className="mb-2 text-[11px] text-[#64748B]">
+                      <div className="mt-4 border-t border-border pt-4">
+                        <div className="mb-2 text-[11px] text-muted-foreground">
                           {publishImageAnchors.length > 0 ? t("未指定段落的配图") : t("配图")}
                         </div>
                         <div className="grid gap-2 sm:grid-cols-2">
                           {unanchoredImages.map((asset) => (
-                            <figure key={asset.id} className="overflow-hidden rounded-lg border border-[#1E293B] bg-[#020617]">
-                              <div className="aspect-[4/3] bg-[#111827]">
+                            <figure key={asset.id} className="overflow-hidden rounded-lg border border-border bg-background">
+                              <div className="aspect-[4/3] bg-card">
                                 <img src={assetUrl(asset)} alt={asset.name} className="h-full w-full object-cover" />
                               </div>
-                              <figcaption className="truncate px-3 py-2 text-[11px] text-[#64748B]">{asset.name}</figcaption>
+                              <figcaption className="truncate px-3 py-2 text-[11px] text-muted-foreground">{asset.name}</figcaption>
                             </figure>
                           ))}
                         </div>
@@ -1357,15 +1357,15 @@ export function PublishSelectedDrawer({
                 </section>
               )}
               <label>
-                <span className="mb-1 block text-body-xs text-[#64748B]">{t("标签")}</span>
+                <span className="mb-1 block text-body-xs text-muted-foreground">{t("标签")}</span>
                 <input
                   value={tags}
                   onChange={(event) => setTags(event.target.value)}
-                  className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#020617] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+                  className="h-10 w-full rounded-lg border border-border bg-background px-3 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
                 />
               </label>
               {!isTencentDesktopAssist && (
-                <label className="flex items-center gap-2 text-body-xs text-[#94A3B8]">
+                <label className="flex items-center gap-2 text-body-xs text-muted-foreground">
                   <input type="checkbox" checked={headless} onChange={(event) => setHeadless(event.target.checked)} />
 
                   {t("后台运行浏览器")}
@@ -1373,11 +1373,11 @@ export function PublishSelectedDrawer({
               )}
             </section>
 
-            {error && <div className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-3 text-body-sm text-[#FCA5A5]">{error}</div>}
+            {error && <div className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-3 text-body-sm text-danger-ink">{error}</div>}
           </div>
         </div>
 
-        <div className="border-t border-[#1E293B] px-5 py-4">
+        <div className="border-t border-border px-5 py-4">
           <button
             type="button"
             onClick={handleSubmit}
@@ -1588,7 +1588,7 @@ export default function AssetManagement() {
     const previewClass = 'max-w-full max-h-[60vh] mx-auto rounded-lg'
 
     if (!url) {
-      return <Icon className={mode === 'card' ? 'w-12 h-12 text-[#334155]' : 'w-16 h-16 text-[#334155] mx-auto'} />
+      return <Icon className={mode === 'card' ? 'w-12 h-12 text-muted-foreground' : 'w-16 h-16 text-muted-foreground mx-auto'} />
     }
     if (asset.type === 'image') {
       return <img src={url} alt={asset.name} className={mode === 'card' ? 'w-full h-full object-cover' : previewClass} />
@@ -1599,7 +1599,7 @@ export default function AssetManagement() {
     if (asset.type === 'audio') {
       return (
         <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-4">
-          <Icon className="w-12 h-12 text-[#6366F1]" />
+          <Icon className="w-12 h-12 text-accent-ink" />
           <audio src={url} controls className="w-full" onClick={(e) => e.stopPropagation()} />
         </div>
       )
@@ -1610,7 +1610,7 @@ export default function AssetManagement() {
       }
       return <TextAssetPreview asset={asset} mode={mode} version={documentVersion} />
     }
-    return <Icon className={mode === 'card' ? 'w-12 h-12 text-[#334155]' : 'w-16 h-16 text-[#334155] mx-auto'} />
+    return <Icon className={mode === 'card' ? 'w-12 h-12 text-muted-foreground' : 'w-16 h-16 text-muted-foreground mx-auto'} />
   }
 
   return (
@@ -1620,14 +1620,14 @@ export default function AssetManagement() {
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
       className="flex flex-col h-full"
     >
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[#1E293B]">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
         <div className="flex items-center gap-3">
-          <p className="text-body-sm text-[#94A3B8]">{t("管理素材，选中后可组合生成或发布到渠道")}</p>
+          <p className="text-body-sm text-muted-foreground">{t("管理素材，选中后可组合生成或发布到渠道")}</p>
           {selectedIds.size > 0 && (
             <>
               <button
                 onClick={handleBulkDelete}
-                className="ml-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#EF4444]/20 text-[#EF4444] hover:bg-[#EF4444]/30 text-body-sm transition-colors"
+                className="ml-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#EF4444]/20 text-danger-ink hover:bg-[#EF4444]/30 text-body-sm transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
 
@@ -1649,7 +1649,7 @@ export default function AssetManagement() {
             <button
               onClick={openGraphicCompose}
               disabled={composeDisabled}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#6366F1] hover:bg-[#5558E6] disabled:bg-[#1E293B] disabled:text-[#64748B] disabled:cursor-not-allowed text-body-sm text-white transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:brightness-90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed text-body-sm text-primary-foreground transition-colors"
             >
               <FileText className="w-4 h-4" />
 
@@ -1660,7 +1660,7 @@ export default function AssetManagement() {
             <button
               onClick={openVideoCompose}
               disabled={composeDisabled}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#6366F1] hover:bg-[#5558E6] disabled:bg-[#1E293B] disabled:text-[#64748B] disabled:cursor-not-allowed text-body-sm text-white transition-colors"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:brightness-90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed text-body-sm text-primary-foreground transition-colors"
             >
               <Sparkles className="w-4 h-4" />
 
@@ -1670,7 +1670,7 @@ export default function AssetManagement() {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="flex items-center gap-2 px-4 py-2 bg-[#6366F1] hover:bg-[#5558E6] disabled:opacity-50 rounded-lg text-body-sm text-white transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-primary hover:brightness-90 disabled:opacity-50 rounded-lg text-body-sm text-primary-foreground transition-colors"
           >
             {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
 
@@ -1687,16 +1687,16 @@ export default function AssetManagement() {
         </div>
       </div>
 
-      <div className="border-b border-[#1E293B] px-6 py-3">
+      <div className="border-b border-border px-6 py-3">
         <div className="flex items-center gap-4">
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#64748B]" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder={t("搜索素材...")}
-              className="w-full pl-9 pr-4 py-2 bg-[#0B0F1A] border border-[#1E293B] rounded-lg text-body-sm text-[#F1F5F9] placeholder:text-[#475569] focus:outline-none focus:border-[#6366F1]"
+              className="w-full pl-9 pr-4 py-2 bg-background border border-border rounded-lg text-body-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[#6366F1]"
             />
           </div>
 
@@ -1707,8 +1707,8 @@ export default function AssetManagement() {
                 onClick={() => setFilter(item.key)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-body-xs transition-all ${
                   filter === item.key
-                    ? 'bg-[#6366F1]/20 text-[#6366F1] border border-[#6366F1]/30'
-                    : 'text-[#94A3B8] hover:bg-[#1E293B]'
+                    ? 'bg-[#6366F1]/20 text-accent-ink border border-[#6366F1]/30'
+                    : 'text-muted-foreground hover:bg-muted'
                 }`}
               >
                 <item.icon className="w-3.5 h-3.5" />
@@ -1717,11 +1717,11 @@ export default function AssetManagement() {
             ))}
           </div>
 
-          <div className="flex gap-1 border-l border-[#1E293B] pl-4">
+          <div className="flex gap-1 border-l border-border pl-4">
             <button
               onClick={() => setViewMode('grid')}
               className={`p-1.5 rounded-md transition-colors ${
-                viewMode === 'grid' ? 'bg-[#1E293B] text-[#F1F5F9]' : 'text-[#64748B] hover:text-[#94A3B8]'
+                viewMode === 'grid' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-muted-foreground'
               }`}
             >
               <Grid3X3 className="w-4 h-4" />
@@ -1729,7 +1729,7 @@ export default function AssetManagement() {
             <button
               onClick={() => setViewMode('list')}
               className={`p-1.5 rounded-md transition-colors ${
-                viewMode === 'list' ? 'bg-[#1E293B] text-[#F1F5F9]' : 'text-[#64748B] hover:text-[#94A3B8]'
+                viewMode === 'list' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-muted-foreground'
               }`}
             >
               <List className="w-4 h-4" />
@@ -1743,14 +1743,14 @@ export default function AssetManagement() {
             disabled={filteredAssetIds.length === 0}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-body-xs transition-all disabled:cursor-not-allowed disabled:opacity-40 ${
               allFilteredSelected
-                ? 'bg-[#1E293B] text-[#CBD5E1] border border-[#334155] hover:bg-[#263449]'
-                : 'text-[#94A3B8] border border-transparent hover:bg-[#1E293B]'
+                ? 'bg-muted text-foreground border border-border hover:bg-muted'
+                : 'text-muted-foreground border border-transparent hover:bg-muted'
             }`}
           >
             <Check className="w-3.5 h-3.5" />
             {allFilteredSelected ? t("取消全选") : t("全选")}
           </button>
-          <span className="text-body-xs text-[#64748B]">
+          <span className="text-body-xs text-muted-foreground">
 
             {t("当前列表")} {filteredAssetIds.length}  {t("个，已选")} {selectedIds.size}  {t("个")}
           </span>
@@ -1759,9 +1759,9 @@ export default function AssetManagement() {
 
       <div className="flex-1 overflow-auto p-6">
         {error && (
-          <div className="mb-4 glass-card rounded-card-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-4 text-[#EF4444] text-body-sm flex items-center justify-between">
+          <div className="mb-4 glass-card rounded-card-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-4 text-danger-ink text-body-sm flex items-center justify-between">
             <span>{error}</span>
-            <button onClick={() => setError(null)} className="text-[#EF4444] hover:text-[#DC2626]">
+            <button onClick={() => setError(null)} className="text-danger-ink hover:text-danger-ink">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -1769,16 +1769,16 @@ export default function AssetManagement() {
 
         {loading ? (
           <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 text-[#6366F1] animate-spin" />
+            <Loader2 className="w-8 h-8 text-accent-ink animate-spin" />
           </div>
         ) : filteredAssets.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-center">
-            <FolderOpen className="w-16 h-16 text-[#334155] mb-4" />
-            <p className="text-body-lg text-[#94A3B8] mb-2">{t("暂无素材")}</p>
-            <p className="text-body-sm text-[#64748B] mb-4">{t("点击上传按钮添加素材")}</p>
+            <FolderOpen className="w-16 h-16 text-muted-foreground mb-4" />
+            <p className="text-body-lg text-muted-foreground mb-2">{t("暂无素材")}</p>
+            <p className="text-body-sm text-muted-foreground mb-4">{t("点击上传按钮添加素材")}</p>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2 bg-[#6366F1] hover:bg-[#5558E6] rounded-lg text-body-sm text-white transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-primary hover:brightness-90 rounded-lg text-body-sm text-primary-foreground transition-colors"
             >
               <Upload className="w-4 h-4" />
 
@@ -1797,11 +1797,11 @@ export default function AssetManagement() {
                       ? 'border-[#6366F1] ring-1 ring-[#6366F1]/30'
                       : graphicDraft
                         ? 'border-[#38BDF8]/30 hover:border-[#38BDF8]/60'
-                        : 'border-[#1E293B]'
+                        : 'border-border'
                   }`}
                   onClick={() => setPreviewAsset(asset)}
                 >
-                  <div className="aspect-square bg-[#0B0F1A] flex items-center justify-center relative">
+                  <div className="aspect-square bg-background flex items-center justify-center relative">
                     {renderAssetMedia(asset, 'card')}
                     <button
                       onClick={(event) => {
@@ -1811,7 +1811,7 @@ export default function AssetManagement() {
                       className={`absolute top-2 left-2 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
                         selectedIds.has(asset.id)
                           ? 'bg-[#6366F1] border-[#6366F1]'
-                          : 'border-[#475569] bg-[#0B0F1A]/80'
+                          : 'border-border bg-background/80'
                       }`}
                     >
                       {selectedIds.has(asset.id) && (
@@ -1825,11 +1825,11 @@ export default function AssetManagement() {
                   <div className="p-3">
                     <div className="flex items-center gap-2">
                       {graphicDraft && (
-                        <span className="shrink-0 rounded bg-[#0EA5E9]/15 px-1.5 py-0.5 text-[10px] text-[#BAE6FD]">{t("图文")}</span>
+                        <span className="shrink-0 rounded bg-[#0EA5E9]/15 px-1.5 py-0.5 text-[10px] text-info-ink">{t("图文")}</span>
                       )}
-                      <p className="min-w-0 truncate text-body-sm text-[#F1F5F9]">{asset.name}</p>
+                      <p className="min-w-0 truncate text-body-sm text-foreground">{asset.name}</p>
                     </div>
-                    <p className="text-body-xs text-[#64748B] mt-1">
+                    <p className="text-body-xs text-muted-foreground mt-1">
                       {graphicDraft ? t("图文发布草稿") : formatFileSize(asset.size)}
                     </p>
                   </div>
@@ -1850,7 +1850,7 @@ export default function AssetManagement() {
                       ? 'border-[#6366F1]'
                       : graphicDraft
                         ? 'border-[#38BDF8]/30 hover:border-[#38BDF8]/60'
-                        : 'border-[#1E293B]'
+                        : 'border-border'
                   }`}
                   onClick={() => setPreviewAsset(asset)}
                 >
@@ -1860,7 +1860,7 @@ export default function AssetManagement() {
                       toggleSelect(asset.id)
                     }}
                     className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                      selectedIds.has(asset.id) ? 'bg-[#6366F1] border-[#6366F1]' : 'border-[#475569]'
+                      selectedIds.has(asset.id) ? 'bg-[#6366F1] border-[#6366F1]' : 'border-border'
                     }`}
                   >
                     {selectedIds.has(asset.id) && (
@@ -1870,18 +1870,18 @@ export default function AssetManagement() {
                     )}
                   </button>
 
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${graphicDraft ? 'bg-[#0EA5E9]/15' : 'bg-[#1E293B]'}`}>
-                    <Icon className={`w-5 h-5 ${graphicDraft ? 'text-[#7DD3FC]' : 'text-[#64748B]'}`} />
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${graphicDraft ? 'bg-[#0EA5E9]/15' : 'bg-muted'}`}>
+                    <Icon className={`w-5 h-5 ${graphicDraft ? 'text-info-ink' : 'text-muted-foreground'}`} />
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="min-w-0 truncate text-body-sm text-[#F1F5F9]">{asset.name}</p>
+                      <p className="min-w-0 truncate text-body-sm text-foreground">{asset.name}</p>
                       {graphicDraft && (
-                        <span className="shrink-0 rounded bg-[#0EA5E9]/15 px-1.5 py-0.5 text-[10px] text-[#BAE6FD]">{t("图文草稿")}</span>
+                        <span className="shrink-0 rounded bg-[#0EA5E9]/15 px-1.5 py-0.5 text-[10px] text-info-ink">{t("图文草稿")}</span>
                       )}
                     </div>
-                    <p className="text-body-xs text-[#64748B]">{graphicDraft ? t("包含正文、标签、配图顺序和发布建议") : formatFileSize(asset.size)}</p>
+                    <p className="text-body-xs text-muted-foreground">{graphicDraft ? t("包含正文、标签、配图顺序和发布建议") : formatFileSize(asset.size)}</p>
                   </div>
 
                   <div className="flex items-center gap-1">
@@ -1890,7 +1890,7 @@ export default function AssetManagement() {
                         event.stopPropagation()
                         handleOpen(asset)
                       }}
-                      className="p-2 rounded-lg hover:bg-[#1E293B] text-[#64748B] hover:text-[#F1F5F9] transition-colors"
+                      className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                     >
                       <FolderOpen className="w-4 h-4" />
                     </button>
@@ -1899,7 +1899,7 @@ export default function AssetManagement() {
                         event.stopPropagation()
                         handleDelete(asset.id)
                       }}
-                      className="p-2 rounded-lg hover:bg-[#EF4444]/20 text-[#64748B] hover:text-[#EF4444] transition-colors"
+                      className="p-2 rounded-lg hover:bg-[#EF4444]/20 text-muted-foreground hover:text-danger-ink transition-colors"
                       title={t("从素材管理与发布中移除")}
                     >
                       <Trash2 className="w-4 h-4" />
@@ -1918,25 +1918,25 @@ export default function AssetManagement() {
           onClick={() => setPreviewAsset(null)}
         >
           <div
-            className="glass-card rounded-card-xl border border-[#1E293B] max-w-4xl max-h-[90vh] overflow-hidden"
+            className="glass-card rounded-card-xl border border-border max-w-4xl max-h-[90vh] overflow-hidden"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#1E293B]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <div className="flex items-center gap-3">
                 {(() => {
                   const Icon = isGraphicDraftAsset(previewAsset) ? Newspaper : (TYPE_ICONS[previewAsset.type] || FileImage)
-                  return <Icon className="w-5 h-5 text-[#6366F1]" />
+                  return <Icon className="w-5 h-5 text-accent-ink" />
                 })()}
                 <div>
-                  <p className="text-body-md text-[#F1F5F9] font-medium">{previewAsset.name}</p>
-                  <p className="text-body-xs text-[#64748B]">
+                  <p className="text-body-md text-foreground font-medium">{previewAsset.name}</p>
+                  <p className="text-body-xs text-muted-foreground">
                     {formatFileSize(previewAsset.size)} · {new Date(previewAsset.created_at).toLocaleDateString('zh-CN')}
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setPreviewAsset(null)}
-                className="p-2 rounded-lg hover:bg-[#1E293B] text-[#64748B] hover:text-[#F1F5F9] transition-colors"
+                className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1946,10 +1946,10 @@ export default function AssetManagement() {
               {renderAssetMedia(previewAsset, 'preview')}
             </div>
 
-            <div className="flex justify-end gap-2 px-6 py-4 border-t border-[#1E293B]">
+            <div className="flex justify-end gap-2 px-6 py-4 border-t border-border">
               <button
                 onClick={() => handleOpen(previewAsset)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1E293B] hover:bg-[#334155] text-[#F1F5F9] text-body-sm transition-colors"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-muted hover:bg-muted text-foreground text-body-sm transition-colors"
               >
                 <FolderOpen className="w-4 h-4" />
 
@@ -1960,7 +1960,7 @@ export default function AssetManagement() {
                   handleDelete(previewAsset.id)
                   setPreviewAsset(null)
                 }}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#EF4444]/20 hover:bg-[#EF4444]/30 text-[#EF4444] text-body-sm transition-colors"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#EF4444]/20 hover:bg-[#EF4444]/30 text-danger-ink text-body-sm transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
 
@@ -1972,7 +1972,7 @@ export default function AssetManagement() {
       )}
 
       {toast && (
-        <div className="fixed bottom-5 left-5 z-[60] rounded-lg border border-[#6366F1]/40 bg-[#111827] px-4 py-2 text-body-sm text-[#E0E7FF] shadow-2xl">
+        <div className="fixed bottom-5 left-5 z-[60] rounded-lg border border-[#6366F1]/40 bg-card px-4 py-2 text-body-sm text-accent-ink shadow-2xl">
           {toast}
         </div>
       )}
@@ -2197,15 +2197,15 @@ function ComposeGraphicDrawer({
     return (
       <div className="my-4 grid gap-3" style={{ gridTemplateColumns: anchored.length === 1 ? '1fr' : 'repeat(2, minmax(0, 1fr))' }}>
         {anchored.map(({ asset, caption }) => (
-          <figure key={`${paragraph}-${asset.id}`} className="overflow-hidden rounded-xl border border-[#1E293B] bg-[#0B0F1A]">
-            <div className="aspect-[4/3] bg-[#111827]">
+          <figure key={`${paragraph}-${asset.id}`} className="overflow-hidden rounded-xl border border-border bg-background">
+            <div className="aspect-[4/3] bg-card">
               {asset.type === 'image' ? (
                 <img src={assetUrl(asset)} alt={asset.name} className="h-full w-full object-cover" />
               ) : (
                 <video src={assetUrl(asset)} muted preload="metadata" className="h-full w-full object-cover" />
               )}
             </div>
-            <figcaption className="px-3 py-2 text-[11px] leading-5 text-[#94A3B8]">
+            <figcaption className="px-3 py-2 text-[11px] leading-5 text-muted-foreground">
               {caption || asset.name}
             </figcaption>
           </figure>
@@ -2235,8 +2235,8 @@ function ComposeGraphicDrawer({
   }, [draft, prepared, onSaved])
 
   const renderQuestion = (question: ComposeQuestion) => (
-    <div key={question.id} className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
-      <div className="mb-3 text-body-sm font-medium text-[#F1F5F9]">{question.question}</div>
+    <div key={question.id} className="rounded-lg border border-border bg-background p-4">
+      <div className="mb-3 text-body-sm font-medium text-foreground">{question.question}</div>
       {question.options.length > 0 ? (
         <div className="grid gap-2 sm:grid-cols-2">
           {question.options.map((option) => {
@@ -2248,8 +2248,8 @@ function ComposeGraphicDrawer({
                 onClick={() => setAnswers((prev) => ({ ...prev, [question.id]: option.value }))}
                 className={`rounded-lg border px-3 py-2 text-left text-body-sm transition-all ${
                   selected
-                    ? 'border-[#6366F1]/70 bg-[#6366F1]/20 text-[#E0E7FF]'
-                    : 'border-[#1E293B] bg-[#111827] text-[#94A3B8] hover:border-[#475569] hover:text-[#F1F5F9]'
+                    ? 'border-[#6366F1]/70 bg-[#6366F1]/20 text-accent-ink'
+                    : 'border-border bg-card text-muted-foreground hover:border-border hover:text-foreground'
                 }`}
               >
                 {option.label}
@@ -2261,7 +2261,7 @@ function ComposeGraphicDrawer({
         <textarea
           value={answers[question.id] || ''}
           onChange={(event) => setAnswers((prev) => ({ ...prev, [question.id]: event.target.value }))}
-          className="h-20 w-full resize-none rounded-lg border border-[#1E293B] bg-[#111827] px-3 py-2 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+          className="h-20 w-full resize-none rounded-lg border border-border bg-card px-3 py-2 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
         />
       )}
     </div>
@@ -2270,33 +2270,33 @@ function ComposeGraphicDrawer({
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="flex h-full w-full max-w-5xl flex-col border-l border-[#1E293B] bg-[#020617] shadow-2xl"
+        className="flex h-full w-full max-w-5xl flex-col border-l border-border bg-background shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-[#1E293B] px-6 py-4">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <div className="flex items-center gap-2 text-heading-sm text-[#F1F5F9]">
-              <FileText className="h-5 w-5 text-[#A5B4FC]" />
+            <div className="flex items-center gap-2 text-heading-sm text-foreground">
+              <FileText className="h-5 w-5 text-accent-ink" />
 
               {t("一键图文")}
             </div>
-            <div className="mt-1 text-body-xs text-[#64748B]">
+            <div className="mt-1 text-body-xs text-muted-foreground">
 
               {t("已选")} {assets.length}  {t("个素材 · AI 理解素材 · 生成发布草稿包")}
             </div>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 text-[#64748B] transition-colors hover:bg-[#1E293B] hover:text-[#F1F5F9]">
+          <button onClick={onClose} className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <div className="grid flex-1 min-h-0 grid-cols-[280px_1fr]">
-          <aside className="overflow-auto border-r border-[#1E293B] p-4">
-            <div className="mb-3 text-body-xs text-[#64748B]">{t("已选素材")}</div>
+          <aside className="overflow-auto border-r border-border p-4">
+            <div className="mb-3 text-body-xs text-muted-foreground">{t("已选素材")}</div>
             <div className="space-y-3">
               {assets.map((asset) => (
-                <div key={asset.id} className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-3">
-                  <div className="aspect-video overflow-hidden rounded-md bg-[#111827]">
+                <div key={asset.id} className="rounded-lg border border-border bg-background p-3">
+                  <div className="aspect-video overflow-hidden rounded-md bg-card">
                     {asset.type === 'image' ? (
                       <img src={assetUrl(asset)} alt={asset.name} className="h-full w-full object-cover" />
                     ) : asset.type === 'video' ? (
@@ -2305,13 +2305,13 @@ function ComposeGraphicDrawer({
                       <div className="flex h-full items-center justify-center">
                         {(() => {
                           const Icon = TYPE_ICONS[asset.type] || FileText
-                          return <Icon className="h-8 w-8 text-[#6366F1]" />
+                          return <Icon className="h-8 w-8 text-accent-ink" />
                         })()}
                       </div>
                     )}
                   </div>
-                  <div className="mt-2 truncate text-body-xs text-[#F1F5F9]">{asset.name}</div>
-                  <div className="text-[11px] text-[#64748B]">{asset.type}</div>
+                  <div className="mt-2 truncate text-body-xs text-foreground">{asset.name}</div>
+                  <div className="text-[11px] text-muted-foreground">{asset.type}</div>
                 </div>
               ))}
             </div>
@@ -2329,8 +2329,8 @@ function ComposeGraphicDrawer({
                   key={key}
                   className={`rounded-lg border px-3 py-2 text-center text-body-xs ${
                     step === key
-                      ? 'border-[#6366F1]/70 bg-[#6366F1]/20 text-[#E0E7FF]'
-                      : 'border-[#1E293B] bg-[#0B0F1A] text-[#64748B]'
+                      ? 'border-[#6366F1]/70 bg-[#6366F1]/20 text-accent-ink'
+                      : 'border-border bg-background text-muted-foreground'
                   }`}
                 >
                   {index + 1}. {label}
@@ -2339,42 +2339,42 @@ function ComposeGraphicDrawer({
             </div>
 
             {error && (
-              <div className="mb-4 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-4 text-body-sm text-[#FCA5A5]">
+              <div className="mb-4 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-4 text-body-sm text-danger-ink">
                 {error}
               </div>
             )}
 
             {loading === 'analyze' && (
-              <div className="flex min-h-[360px] flex-col items-center justify-center rounded-lg border border-[#1E293B] bg-[#0B0F1A]">
-                <Loader2 className="mb-4 h-8 w-8 animate-spin text-[#6366F1]" />
-                <div className="text-body-md text-[#F1F5F9]">{t("AI 正在理解素材")}</div>
+              <div className="flex min-h-[360px] flex-col items-center justify-center rounded-lg border border-border bg-background">
+                <Loader2 className="mb-4 h-8 w-8 animate-spin text-accent-ink" />
+                <div className="text-body-md text-foreground">{t("AI 正在理解素材")}</div>
               </div>
             )}
 
             {analysis && step !== 'analyze' && (
-              <div className="mb-4 rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
-                <div className="mb-2 flex items-center gap-2 text-body-sm font-medium text-[#F1F5F9]">
-                  <Check className="h-4 w-4 text-[#10B981]" />
+              <div className="mb-4 rounded-lg border border-border bg-background p-4">
+                <div className="mb-2 flex items-center gap-2 text-body-sm font-medium text-foreground">
+                  <Check className="h-4 w-4 text-success-ink" />
 
                   {t("素材理解结果")}
                 </div>
-                <p className="text-body-sm leading-6 text-[#CBD5E1]">{analysis.summary || t("已完成素材理解。")}</p>
+                <p className="text-body-sm leading-6 text-foreground">{analysis.summary || t("已完成素材理解。")}</p>
                 <div className="mt-3 grid gap-2 md:grid-cols-2">
                   {analysis.assets.map((item) => (
                     <button
                       key={item.id}
                       type="button"
                       onClick={() => setSelectedAnalysisItem(item)}
-                      className="rounded-md border border-[#1E293B] bg-[#111827] p-3 text-left transition-all hover:border-[#6366F1]/60 hover:bg-[#162033] focus:outline-none focus:ring-1 focus:ring-[#6366F1]/60"
+                      className="rounded-md border border-border bg-card p-3 text-left transition-all hover:border-[#6366F1]/60 hover:bg-muted focus:outline-none focus:ring-1 focus:ring-[#6366F1]/60"
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-body-xs text-[#F1F5F9]">{item.name}</span>
-                        <span className={`shrink-0 rounded px-2 py-0.5 text-[11px] ${item.status === 'success' ? 'bg-[#10B981]/15 text-[#86EFAC]' : 'bg-[#EF4444]/15 text-[#FCA5A5]'}`}>
+                        <span className="truncate text-body-xs text-foreground">{item.name}</span>
+                        <span className={`shrink-0 rounded px-2 py-0.5 text-[11px] ${item.status === 'success' ? 'bg-[#10B981]/15 text-success-ink' : 'bg-[#EF4444]/15 text-danger-ink'}`}>
                           {item.status}
                         </span>
                       </div>
-                      <div className="mt-1 text-[11px] text-[#A5B4FC]">{item.role || item.type}</div>
-                      <div className="mt-2 line-clamp-3 text-body-xs leading-5 text-[#94A3B8]">{item.summary || item.error || t("暂无摘要")}</div>
+                      <div className="mt-1 text-[11px] text-accent-ink">{item.role || item.type}</div>
+                      <div className="mt-2 line-clamp-3 text-body-xs leading-5 text-muted-foreground">{item.summary || item.error || t("暂无摘要")}</div>
                     </button>
                   ))}
                 </div>
@@ -2383,22 +2383,22 @@ function ComposeGraphicDrawer({
 
             {step === 'questions' && analysis && (
               <div className="space-y-4">
-                <div className="text-body-sm text-[#94A3B8]">{t("根据素材内容，AI 只需要你确认几个图文方向。")}</div>
+                <div className="text-body-sm text-muted-foreground">{t("根据素材内容，AI 只需要你确认几个图文方向。")}</div>
                 {analysis.questions.map(renderQuestion)}
                 <label className="block">
-                  <span className="mb-2 block text-body-xs text-[#64748B]">{t("补充要求")}</span>
+                  <span className="mb-2 block text-body-xs text-muted-foreground">{t("补充要求")}</span>
                   <textarea
                     value={userInstruction}
                     onChange={(event) => setUserInstruction(event.target.value)}
                     placeholder={t("例如：偏小红书种草语气，突出门店优惠，不要太夸张。")}
-                    className="h-24 w-full resize-none rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 py-2 text-body-sm text-[#F1F5F9] outline-none placeholder:text-[#475569] focus:border-[#6366F1]"
+                    className="h-24 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-body-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-[#6366F1]"
                   />
                 </label>
                 <div className="flex items-center justify-between gap-3">
                   <button
                     onClick={handlePrepare}
                     disabled={loading === 'prepare'}
-                    className="inline-flex items-center gap-2 rounded-lg bg-[#6366F1] px-5 py-2.5 text-body-sm text-white transition-colors hover:bg-[#5558E6] disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-body-sm text-primary-foreground transition-colors hover:brightness-90 disabled:opacity-50"
                   >
                     {loading === 'prepare' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
 
@@ -2407,7 +2407,7 @@ function ComposeGraphicDrawer({
                   <button
                     onClick={handleRegenerateAnalysis}
                     disabled={loading === 'analyze'}
-                    className="inline-flex items-center gap-2 rounded-lg border border-[#334155] bg-[#111827] px-4 py-2.5 text-body-sm text-[#CBD5E1] transition-colors hover:border-[#6366F1]/60 hover:text-[#F1F5F9] disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2.5 text-body-sm text-foreground transition-colors hover:border-[#6366F1]/60 hover:text-foreground disabled:opacity-50"
                   >
                     {loading === 'analyze' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
 
@@ -2419,21 +2419,21 @@ function ComposeGraphicDrawer({
 
             {step === 'draft' && draft && (
               <div className="space-y-4">
-                <div className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
-                  <div className="mb-2 text-body-sm font-medium text-[#F1F5F9]">{t("图文草稿包")}</div>
-                  <p className="text-body-sm leading-6 text-[#CBD5E1]">{prepared?.summary || t("已生成可发布的图文草稿。")}</p>
+                <div className="rounded-lg border border-border bg-background p-4">
+                  <div className="mb-2 text-body-sm font-medium text-foreground">{t("图文草稿包")}</div>
+                  <p className="text-body-sm leading-6 text-foreground">{prepared?.summary || t("已生成可发布的图文草稿。")}</p>
                 </div>
                 <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.9fr)_minmax(420px,1.1fr)]">
-                  <section className="overflow-hidden rounded-xl border border-[#1E293B] bg-[#0B0F1A]">
-                    <div className="flex items-center justify-between border-b border-[#1E293B] px-4 py-3">
-                      <div className="text-body-sm font-medium text-[#F1F5F9]">{t("图文预览")}</div>
-                      <div className="text-[11px] text-[#64748B]">{graphicPreviewAssets.length}  {t("个视觉素材")}</div>
+                  <section className="overflow-hidden rounded-xl border border-border bg-background">
+                    <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                      <div className="text-body-sm font-medium text-foreground">{t("图文预览")}</div>
+                      <div className="text-[11px] text-muted-foreground">{graphicPreviewAssets.length}  {t("个视觉素材")}</div>
                     </div>
                     <div className="p-4">
-                      <article className="mt-4 rounded-lg border border-[#1E293B] bg-[#111827] p-4">
-                        <h3 className="text-heading-sm leading-7 text-[#F8FAFC]">{draft.title || t("未命名图文标题")}</h3>
+                      <article className="mt-4 rounded-lg border border-border bg-card p-4">
+                        <h3 className="text-heading-sm leading-7 text-foreground">{draft.title || t("未命名图文标题")}</h3>
                         {renderAnchoredAssets(0)}
-                        <div className="mt-3 space-y-4 text-body-sm leading-7 text-[#CBD5E1]">
+                        <div className="mt-3 space-y-4 text-body-sm leading-7 text-foreground">
                           {draftParagraphs.length > 0 ? draftParagraphs.map((paragraph, index) => (
                             <div key={`${index}-${paragraph.slice(0, 12)}`}>
                               <p className="whitespace-pre-wrap break-words">{paragraph}</p>
@@ -2444,13 +2444,13 @@ function ComposeGraphicDrawer({
                         {draft.tags.length > 0 && (
                           <div className="mt-4 flex flex-wrap gap-2">
                             {draft.tags.map((tag) => (
-                              <span key={tag} className="rounded-full bg-[#6366F1]/15 px-2.5 py-1 text-[11px] text-[#C7D2FE]">#{tag}</span>
+                              <span key={tag} className="rounded-full bg-[#6366F1]/15 px-2.5 py-1 text-[11px] text-accent-ink">#{tag}</span>
                             ))}
                           </div>
                         )}
                       </article>
                       {draft.publish_notes && (
-                        <div className="mt-3 rounded-lg border border-[#1E293B] bg-[#111827] p-3 text-body-xs leading-5 text-[#94A3B8]">
+                        <div className="mt-3 rounded-lg border border-border bg-card p-3 text-body-xs leading-5 text-muted-foreground">
                           {draft.publish_notes}
                         </div>
                       )}
@@ -2459,7 +2459,7 @@ function ComposeGraphicDrawer({
 
                   <section className="space-y-3">
                     <label className="block">
-                      <span className="mb-2 flex items-center justify-between gap-3 text-body-xs text-[#64748B]">
+                      <span className="mb-2 flex items-center justify-between gap-3 text-body-xs text-muted-foreground">
                         <span>{t("标题")}</span>
                         <span>{Array.from(draft.title || '').length}/{GRAPHIC_DRAFT_TITLE_LIMIT}</span>
                       </span>
@@ -2475,70 +2475,70 @@ function ComposeGraphicDrawer({
                           const pasted = event.clipboardData.getData('text')
                           updateDraftTitle(`${draft.title.slice(0, start)}${pasted}${draft.title.slice(end)}`)
                         }}
-                        className="w-full rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 py-2 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
                       />
-                      {notice && <div className="mt-1 text-body-xs text-[#FBBF24]">{notice}</div>}
+                      {notice && <div className="mt-1 text-body-xs text-warning-ink">{notice}</div>}
                     </label>
                     <label className="block">
-                      <span className="mb-2 block text-body-xs text-[#64748B]">{t("正文")}</span>
+                      <span className="mb-2 block text-body-xs text-muted-foreground">{t("正文")}</span>
                       <textarea
                         value={draft.body}
                         onChange={(event) => updateDraft({ body: event.target.value })}
-                        className="h-52 w-full resize-none rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 py-2 text-body-sm leading-6 text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+                        className="h-52 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-body-sm leading-6 text-foreground outline-none focus:border-[#6366F1]"
                       />
                     </label>
                     <div className="grid gap-3 md:grid-cols-2">
                       <label className="block">
-                        <span className="mb-2 block text-body-xs text-[#64748B]">{t("标签")}</span>
+                        <span className="mb-2 block text-body-xs text-muted-foreground">{t("标签")}</span>
                         <input
                           value={draft.tags.join('，')}
                           onChange={(event) => updateDraft({ tags: event.target.value.split(/[，,]/).map((item) => item.trim().replace(/^#/, '')).filter(Boolean) })}
-                          className="w-full rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 py-2 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
                         />
                       </label>
                       <label className="block">
-                        <span className="mb-2 block text-body-xs text-[#64748B]">{t("平台建议")}</span>
+                        <span className="mb-2 block text-body-xs text-muted-foreground">{t("平台建议")}</span>
                         <input
                           value={draft.platform_suggestion.join('，')}
                           onChange={(event) => updateDraft({ platform_suggestion: event.target.value.split(/[，,]/).map((item) => item.trim()).filter(Boolean) })}
-                          className="w-full rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 py-2 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+                          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
                         />
                       </label>
                     </div>
                     <label className="block">
-                      <span className="mb-2 block text-body-xs text-[#64748B]">{t("配图顺序")}</span>
+                      <span className="mb-2 block text-body-xs text-muted-foreground">{t("配图顺序")}</span>
                       <input
                         value={draft.image_order.join('，')}
                         onChange={(event) => updateDraft({ image_order: event.target.value.split(/[，,]/).map((item) => item.trim()).filter(Boolean) })}
-                        className="w-full rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 py-2 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+                        className="w-full rounded-lg border border-border bg-background px-3 py-2 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
                       />
                     </label>
                     {graphicPreviewAssets.length > 0 && (
-                      <div className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-3">
-                        <div className="mb-3 text-body-xs text-[#64748B]">{t("配图位置")}</div>
+                      <div className="rounded-lg border border-border bg-background p-3">
+                        <div className="mb-3 text-body-xs text-muted-foreground">{t("配图位置")}</div>
                         <div className="space-y-3">
                           {graphicPreviewAssets.map((asset) => {
                             const anchor = (draft.image_anchors || []).find((item) => item.asset_id === asset.id)
                             return (
-                              <div key={asset.id} className="grid gap-2 rounded-lg border border-[#1E293B] bg-[#111827] p-3 md:grid-cols-[minmax(0,1fr)_120px]">
+                              <div key={asset.id} className="grid gap-2 rounded-lg border border-border bg-card p-3 md:grid-cols-[minmax(0,1fr)_120px]">
                                 <div className="min-w-0">
-                                  <div className="truncate text-body-xs text-[#F1F5F9]">{asset.name}</div>
+                                  <div className="truncate text-body-xs text-foreground">{asset.name}</div>
                                   <input
                                     value={anchor?.caption || ''}
                                     onChange={(event) => updateImageAnchor(asset.id, { caption: event.target.value })}
                                     placeholder={t("配图说明")}
-                                    className="mt-2 w-full rounded-md border border-[#1E293B] bg-[#0B0F1A] px-2 py-1.5 text-body-xs text-[#CBD5E1] outline-none focus:border-[#6366F1]"
+                                    className="mt-2 w-full rounded-md border border-border bg-background px-2 py-1.5 text-body-xs text-foreground outline-none focus:border-[#6366F1]"
                                   />
                                 </div>
                                 <label className="block">
-                                  <span className="mb-1 block text-[11px] text-[#64748B]">{t("插入段落后")}</span>
+                                  <span className="mb-1 block text-[11px] text-muted-foreground">{t("插入段落后")}</span>
                                   <input
                                     type="number"
                                     min={0}
                                     max={Math.max(1, draftParagraphs.length)}
                                     value={anchor?.anchor_after_paragraph ?? 1}
                                     onChange={(event) => updateImageAnchor(asset.id, { anchor_after_paragraph: Math.max(0, Math.min(Math.max(1, draftParagraphs.length), Number(event.target.value) || 0)) })}
-                                    className="h-9 w-full rounded-md border border-[#1E293B] bg-[#0B0F1A] px-2 text-body-xs text-[#CBD5E1] outline-none focus:border-[#6366F1]"
+                                    className="h-9 w-full rounded-md border border-border bg-background px-2 text-body-xs text-foreground outline-none focus:border-[#6366F1]"
                                   />
                                 </label>
                               </div>
@@ -2548,11 +2548,11 @@ function ComposeGraphicDrawer({
                       </div>
                     )}
                     <label className="block">
-                      <span className="mb-2 block text-body-xs text-[#64748B]">{t("发布建议")}</span>
+                      <span className="mb-2 block text-body-xs text-muted-foreground">{t("发布建议")}</span>
                       <textarea
                         value={draft.publish_notes}
                         onChange={(event) => updateDraft({ publish_notes: event.target.value })}
-                        className="h-24 w-full resize-none rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 py-2 text-body-sm leading-6 text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+                        className="h-24 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-body-sm leading-6 text-foreground outline-none focus:border-[#6366F1]"
                       />
                     </label>
                   </section>
@@ -2560,7 +2560,7 @@ function ComposeGraphicDrawer({
                 <button
                   onClick={handleSave}
                   disabled={loading === 'save'}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#6366F1] px-5 py-2.5 text-body-sm text-white transition-colors hover:bg-[#5558E6] disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-body-sm text-primary-foreground transition-colors hover:brightness-90 disabled:opacity-50"
                 >
                   {loading === 'save' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
 
@@ -2570,10 +2570,10 @@ function ComposeGraphicDrawer({
             )}
 
             {step === 'saved' && (
-              <div className="flex min-h-[360px] flex-col items-center justify-center rounded-lg border border-[#1E293B] bg-[#0B0F1A] text-center">
-                <Check className="mb-4 h-10 w-10 text-[#10B981]" />
-                <div className="text-body-lg text-[#F1F5F9]">{t("图文草稿已保存")}</div>
-                <div className="mt-2 max-w-xl break-all text-body-sm text-[#64748B]">{savedPath}</div>
+              <div className="flex min-h-[360px] flex-col items-center justify-center rounded-lg border border-border bg-background text-center">
+                <Check className="mb-4 h-10 w-10 text-success-ink" />
+                <div className="text-body-lg text-foreground">{t("图文草稿已保存")}</div>
+                <div className="mt-2 max-w-xl break-all text-body-sm text-muted-foreground">{savedPath}</div>
               </div>
             )}
           </main>
@@ -2585,15 +2585,15 @@ function ComposeGraphicDrawer({
             onClick={() => setSelectedAnalysisItem(null)}
           >
             <div
-              className="w-full max-w-2xl rounded-xl border border-[#1E293B] bg-[#020617] shadow-2xl"
+              className="w-full max-w-2xl rounded-xl border border-border bg-background shadow-2xl"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="flex items-start justify-between gap-4 border-b border-[#1E293B] px-5 py-4">
+              <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
                 <div className="min-w-0">
-                  <div className="truncate text-body-md font-medium text-[#F1F5F9]">{selectedAnalysisItem.name}</div>
+                  <div className="truncate text-body-md font-medium text-foreground">{selectedAnalysisItem.name}</div>
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px]">
-                    <span className="rounded bg-[#6366F1]/15 px-2 py-0.5 text-[#A5B4FC]">{selectedAnalysisItem.role || selectedAnalysisItem.type}</span>
-                    <span className={`rounded px-2 py-0.5 ${selectedAnalysisItem.status === 'success' ? 'bg-[#10B981]/15 text-[#86EFAC]' : 'bg-[#EF4444]/15 text-[#FCA5A5]'}`}>
+                    <span className="rounded bg-[#6366F1]/15 px-2 py-0.5 text-accent-ink">{selectedAnalysisItem.role || selectedAnalysisItem.type}</span>
+                    <span className={`rounded px-2 py-0.5 ${selectedAnalysisItem.status === 'success' ? 'bg-[#10B981]/15 text-success-ink' : 'bg-[#EF4444]/15 text-danger-ink'}`}>
                       {selectedAnalysisItem.status}
                     </span>
                   </div>
@@ -2601,21 +2601,21 @@ function ComposeGraphicDrawer({
                 <button
                   type="button"
                   onClick={() => setSelectedAnalysisItem(null)}
-                  className="rounded-lg p-2 text-[#64748B] transition-colors hover:bg-[#1E293B] hover:text-[#F1F5F9]"
+                  className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
               <div className="max-h-[55vh] overflow-auto px-5 py-4">
-                <div className="whitespace-pre-wrap break-words text-body-sm leading-7 text-[#CBD5E1]">
+                <div className="whitespace-pre-wrap break-words text-body-sm leading-7 text-foreground">
                   {selectedAnalysisItem.summary || selectedAnalysisItem.error || t("暂无摘要")}
                 </div>
               </div>
-              <div className="flex justify-end border-t border-[#1E293B] px-5 py-4">
+              <div className="flex justify-end border-t border-border px-5 py-4">
                 <button
                   type="button"
                   onClick={() => setSelectedAnalysisItem(null)}
-                  className="rounded-lg bg-[#1E293B] px-4 py-2 text-body-sm text-[#F1F5F9] transition-colors hover:bg-[#334155]"
+                  className="rounded-lg bg-muted px-4 py-2 text-body-sm text-foreground transition-colors hover:bg-muted"
                 >
 
                   {t("关闭")}
@@ -2909,8 +2909,8 @@ function ComposeVideoDrawer({
   }, [tasks, onGenerated])
 
   const renderQuestion = (question: ComposeQuestion) => (
-    <div key={question.id} className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
-      <div className="mb-3 text-body-sm font-medium text-[#F1F5F9]">{question.question}</div>
+    <div key={question.id} className="rounded-lg border border-border bg-background p-4">
+      <div className="mb-3 text-body-sm font-medium text-foreground">{question.question}</div>
       {question.options.length > 0 ? (
         <div className="grid gap-2 sm:grid-cols-2">
           {question.options.map((option) => {
@@ -2922,8 +2922,8 @@ function ComposeVideoDrawer({
                 onClick={() => setAnswers((prev) => ({ ...prev, [question.id]: option.value }))}
                 className={`rounded-lg border px-3 py-2 text-left text-body-sm transition-all ${
                   selected
-                    ? 'border-[#6366F1]/70 bg-[#6366F1]/20 text-[#E0E7FF]'
-                    : 'border-[#1E293B] bg-[#111827] text-[#94A3B8] hover:border-[#475569] hover:text-[#F1F5F9]'
+                    ? 'border-[#6366F1]/70 bg-[#6366F1]/20 text-accent-ink'
+                    : 'border-border bg-card text-muted-foreground hover:border-border hover:text-foreground'
                 }`}
               >
                 {option.label}
@@ -2935,7 +2935,7 @@ function ComposeVideoDrawer({
         <textarea
           value={answers[question.id] || ''}
           onChange={(event) => setAnswers((prev) => ({ ...prev, [question.id]: event.target.value }))}
-          className="h-20 w-full resize-none rounded-lg border border-[#1E293B] bg-[#111827] px-3 py-2 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+          className="h-20 w-full resize-none rounded-lg border border-border bg-card px-3 py-2 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
         />
       )}
     </div>
@@ -2944,33 +2944,33 @@ function ComposeVideoDrawer({
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
-        className="flex h-full w-full max-w-5xl flex-col border-l border-[#1E293B] bg-[#020617] shadow-2xl"
+        className="flex h-full w-full max-w-5xl flex-col border-l border-border bg-background shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-[#1E293B] px-6 py-4">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <div className="flex items-center gap-2 text-heading-sm text-[#F1F5F9]">
-              <Wand2 className="h-5 w-5 text-[#A5B4FC]" />
+            <div className="flex items-center gap-2 text-heading-sm text-foreground">
+              <Wand2 className="h-5 w-5 text-accent-ink" />
 
               {t("一键成片")}
             </div>
-            <div className="mt-1 text-body-xs text-[#64748B]">
+            <div className="mt-1 text-body-xs text-muted-foreground">
 
               {t("已选")} {assets.length}/{MAX_COMPOSE_ASSETS}  {t("个素材 · AI 理解素材 ·")} {currentModelLabel}
             </div>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 text-[#64748B] transition-colors hover:bg-[#1E293B] hover:text-[#F1F5F9]">
+          <button onClick={onClose} className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         <div className="grid flex-1 min-h-0 grid-cols-[280px_1fr]">
-          <aside className="overflow-auto border-r border-[#1E293B] p-4">
-            <div className="mb-3 text-body-xs text-[#64748B]">{t("已选素材")}</div>
+          <aside className="overflow-auto border-r border-border p-4">
+            <div className="mb-3 text-body-xs text-muted-foreground">{t("已选素材")}</div>
             <div className="space-y-3">
               {assets.map((asset) => (
-                <div key={asset.id} className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-3">
-                  <div className="aspect-video overflow-hidden rounded-md bg-[#111827]">
+                <div key={asset.id} className="rounded-lg border border-border bg-background p-3">
+                  <div className="aspect-video overflow-hidden rounded-md bg-card">
                     {asset.type === 'image' ? (
                       <img src={assetUrl(asset)} alt={asset.name} className="h-full w-full object-cover" />
                     ) : asset.type === 'video' ? (
@@ -2979,13 +2979,13 @@ function ComposeVideoDrawer({
                       <div className="flex h-full items-center justify-center">
                         {(() => {
                           const Icon = TYPE_ICONS[asset.type] || FileText
-                          return <Icon className="h-8 w-8 text-[#6366F1]" />
+                          return <Icon className="h-8 w-8 text-accent-ink" />
                         })()}
                       </div>
                     )}
                   </div>
-                  <div className="mt-2 truncate text-body-xs text-[#F1F5F9]">{asset.name}</div>
-                  <div className="text-[11px] text-[#64748B]">{asset.type}</div>
+                  <div className="mt-2 truncate text-body-xs text-foreground">{asset.name}</div>
+                  <div className="text-[11px] text-muted-foreground">{asset.type}</div>
                 </div>
               ))}
             </div>
@@ -3003,8 +3003,8 @@ function ComposeVideoDrawer({
                   key={key}
                   className={`rounded-lg border px-3 py-2 text-center text-body-xs ${
                     step === key
-                      ? 'border-[#6366F1]/70 bg-[#6366F1]/20 text-[#E0E7FF]'
-                      : 'border-[#1E293B] bg-[#0B0F1A] text-[#64748B]'
+                      ? 'border-[#6366F1]/70 bg-[#6366F1]/20 text-accent-ink'
+                      : 'border-border bg-background text-muted-foreground'
                   }`}
                 >
                   {index + 1}. {label}
@@ -3013,55 +3013,55 @@ function ComposeVideoDrawer({
             </div>
 
             {error && (
-              <div className="mb-4 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-4 text-body-sm text-[#FCA5A5]">
+              <div className="mb-4 rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-4 text-body-sm text-danger-ink">
                 {error}
               </div>
             )}
 
             {loading === 'analyze' && (
-              <div className="flex min-h-[360px] flex-col items-center justify-center rounded-lg border border-[#1E293B] bg-[#0B0F1A]">
-                <Loader2 className="mb-4 h-8 w-8 animate-spin text-[#6366F1]" />
-                <div className="text-body-md text-[#F1F5F9]">{t("AI 正在理解素材")}</div>
+              <div className="flex min-h-[360px] flex-col items-center justify-center rounded-lg border border-border bg-background">
+                <Loader2 className="mb-4 h-8 w-8 animate-spin text-accent-ink" />
+                <div className="text-body-md text-foreground">{t("AI 正在理解素材")}</div>
               </div>
             )}
 
             {analysis && step !== 'analyze' && (
-              <div className="mb-4 rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
-                <div className="mb-2 flex items-center gap-2 text-body-sm font-medium text-[#F1F5F9]">
-                  <Check className="h-4 w-4 text-[#10B981]" />
+              <div className="mb-4 rounded-lg border border-border bg-background p-4">
+                <div className="mb-2 flex items-center gap-2 text-body-sm font-medium text-foreground">
+                  <Check className="h-4 w-4 text-success-ink" />
 
                   {t("素材理解结果")}
                 </div>
-                <p className="text-body-sm leading-6 text-[#CBD5E1]">{analysis.summary || t("已完成素材理解。")}</p>
+                <p className="text-body-sm leading-6 text-foreground">{analysis.summary || t("已完成素材理解。")}</p>
                 <div className="mt-3 grid gap-2 md:grid-cols-2">
                   {analysis.assets.map((item) => (
-                    <div key={item.id} className="rounded-md border border-[#1E293B] bg-[#111827] p-3">
+                    <div key={item.id} className="rounded-md border border-border bg-card p-3">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-body-xs text-[#F1F5F9]">{item.name}</span>
-                        <span className={`shrink-0 rounded px-2 py-0.5 text-[11px] ${item.status === 'success' ? 'bg-[#10B981]/15 text-[#86EFAC]' : 'bg-[#EF4444]/15 text-[#FCA5A5]'}`}>
+                        <span className="truncate text-body-xs text-foreground">{item.name}</span>
+                        <span className={`shrink-0 rounded px-2 py-0.5 text-[11px] ${item.status === 'success' ? 'bg-[#10B981]/15 text-success-ink' : 'bg-[#EF4444]/15 text-danger-ink'}`}>
                           {item.status}
                         </span>
                       </div>
-                      <div className="mt-1 text-[11px] text-[#A5B4FC]">{item.role || item.type}</div>
-                      <div className="mt-2 line-clamp-3 text-body-xs leading-5 text-[#94A3B8]">{item.summary || item.error || t("暂无摘要")}</div>
+                      <div className="mt-1 text-[11px] text-accent-ink">{item.role || item.type}</div>
+                      <div className="mt-2 line-clamp-3 text-body-xs leading-5 text-muted-foreground">{item.summary || item.error || t("暂无摘要")}</div>
                     </div>
                   ))}
                 </div>
                 {analysis.warnings.length > 0 && (
-                  <div className="mt-3 text-body-xs text-[#FBBF24]">{analysis.warnings.join('；')}</div>
+                  <div className="mt-3 text-body-xs text-warning-ink">{analysis.warnings.join('；')}</div>
                 )}
               </div>
             )}
 
             {step === 'questions' && analysis && (
               <div className="space-y-4">
-                <div className="text-body-sm text-[#94A3B8]">{t("根据素材内容，AI 只需要你确认下面几个关键方向。")}</div>
+                <div className="text-body-sm text-muted-foreground">{t("根据素材内容，AI 只需要你确认下面几个关键方向。")}</div>
                 {analysis.questions.map(renderQuestion)}
                 <ComposeParamsPanel params={params} models={videoModels} onChange={setParams} advancedOpen={advancedOpen} onToggleAdvanced={() => setAdvancedOpen((value) => !value)} />
                 <button
                   onClick={() => handlePrepare()}
                   disabled={loading === 'prepare'}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#6366F1] px-5 py-2.5 text-body-sm text-white transition-colors hover:bg-[#5558E6] disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-body-sm text-primary-foreground transition-colors hover:brightness-90 disabled:opacity-50"
                 >
                   {loading === 'prepare' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
 
@@ -3072,32 +3072,32 @@ function ComposeVideoDrawer({
 
             {step === 'prepare' && prepared && (
               <div className="space-y-4">
-                <div className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
-                  <div className="mb-2 text-body-sm font-medium text-[#F1F5F9]">{t("成片方案")}</div>
-                  <p className="text-body-sm leading-6 text-[#CBD5E1]">{prepared.summary || t("已生成分镜和最终提示词。")}</p>
+                <div className="rounded-lg border border-border bg-background p-4">
+                  <div className="mb-2 text-body-sm font-medium text-foreground">{t("成片方案")}</div>
+                  <p className="text-body-sm leading-6 text-foreground">{prepared.summary || t("已生成分镜和最终提示词。")}</p>
                 </div>
                 <div className="grid gap-3">
                   {prepared.storyboard.map((shot, index) => (
-                    <div key={shot.id || index} className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
-                      <div className="mb-2 text-body-sm font-medium text-[#F1F5F9]">{t("镜头")} {index + 1} · {shot.title}</div>
-                      <div className="text-body-xs leading-6 text-[#94A3B8]">{shot.scene}</div>
-                      <div className="mt-2 text-[11px] text-[#64748B]">{shot.duration}s · {shot.shot_size} · {shot.camera}</div>
+                    <div key={shot.id || index} className="rounded-lg border border-border bg-background p-4">
+                      <div className="mb-2 text-body-sm font-medium text-foreground">{t("镜头")} {index + 1} · {shot.title}</div>
+                      <div className="text-body-xs leading-6 text-muted-foreground">{shot.scene}</div>
+                      <div className="mt-2 text-[11px] text-muted-foreground">{shot.duration}s · {shot.shot_size} · {shot.camera}</div>
                     </div>
                   ))}
                 </div>
                 <label className="block">
-                  <span className="mb-2 block text-body-xs text-[#64748B]">{t("最终提示词")}</span>
+                  <span className="mb-2 block text-body-xs text-muted-foreground">{t("最终提示词")}</span>
                   <textarea
                     value={prepared.final_prompt}
                     onChange={(event) => setPrepared((current) => current ? { ...current, final_prompt: event.target.value } : current)}
-                    className="h-40 w-full resize-none rounded-lg border border-[#1E293B] bg-[#0B0F1A] px-3 py-2 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+                    className="h-40 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-body-sm text-foreground outline-none focus:border-[#6366F1]"
                   />
                   <div className="mt-3 flex justify-end">
                     <button
                       type="button"
                       onClick={handleRegeneratePrepared}
                       disabled={loading === 'prepare' || !prepared.final_prompt.trim()}
-                      className="inline-flex items-center gap-2 rounded-lg border border-[#334155] bg-[#111827] px-4 py-2 text-body-sm text-[#CBD5E1] transition-colors hover:border-[#6366F1]/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-4 py-2 text-body-sm text-foreground transition-colors hover:border-[#6366F1]/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {loading === 'prepare' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
 
@@ -3106,7 +3106,7 @@ function ComposeVideoDrawer({
                   </div>
                 </label>
                 {prepared.unsupported_features.filter((feature) => feature !== 'audio_reference_input').length > 0 && (
-                  <div className="rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/10 p-3 text-body-xs text-[#FCD34D]">
+                  <div className="rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/10 p-3 text-body-xs text-warning-ink">
 
                     {t("暂不支持：")}{prepared.unsupported_features.filter((feature) => feature !== 'audio_reference_input').map(formatUnsupportedFeature).join('、')}
                   </div>
@@ -3114,7 +3114,7 @@ function ComposeVideoDrawer({
                 <button
                   onClick={handleCreate}
                   disabled={loading === 'create'}
-                  className="inline-flex items-center gap-2 rounded-lg bg-[#6366F1] px-5 py-2.5 text-body-sm text-white transition-colors hover:bg-[#5558E6] disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-body-sm text-primary-foreground transition-colors hover:brightness-90 disabled:opacity-50"
                 >
                   {loading === 'create' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
 
@@ -3126,23 +3126,23 @@ function ComposeVideoDrawer({
             {step === 'tasks' && (
               <div className="space-y-3">
                 {tasks.map((task, index) => (
-                  <div key={task.taskId} className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
+                  <div key={task.taskId} className="rounded-lg border border-border bg-background p-4">
                     <div className="flex items-center justify-between gap-3">
-                      <div className="text-body-sm font-medium text-[#F1F5F9]">{t("生成视频")} {index + 1}</div>
-                      <span className="rounded-md bg-[#1E293B] px-3 py-1 text-body-xs text-[#CBD5E1]">{taskStatusLabel(task.status)}</span>
+                      <div className="text-body-sm font-medium text-foreground">{t("生成视频")} {index + 1}</div>
+                      <span className="rounded-md bg-muted px-3 py-1 text-body-xs text-foreground">{taskStatusLabel(task.status)}</span>
                     </div>
-                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#1E293B]">
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
                       <div className="h-full bg-[#6366F1]" style={{ width: `${Math.min(100, task.progress || (task.status === 'succeeded' ? 100 : 12))}%` }} />
                     </div>
                     {task.videoUrl && (
                       <video src={resolveGeneratedAssetUrl(task.videoUrl, task.localPath || '')} controls className="mt-4 max-h-72 w-full rounded-lg bg-black" />
                     )}
                     {(task.unsupportedFeatures || []).filter((feature) => feature !== 'audio_reference_input').length > 0 && (
-                      <div className="mt-3 rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/10 p-3 text-body-xs leading-5 text-[#FCD34D]">
+                      <div className="mt-3 rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/10 p-3 text-body-xs leading-5 text-warning-ink">
                         {(task.unsupportedFeatures || []).filter((feature) => feature !== 'audio_reference_input').map(formatUnsupportedFeature).join('；')}
                       </div>
                     )}
-                    {task.error && <div className="mt-3 text-body-xs text-[#FCA5A5]">{task.error}</div>}
+                    {task.error && <div className="mt-3 text-body-xs text-danger-ink">{task.error}</div>}
                   </div>
                 ))}
               </div>
@@ -3171,14 +3171,14 @@ function ComposeParamsPanel({
   const update = (patch: Partial<ComposeVideoParams>) => onChange({ ...params, ...patch })
   const selectedModel = models.find((model) => model.id === params.model)
   return (
-    <div className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
-      <button type="button" onClick={onToggleAdvanced} className="mb-3 text-body-sm font-medium text-[#C4B5FD]">
+    <div className="rounded-lg border border-border bg-background p-4">
+      <button type="button" onClick={onToggleAdvanced} className="mb-3 text-body-sm font-medium text-accent-ink">
         {advancedOpen ? t("收起高级参数") : t("展开高级参数")}
       </button>
       {advancedOpen && (
         <div className="grid gap-3 md:grid-cols-3">
           <label>
-            <span className="mb-1 block text-body-xs text-[#64748B]">{t("生成质量")}</span>
+            <span className="mb-1 block text-body-xs text-muted-foreground">{t("生成质量")}</span>
             <select value={params.model} onChange={(event) => {
               const nextModel = models.find((model) => model.id === event.target.value)
               update({
@@ -3186,15 +3186,15 @@ function ComposeParamsPanel({
                 duration: nextModel ? Math.min(nextModel.max_duration, Math.max(nextModel.min_duration, params.duration)) : params.duration,
                 size: nextModel && !nextModel.sizes.includes(params.size) ? (nextModel.sizes[0] || params.size) : params.size,
               })
-            }} className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#111827] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]">
+            }} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-body-sm text-foreground outline-none focus:border-[#6366F1]">
               {(models.length ? models : [{ id: params.model, label: params.model } as VideoModelConfig]).map((model) => (
                 <option key={model.id} value={model.id} disabled={model.available === false}>{videoQualityLabel(model.id, model.label)}{model.available === false ? t("（暂未开放）") : ''}</option>
               ))}
             </select>
           </label>
           <label>
-            <span className="mb-1 block text-body-xs text-[#64748B]">{t("平台")}</span>
-            <select value={params.platform} onChange={(event) => update({ platform: event.target.value })} className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#111827] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]">
+            <span className="mb-1 block text-body-xs text-muted-foreground">{t("平台")}</span>
+            <select value={params.platform} onChange={(event) => update({ platform: event.target.value })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-body-sm text-foreground outline-none focus:border-[#6366F1]">
               <option value="douyin_xhs">{t("抖音/小红书通用")}</option>
               <option value="douyin">{t("抖音")}</option>
               <option value="xhs">{t("小红书")}</option>
@@ -3202,8 +3202,8 @@ function ComposeParamsPanel({
             </select>
           </label>
           <label>
-            <span className="mb-1 block text-body-xs text-[#64748B]">{t("视频类型")}</span>
-            <select value={params.scenario} onChange={(event) => update({ scenario: event.target.value })} className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#111827] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]">
+            <span className="mb-1 block text-body-xs text-muted-foreground">{t("视频类型")}</span>
+            <select value={params.scenario} onChange={(event) => update({ scenario: event.target.value })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-body-sm text-foreground outline-none focus:border-[#6366F1]">
               <option value="product_seed">{t("产品种草")}</option>
               <option value="store_promo">{t("门店宣传")}</option>
               <option value="brand_ad">{t("品牌广告")}</option>
@@ -3211,40 +3211,40 @@ function ComposeParamsPanel({
             </select>
           </label>
           <label>
-            <span className="mb-1 block text-body-xs text-[#64748B]">{t("比例")}</span>
-            <select value={params.ratio} onChange={(event) => update({ ratio: event.target.value })} className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#111827] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]">
+            <span className="mb-1 block text-body-xs text-muted-foreground">{t("比例")}</span>
+            <select value={params.ratio} onChange={(event) => update({ ratio: event.target.value })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-body-sm text-foreground outline-none focus:border-[#6366F1]">
               <option value="9:16">{t("9:16 竖屏")}</option>
               <option value="1:1">{t("1:1 方形")}</option>
               <option value="16:9">{t("16:9 横屏")}</option>
             </select>
           </label>
           <label>
-            <span className="mb-1 block text-body-xs text-[#64748B]">{t("时长")}</span>
-            <select value={params.duration} onChange={(event) => update({ duration: Number(event.target.value) })} className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#111827] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]">
+            <span className="mb-1 block text-body-xs text-muted-foreground">{t("时长")}</span>
+            <select value={params.duration} onChange={(event) => update({ duration: Number(event.target.value) })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-body-sm text-foreground outline-none focus:border-[#6366F1]">
               {[6, 10, 15, 30].map((value) => <option key={value} value={value} disabled={Boolean(selectedModel && (value < selectedModel.min_duration || value > selectedModel.max_duration))}>{value}  {t("秒")}</option>)}
             </select>
           </label>
           <label>
-            <span className="mb-1 block text-body-xs text-[#64748B]">{t("分辨率")}</span>
-            <select value={params.size} onChange={(event) => update({ size: event.target.value })} className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#111827] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]">
+            <span className="mb-1 block text-body-xs text-muted-foreground">{t("分辨率")}</span>
+            <select value={params.size} onChange={(event) => update({ size: event.target.value })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-body-sm text-foreground outline-none focus:border-[#6366F1]">
               <option value="1080p" disabled={Boolean(selectedModel && !selectedModel.sizes.includes('1080p'))}>1080p</option>
               <option value="4K" disabled={Boolean(!selectedModel?.sizes.includes('4K'))}>4K{selectedModel?.sizes.includes('4K') ? '' : t("（暂未开放）")}</option>
               <option value="720p" disabled={Boolean(selectedModel && !selectedModel.sizes.includes('720p'))}>720p</option>
             </select>
           </label>
           <label>
-            <span className="mb-1 block text-body-xs text-[#64748B]">{t("生成数量")}</span>
-            <select value={params.count} onChange={(event) => update({ count: Number(event.target.value) })} className="h-10 w-full rounded-lg border border-[#1E293B] bg-[#111827] px-3 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]">
+            <span className="mb-1 block text-body-xs text-muted-foreground">{t("生成数量")}</span>
+            <select value={params.count} onChange={(event) => update({ count: Number(event.target.value) })} className="h-10 w-full rounded-lg border border-border bg-card px-3 text-body-sm text-foreground outline-none focus:border-[#6366F1]">
               {[1, 2, 3, 4].map((value) => <option key={value} value={value}>{value}  {t("个")}</option>)}
             </select>
           </label>
-          <label className="md:col-span-3 flex items-center gap-3 rounded-lg border border-[#1E293B] bg-[#111827] px-3 py-2">
+          <label className="md:col-span-3 flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2">
             <input type="checkbox" checked={params.native_audio} onChange={(event) => update({ native_audio: event.target.checked })} className="accent-[#6366F1]" />
-            <span className="text-body-sm text-[#F1F5F9]">{t("Native Audio 原生声音")}</span>
+            <span className="text-body-sm text-foreground">{t("Native Audio 原生声音")}</span>
           </label>
           <label className="md:col-span-3">
-            <span className="mb-1 block text-body-xs text-[#64748B]">{t("补充说明")}</span>
-            <textarea value={params.user_instruction || ''} onChange={(event) => update({ user_instruction: event.target.value })} className="h-20 w-full resize-none rounded-lg border border-[#1E293B] bg-[#111827] px-3 py-2 text-body-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]" placeholder={t("例如：突出产品质感和成交转化，结尾加行动引导")} />
+            <span className="mb-1 block text-body-xs text-muted-foreground">{t("补充说明")}</span>
+            <textarea value={params.user_instruction || ''} onChange={(event) => update({ user_instruction: event.target.value })} className="h-20 w-full resize-none rounded-lg border border-border bg-card px-3 py-2 text-body-sm text-foreground outline-none focus:border-[#6366F1]" placeholder={t("例如：突出产品质感和成交转化，结尾加行动引导")} />
           </label>
         </div>
       )}

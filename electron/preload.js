@@ -40,9 +40,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     sessions: {
       list: (params = {}) => ipcRenderer.invoke('openclaw-sessions-list', params),
       create: (params = {}) => ipcRenderer.invoke('openclaw-sessions-create', params),
+      directorRenders: (params) => ipcRenderer.invoke('openclaw-sessions-director-renders', params),
       history: (params) => ipcRenderer.invoke('openclaw-sessions-history', params),
+      configure: (params) => ipcRenderer.invoke('openclaw-sessions-configure', params),
     },
     runs: {
+      status: (params) => ipcRenderer.invoke('openclaw-runs-status', params),
       send: (params) => ipcRenderer.invoke('openclaw-runs-send', params),
       interrupt: (params) => ipcRenderer.invoke('openclaw-runs-interrupt', params),
       subscribe: (callback) => {
@@ -58,8 +61,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
       answer: (params) => ipcRenderer.invoke('openclaw-questions-answer', params),
     },
     skills: {
+      catalog: (params) => ipcRenderer.invoke('openclaw-skills-catalog', params),
+      selection: (params) => ipcRenderer.invoke('openclaw-skills-selection', params),
+      attach: (params) => ipcRenderer.invoke('openclaw-skills-attach', params),
+      detach: (params) => ipcRenderer.invoke('openclaw-skills-detach', params),
       list: (params = {}) => ipcRenderer.invoke('openclaw-skills-list', params),
       readStatus: (params) => ipcRenderer.invoke('openclaw-skills-read-status', params),
+    },
+    capabilities: {
+      catalog: (params) => ipcRenderer.invoke('openclaw-capabilities-catalog', params),
+      selection: (params) => ipcRenderer.invoke('openclaw-capabilities-selection', params),
+      attach: (params) => ipcRenderer.invoke('openclaw-capabilities-attach', params),
+      detach: (params) => ipcRenderer.invoke('openclaw-capabilities-detach', params),
     },
     routines: {
       list: (params = {}) => ipcRenderer.invoke('openclaw-routines-list', params),

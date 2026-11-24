@@ -94,13 +94,13 @@ export function PublishedPostLink({
   }
 
   return (
-    <div className={`rounded-md border border-[#164E63] bg-[#082F49]/35 ${compact ? 'p-3' : 'p-4'}`}>
+    <div className={`rounded-md border border-info-ink/35 bg-info-soft/35 ${compact ? 'p-3' : 'p-4'}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-sm font-medium text-[#E0F2FE]">
+          <div className="text-sm font-medium text-info-ink">
             {info.heading}
           </div>
-          <div className="mt-1 truncate text-xs text-[#7DD3FC]">
+          <div className="mt-1 truncate text-xs text-info-ink">
             {info.title || info.postId || info.message || (info.fallback ? t("平台暂未返回单条公开链接") : t("已拿到公开链接"))}
           </div>
         </div>
@@ -112,7 +112,7 @@ export function PublishedPostLink({
         )}
       </div>
       {!compact && (
-        <div className="mt-3 space-y-1 text-xs text-[#BAE6FD]">
+        <div className="mt-3 space-y-1 text-xs text-info-ink">
           {info.url && <div className="break-all">{info.url}</div>}
           {info.status && <div>{t("状态：")}{info.status}</div>}
           {info.method && <div>{t("来源：")}{info.method}</div>}

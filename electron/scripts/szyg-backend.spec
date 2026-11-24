@@ -28,6 +28,7 @@ datas = [
 ]
 
 datas.extend([
+    (str(SERVER_ROOT / "szyg" / "resources" / "openmontage" / "worker.py"), "szyg/resources/openmontage"),
     (
         str(SERVER_ROOT / "szyg" / "integrations" / "wxauto_vendor" / "LICENSE"),
         "third_party_licenses/wxauto",

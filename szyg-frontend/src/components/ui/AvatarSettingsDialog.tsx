@@ -72,18 +72,18 @@ export default function AvatarSettingsDialog({ open, onClose, onError }: AvatarS
             exit={{ opacity: 0, y: 14, scale: 0.96 }}
             transition={{ duration: 0.2, ease: easeOutExpo }}
             onClick={(event) => event.stopPropagation()}
-            className="m-auto w-full max-w-md rounded-2xl border border-[#26334B] bg-[#141B2D] shadow-2xl overflow-hidden"
+            className="m-auto w-full max-w-md rounded-2xl border border-border bg-muted shadow-2xl overflow-hidden"
           >
-            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-[#1E293B]">
-              <h3 className="text-base font-semibold text-[#F1F5F9]">{t("设置头像")}</h3>
-              <span className="text-xs text-[#64748B]">{t("仅保存在本机，不会上传云端")}</span>
+            <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-border">
+              <h3 className="text-base font-semibold text-foreground">{t("设置头像")}</h3>
+              <span className="text-xs text-muted-foreground">{t("仅保存在本机，不会上传云端")}</span>
             </div>
 
             <div className="px-5 py-5 space-y-6">
               {/* 当前头像预览 */}
               <div className="flex items-center gap-4">
-                <UserAvatar className="h-20 w-20 border-2 border-[#26334B]" />
-                <div className="text-sm text-[#94A3B8] leading-relaxed">
+                <UserAvatar className="h-20 w-20 border-2 border-border" />
+                <div className="text-sm text-muted-foreground leading-relaxed">
                   <p>{t("选择你喜欢的内置头像，")}</p>
                   <p>{t("或点击下方按钮上传自己的照片。")}</p>
                 </div>
@@ -91,7 +91,7 @@ export default function AvatarSettingsDialog({ open, onClose, onError }: AvatarS
 
               {/* 内置头像选择 */}
               <div>
-                <p className="mb-3 text-sm text-[#94A3B8]">{t("内置头像")}</p>
+                <p className="mb-3 text-sm text-muted-foreground">{t("内置头像")}</p>
                 <div className="grid grid-cols-5 gap-3">
                   {AVATAR_PRESETS.map((src, index) => (
                     <button
@@ -102,7 +102,7 @@ export default function AvatarSettingsDialog({ open, onClose, onError }: AvatarS
                         'aspect-square w-full rounded-full overflow-hidden border-2 transition-all',
                         source.kind === 'preset' && source.index === index
                           ? 'border-[#6366F1] ring-2 ring-[#6366F1]/40 scale-105'
-                          : 'border-[#1E293B] hover:border-[#334155]',
+                          : 'border-border hover:border-border',
                       )}
                       title={index === 0 ? t("默认头像") : t("内置头像 {v0}", { v0: index + 1 })}
                     >
@@ -113,14 +113,14 @@ export default function AvatarSettingsDialog({ open, onClose, onError }: AvatarS
               </div>
 
               {/* 自定义上传 */}
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-[#334155] bg-[#0D1321]/60 px-4 py-3">
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-border bg-background/60 px-4 py-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[rgba(99,102,241,0.15)] text-[#A5B4FC]">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[rgba(99,102,241,0.15)] text-accent-ink">
                     <Upload className="h-4 w-4" />
                   </span>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-[#F1F5F9]">{t("上传自定义头像")}</p>
-                    <p className="mt-0.5 text-xs text-[#64748B]">{t("支持 JPG / PNG，将自动压缩后保存在本机")}</p>
+                    <p className="text-sm font-medium text-foreground">{t("上传自定义头像")}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{t("支持 JPG / PNG，将自动压缩后保存在本机")}</p>
                   </div>
                 </div>
                 <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => void handleFile(event.target.files?.[0])} />
@@ -128,19 +128,19 @@ export default function AvatarSettingsDialog({ open, onClose, onError }: AvatarS
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={saving}
-                  className="shrink-0 rounded-lg bg-[#6366F1] px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#818CF8] disabled:opacity-60"
+                  className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:brightness-90 disabled:opacity-60"
                 >
                   {saving ? t("处理中…") : t("选择图片")}
                 </button>
               </div>
             </div>
 
-            <div className="flex items-center justify-between px-5 py-4 border-t border-[#1E293B]">
+            <div className="flex items-center justify-between px-5 py-4 border-t border-border">
               {hasCustom ? (
                 <button
                   type="button"
                   onClick={() => clearUserAvatar()}
-                  className="inline-flex items-center gap-1.5 text-sm text-[#94A3B8] transition-colors hover:text-[#EF4444]"
+                  className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-danger-ink"
                 >
                   <Trash2 className="h-4 w-4" />
 
@@ -152,7 +152,7 @@ export default function AvatarSettingsDialog({ open, onClose, onError }: AvatarS
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg border border-[#1E293B] px-4 py-2 text-sm text-[#94A3B8] transition-colors hover:border-[#334155] hover:text-[#F1F5F9]"
+                className="rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-border hover:text-foreground"
               >
 
                 {t("完成")}

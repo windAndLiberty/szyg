@@ -23,3 +23,16 @@ def test_agency_market_localizes_catalog_for_english():
     assert english["description"] == source["description_en"]
     assert chinese["name"] == source["name"]
     assert division["label"] == agency_routes._cache_divisions[0]["label_en"]
+
+
+
+def test_new_expert_conversation_pins_requested_role(tmp_path, monkeypatch):
+    import asyncio
+
+    monkeypatch.setattr(agency_routes, "_AGENCY_CONV_DIR", tmp_path)
+    monkeypatch.setattr(agency_routes.agency_state, "get_active_expert", lambda: {"slug": "different", "name": "Other"})
+    agency_routes._build_cache()
+    chosen = agency_routes._cache_agents[0]["slug"]
+    conversation = asyncio.run(agency_routes.create_agency_conversation(expert_slug=chosen))
+    assert conversation.expert_slug == chosen
+    assert asyncio.run(agency_routes.get_agency_conversation(conversation.id)).expert_slug == chosen

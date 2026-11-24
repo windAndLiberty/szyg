@@ -94,7 +94,7 @@ export function useUserAvatar(): AvatarSource {
 }
 
 /** 读取本地图片并压缩为 dataURL（上限 512px，PNG 透明保留、其余转 JPEG） */
-export function fileToAvatarDataUrl(file: File): Promise<string> {
+export function fileToAvatarDataUrl(file: File, max = 512): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onerror = () => reject(new Error('读取失败'))
@@ -102,7 +102,6 @@ export function fileToAvatarDataUrl(file: File): Promise<string> {
       const image = new Image()
       image.onerror = () => reject(new Error('图片解析失败'))
       image.onload = () => {
-        const max = 512
         const scale = Math.min(1, max / Math.max(image.width, image.height))
         const canvas = document.createElement('canvas')
         canvas.width = Math.max(1, Math.round(image.width * scale))

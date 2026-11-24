@@ -138,6 +138,8 @@ def create_app() -> FastAPI:
     app.include_router(oem_router)
     from szyg.api.business_mcp_routes import router as business_mcp_router
     app.include_router(business_mcp_router)
+    from szyg.api.director_routes import router as director_router
+    app.include_router(director_router)
     from szyg.api.cloud_routes import router as cloud_router
     app.include_router(cloud_router)
 

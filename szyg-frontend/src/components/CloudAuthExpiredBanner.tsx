@@ -67,7 +67,9 @@ export default function CloudAuthExpiredBanner() {
     setError('')
     try {
       const result = await refreshCloudSession()
-      if (!result.expired) {
+      if (result.expired === null) {
+        setError(result.message || t("刷新授权状态失败，请稍后重试"))
+      } else if (!result.expired) {
         hide()
         // 状态恢复后重新拉取一次 session,确保 CloudAuthGate 等消费方拿到最新档案
         try { await fetchCloudSession() } catch { /* ignore */ }
@@ -95,16 +97,16 @@ export default function CloudAuthExpiredBanner() {
         <div
           role="alert"
           aria-live="assertive"
-          className="fixed inset-x-0 bottom-0 z-[140] border-t-2 border-[#F59E0B] bg-[#1A1304]/95 backdrop-blur shadow-[0_-12px_40px_rgba(0,0,0,0.55)]"
+          className="fixed inset-x-0 bottom-0 z-[140] border-t-2 border-[#F59E0B] bg-warning-soft/95 backdrop-blur shadow-[0_-12px_40px_rgba(0,0,0,0.55)]"
         >
           <div className="mx-auto flex max-w-5xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-6">
-            <div className="flex flex-1 items-start gap-3 text-[#FCD34D] sm:items-center">
+            <div className="flex flex-1 items-start gap-3 text-warning-ink sm:items-center">
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 sm:mt-0" />
               <div className="min-w-0">
-                <p className="text-sm font-medium text-[#FDE68A]">{t("服务授权已到期")}</p>
-                <p className="mt-0.5 text-xs leading-5 text-[#FCD34D]/85">
+                <p className="text-sm font-medium text-warning-ink">{t("服务授权已到期")}</p>
+                <p className="mt-0.5 text-xs leading-5 text-warning-ink/85">
                   {message}
-                  {error && <span className="ml-2 text-[#FCA5A5]">· {error}</span>}
+                  {error && <span className="ml-2 text-danger-ink">· {error}</span>}
                 </p>
               </div>
             </div>
@@ -115,7 +117,7 @@ export default function CloudAuthExpiredBanner() {
                 size="sm"
                 onClick={() => void handleRefresh()}
                 disabled={refreshing}
-                className="border border-[#3F2E0A] bg-[#221706] text-[#FDE68A] hover:bg-[#2D1F08]"
+                className="border border-warning-ink/35 bg-warning-soft text-warning-ink hover:bg-warning-soft"
               >
                 {refreshing ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
 
@@ -134,7 +136,7 @@ export default function CloudAuthExpiredBanner() {
                 type="button"
                 onClick={handleDismiss}
                 aria-label={t("关闭提示")}
-                className="rounded p-1.5 text-[#FCD34D]/70 transition-colors hover:bg-[#2A1D05] hover:text-[#FDE68A]"
+                className="rounded p-1.5 text-warning-ink/70 transition-colors hover:bg-warning-soft hover:text-warning-ink"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -144,7 +146,7 @@ export default function CloudAuthExpiredBanner() {
       )}
 
       {loginOpen && (
-        <div className="fixed inset-0 z-[160] bg-[#0B0F1A]">
+        <div className="fixed inset-0 z-[160] bg-background">
           <CloudLogin
             initialMessage={t("服务授权已到期，请重新登录以恢复智能服务")}
             onSuccess={async () => {

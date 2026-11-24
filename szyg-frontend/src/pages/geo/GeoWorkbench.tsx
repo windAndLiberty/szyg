@@ -144,21 +144,21 @@ export default function GeoWorkbench() {
     { id: 'progress', type: 'observe', title: t("已采集 {v0} / {v1} 条回答", { v0: activeAudit.completed, v1: activeAudit.total }), detail: auditWasStopped ? t("用户已停止本次检测") : activeAudit.failed ? t("{v0} 条暂未获得结果", { v0: activeAudit.failed }) : t("回答与引用会自动保存到本地"), state: auditWasStopped ? 'warning' : activeAudit.status === 'failed' ? 'error' : auditRunning ? 'running' : 'success' },
   ] : []
 
-  return <div className="flex h-[calc(100vh-4rem)] min-w-0 overflow-hidden bg-[#0B0F1A]">
+  return <div className="flex h-[calc(100vh-4rem)] min-w-0 overflow-hidden bg-background">
   <GeoPage subtitle={t("持续检查客户向AI咨询时，是否能看到、理解并信任你的品牌。")}>
-    {error && <div className="rounded-lg bg-[#EF4444]/10 px-4 py-3 text-sm text-[#FCA5A5]">{error}</div>}
-    {notice && <div className="rounded-lg bg-[#10B981]/10 px-4 py-3 text-sm text-[#A7F3D0]">{notice}</div>}
+    {error && <div className="rounded-lg bg-[#EF4444]/10 px-4 py-3 text-sm text-danger-ink">{error}</div>}
+    {notice && <div className="rounded-lg bg-[#10B981]/10 px-4 py-3 text-sm text-success-ink">{notice}</div>}
 
-    <section className="rounded-2xl bg-gradient-to-br from-[#171B34] to-[#111827] p-6 shadow-[0_18px_50px_rgba(0,0,0,.18)]">
-      <p className="text-xs font-medium text-[#A5B4FC]">{t("AI品牌结论")}</p>
-      <h1 className="mt-3 max-w-4xl text-xl font-semibold leading-8 text-[#F1F5F9]">{summary}</h1>
+    <section className="rounded-2xl bg-gradient-to-br from-accent-soft to-card p-6 shadow-[0_18px_50px_rgba(0,0,0,.18)]">
+      <p className="text-xs font-medium text-accent-ink">{t("AI品牌结论")}</p>
+      <h1 className="mt-3 max-w-4xl text-xl font-semibold leading-8 text-foreground">{summary}</h1>
       <div className="mt-5 flex flex-wrap gap-3">
         <button onClick={startAudit} disabled={working === 'audit' || auditRunning || editing || !profile.product_name || !selectedQuestions.length || !consumerProviders.length} className={primaryButton}>{working === 'audit' || auditRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}{t("开始真实AI界面检测")}</button>
         {activeAudit && !browserOpen && <button onClick={() => setBrowserOpen(true)} className={secondaryButton}><Globe2 className="h-4 w-4" />{t("查看检测现场")}</button>}
         <button onClick={() => setEditing((value) => !value)} className={secondaryButton}>{editing ? t("收起设置") : t("检查体检范围")}</button>
       </div>
-      <p className="mt-3 text-xs leading-5 text-[#64748B]">{t("本次默认检测 1 个平台 ×")} {selectedQuestions.length}  {t("个已选问题。不会消耗数字员工或 Dolphin 的模型推理 Token；但会像你正常提问一样，占用所选 AI 平台账号的对话次数或使用配额。")}</p>
-      {!consumerProviders.length && <p className="mt-3 text-xs text-[#FBBF24]">{t("当前无法使用真实AI界面检测。请从开发桌面版启动数字员工，并确认右侧工作现场可用。")}</p>}
+      <p className="mt-3 text-xs leading-5 text-muted-foreground">{t("本次默认检测 1 个平台 ×")} {selectedQuestions.length}  {t("个已选问题。不会消耗数字员工或 Dolphin 的模型推理 Token；但会像你正常提问一样，占用所选 AI 平台账号的对话次数或使用配额。")}</p>
+      {!consumerProviders.length && <p className="mt-3 text-xs text-warning-ink">{t("当前无法使用真实AI界面检测。请从开发桌面版启动数字员工，并确认右侧工作现场可用。")}</p>}
     </section>
 
     <div className="grid gap-4 md:grid-cols-3">
@@ -175,38 +175,38 @@ export default function GeoWorkbench() {
 
     {editing && <GeoSection title={t("三步完成体检设置")} description={t("只填写业务信息；超级员工会复用桌面版中的AI平台登录状态，不需要配置API密钥。")}>
       <div className="grid gap-5 xl:grid-cols-[.85fr_1.15fr]">
-        <div className="space-y-4 rounded-xl bg-[#0B0F1A]/70 p-5">
-          <div><p className="text-xs font-medium text-[#818CF8]">{t("1 · 确认企业")}</p></div>
-          <div><label className="mb-2 block text-xs text-[#94A3B8]">{t("企业或品牌名称")}</label><input value={profile.product_name} onChange={(e) => setProfile({ ...profile, product_name: e.target.value })} className={inputClass} /></div>
-          <div><label className="mb-2 block text-xs text-[#94A3B8]">{t("官网")}</label><input value={profile.website} onChange={(e) => setProfile({ ...profile, website: e.target.value })} className={inputClass} placeholder="https://" /></div>
-          <div><label className="mb-2 block text-xs text-[#94A3B8]">{t("主要产品（逗号分隔）")}</label><input value={profile.products.join('，')} onChange={(e) => setProfile({ ...profile, products: e.target.value.split(/[，,]/).map((v) => v.trim()).filter(Boolean) })} className={inputClass} /></div>
-          <div><label className="mb-2 block text-xs text-[#94A3B8]">{t("目标客户")}</label><input value={profile.audience || ''} onChange={(e) => setProfile({ ...profile, audience: e.target.value })} className={inputClass} /></div>
-          <div><label className="mb-2 block text-xs text-[#94A3B8]">{t("主要竞品（逗号分隔）")}</label><input value={profile.competitors.join('，')} onChange={(e) => setProfile({ ...profile, competitors: e.target.value.split(/[，,]/).map((v) => v.trim()).filter(Boolean) })} className={inputClass} /></div>
+        <div className="space-y-4 rounded-xl bg-background/70 p-5">
+          <div><p className="text-xs font-medium text-accent-ink">{t("1 · 确认企业")}</p></div>
+          <div><label className="mb-2 block text-xs text-muted-foreground">{t("企业或品牌名称")}</label><input value={profile.product_name} onChange={(e) => setProfile({ ...profile, product_name: e.target.value })} className={inputClass} /></div>
+          <div><label className="mb-2 block text-xs text-muted-foreground">{t("官网")}</label><input value={profile.website} onChange={(e) => setProfile({ ...profile, website: e.target.value })} className={inputClass} placeholder="https://" /></div>
+          <div><label className="mb-2 block text-xs text-muted-foreground">{t("主要产品（逗号分隔）")}</label><input value={profile.products.join('，')} onChange={(e) => setProfile({ ...profile, products: e.target.value.split(/[，,]/).map((v) => v.trim()).filter(Boolean) })} className={inputClass} /></div>
+          <div><label className="mb-2 block text-xs text-muted-foreground">{t("目标客户")}</label><input value={profile.audience || ''} onChange={(e) => setProfile({ ...profile, audience: e.target.value })} className={inputClass} /></div>
+          <div><label className="mb-2 block text-xs text-muted-foreground">{t("主要竞品（逗号分隔）")}</label><input value={profile.competitors.join('，')} onChange={(e) => setProfile({ ...profile, competitors: e.target.value.split(/[，,]/).map((v) => v.trim()).filter(Boolean) })} className={inputClass} /></div>
           <div>
-            <label className="mb-2 block text-xs text-[#94A3B8]">{t("本次用哪个AI检测")}</label>
+            <label className="mb-2 block text-xs text-muted-foreground">{t("本次用哪个AI检测")}</label>
             <div className="grid gap-2 sm:grid-cols-2">
-              {consumerProviders.map((item) => <label key={item.id} className={`flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-sm ${providerIds[0] === item.id ? 'bg-[#6366F1]/15 text-[#C7D2FE]' : 'bg-[#111827] text-[#94A3B8] hover:bg-[#172033]'}`}><input type="radio" name="geo-provider" checked={providerIds[0] === item.id} onChange={() => setProfile({ ...profile, geo_providers: [item.id] })} className="accent-[#6366F1]" />{item.label}</label>)}
+              {consumerProviders.map((item) => <label key={item.id} className={`flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2.5 text-sm ${providerIds[0] === item.id ? 'bg-[#6366F1]/15 text-accent-ink' : 'bg-card text-muted-foreground hover:bg-muted'}`}><input type="radio" name="geo-provider" checked={providerIds[0] === item.id} onChange={() => setProfile({ ...profile, geo_providers: [item.id] })} className="accent-[#6366F1]" />{item.label}</label>)}
             </div>
-            <p className="mt-2 text-xs leading-5 text-[#64748B]">{t("一次只检测一个平台，超级员工会在右侧真实界面中逐个提问。默认使用 DeepSeek。")}</p>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">{t("一次只检测一个平台，超级员工会在右侧真实界面中逐个提问。默认使用 DeepSeek。")}</p>
           </div>
           <button onClick={discoverQuestions} disabled={working === 'suggest'} className={secondaryButton}>{working === 'suggest' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{t("发现客户会问什么")}</button>
         </div>
-        <div className="rounded-xl bg-[#0B0F1A]/70 p-5">
-          <div className="flex items-center justify-between"><p className="text-xs font-medium text-[#818CF8]">{t("2 · 确认客户问题")}</p><span className="text-xs text-[#64748B]">{t("已选")} {selectedQuestions.length} / {questions.length}</span></div>
-          {questions.length ? <div className="mt-4 max-h-[440px] space-y-2 overflow-auto pr-1">{questions.map((item, index) => <label key={item.id || index} className="flex cursor-pointer gap-3 rounded-lg bg-[#111827] p-3 hover:bg-[#172033]"><input type="checkbox" checked={item.selected !== false} onChange={(e) => setQuestions((rows) => rows.map((row, i) => i === index ? { ...row, selected: e.target.checked } : row))} className="mt-1 accent-[#6366F1]" /><div><p className="text-sm text-[#E2E8F0]">{item.text}</p><p className="mt-1 text-xs text-[#64748B]">{item.topic || t("客户问题")} · {sourceLabels[item.source] || t("智能建议")}</p></div></label>)}</div> : <EmptyGeo title={t("尚未生成客户问题")} description={t("填写企业信息后，点击“发现客户会问什么”，系统会从企业资料和营销情报中生成建议。")} />}
-          <div className="mt-4 flex items-center justify-between"><p className="text-xs text-[#64748B]">{t("3 · 保存后即可开始体检")}</p><button onClick={save} disabled={working === 'save'} className={primaryButton}>{working === 'save' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{t("保存体检范围")}</button></div>
+        <div className="rounded-xl bg-background/70 p-5">
+          <div className="flex items-center justify-between"><p className="text-xs font-medium text-accent-ink">{t("2 · 确认客户问题")}</p><span className="text-xs text-muted-foreground">{t("已选")} {selectedQuestions.length} / {questions.length}</span></div>
+          {questions.length ? <div className="mt-4 max-h-[440px] space-y-2 overflow-auto pr-1">{questions.map((item, index) => <label key={item.id || index} className="flex cursor-pointer gap-3 rounded-lg bg-card p-3 hover:bg-muted"><input type="checkbox" checked={item.selected !== false} onChange={(e) => setQuestions((rows) => rows.map((row, i) => i === index ? { ...row, selected: e.target.checked } : row))} className="mt-1 accent-[#6366F1]" /><div><p className="text-sm text-foreground">{item.text}</p><p className="mt-1 text-xs text-muted-foreground">{item.topic || t("客户问题")} · {sourceLabels[item.source] || t("智能建议")}</p></div></label>)}</div> : <EmptyGeo title={t("尚未生成客户问题")} description={t("填写企业信息后，点击“发现客户会问什么”，系统会从企业资料和营销情报中生成建议。")} />}
+          <div className="mt-4 flex items-center justify-between"><p className="text-xs text-muted-foreground">{t("3 · 保存后即可开始体检")}</p><button onClick={save} disabled={working === 'save'} className={primaryButton}>{working === 'save' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{t("保存体检范围")}</button></div>
         </div>
       </div>
     </GeoSection>}
 
     <div className="grid gap-5 xl:grid-cols-[1.2fr_.8fr]">
       <GeoSection title={t("今天最值得做的事")} description={t("建议来自真实回答、竞品和引用差距。")}>
-        {overview?.recommendations.length ? <div className="space-y-2">{overview.recommendations.slice(0, 3).map((item) => <a key={item.id} href="/geo/optimization" className="flex items-center gap-3 rounded-xl bg-[#0B0F1A]/75 p-4 hover:bg-[#131B2C]"><Sparkles className="h-4 w-4 text-[#A5B4FC]" /><div className="flex-1"><p className="text-sm font-medium text-[#F1F5F9]">{item.title}</p><p className="mt-1 text-xs text-[#64748B]">{item.rationale || item.description}</p></div><ChevronRight className="h-4 w-4 text-[#64748B]" /></a>)}</div> : <EmptyGeo title={t("暂无改进建议")} description={t("完成一次真实AI品牌体检后，这里会优先展示最值得处理的三项工作。")} />}
+        {overview?.recommendations.length ? <div className="space-y-2">{overview.recommendations.slice(0, 3).map((item) => <a key={item.id} href="/geo/optimization" className="flex items-center gap-3 rounded-xl bg-background/75 p-4 hover:bg-muted"><Sparkles className="h-4 w-4 text-accent-ink" /><div className="flex-1"><p className="text-sm font-medium text-foreground">{item.title}</p><p className="mt-1 text-xs text-muted-foreground">{item.rationale || item.description}</p></div><ChevronRight className="h-4 w-4 text-muted-foreground" /></a>)}</div> : <EmptyGeo title={t("暂无改进建议")} description={t("完成一次真实AI品牌体检后，这里会优先展示最值得处理的三项工作。")} />}
       </GeoSection>
       <GeoSection title={t("体检覆盖")} description={t("所有核心结果都来自用户实际使用的AI产品界面。")}>
-        {!!overview?.valid_sample_count && <p className="mb-3 text-xs text-[#64748B]">{t("真实界面回答")} {overview.consumer_sample_count || 0}  {t("条 · 暂未获得结果的平台")} {overview.failed_provider_count || 0}  {t("个")}</p>}
-        <div className="space-y-2">{(overview?.providers || []).map((item) => <div key={item.id} className="flex items-center justify-between rounded-xl bg-[#0B0F1A]/75 px-4 py-3"><div><p className="text-sm text-[#E2E8F0]">{item.label}</p><p className="mt-1 text-xs text-[#64748B]">{t("侧边栏真实AI界面 · 复用本地登录状态")}</p></div><span className={`rounded-full px-2 py-1 text-xs ${item.configured ? 'bg-[#10B981]/10 text-[#34D399]' : 'bg-[#64748B]/10 text-[#94A3B8]'}`}>{item.configured ? t("可检测") : t("需要桌面版")}</span></div>)}</div>
-        <button onClick={load} className="mt-4 inline-flex items-center gap-2 text-xs text-[#818CF8]"><RefreshCw className="h-3.5 w-3.5" />{t("刷新覆盖状态")}</button>
+        {!!overview?.valid_sample_count && <p className="mb-3 text-xs text-muted-foreground">{t("真实界面回答")} {overview.consumer_sample_count || 0}  {t("条 · 暂未获得结果的平台")} {overview.failed_provider_count || 0}  {t("个")}</p>}
+        <div className="space-y-2">{(overview?.providers || []).map((item) => <div key={item.id} className="flex items-center justify-between rounded-xl bg-background/75 px-4 py-3"><div><p className="text-sm text-foreground">{item.label}</p><p className="mt-1 text-xs text-muted-foreground">{t("侧边栏真实AI界面 · 复用本地登录状态")}</p></div><span className={`rounded-full px-2 py-1 text-xs ${item.configured ? 'bg-[#10B981]/10 text-success-ink' : 'bg-muted-foreground/10 text-muted-foreground'}`}>{item.configured ? t("可检测") : t("需要桌面版")}</span></div>)}</div>
+        <button onClick={load} className="mt-4 inline-flex items-center gap-2 text-xs text-accent-ink"><RefreshCw className="h-3.5 w-3.5" />{t("刷新覆盖状态")}</button>
       </GeoSection>
     </div>
   </GeoPage>

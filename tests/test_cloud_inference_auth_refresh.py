@@ -11,7 +11,8 @@ from szyg.integrations.cloud_inference_client import CloudInferenceClient
 async def test_cloud_inference_refreshes_expired_access_token(monkeypatch, tmp_path):
     tokens: list[tuple[bool, str]] = []
 
-    def access_token(*, force_refresh: bool = False) -> str:
+    def access_token(*, force_refresh: bool = False, rejected_token: str | None = None) -> str:
+        assert rejected_token == ("expired-token" if force_refresh else None)
         token = "fresh-token" if force_refresh else "expired-token"
         tokens.append((force_refresh, token))
         return token

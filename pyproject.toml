@@ -10,6 +10,7 @@ dependencies = [
     "httpx[socks]>=0.27.0",
     "requests>=2.33.0",
     "pydantic>=2.9.0",
+    "psutil>=5.9.0",
     "pydantic-settings>=2.6.0",
     "pyyaml>=6.0.2",
     "structlog>=24.4.0",
@@ -44,7 +45,6 @@ platforms = [
     "pywin32>=306; sys_platform == 'win32'",              # Windows API (剪贴板操作)
     "pyperclip>=1.9.0",          # wxauto clipboard support
     "py-mini-racer>=0.6.0",      # V8 JS引擎 (反爬签名)
-    "psutil>=5.9.0",             # 进程管理
 ]
 skills = [
     "openpyxl>=3.1.0",           # Excel 读写 → 内容日历/数据分析/批量导出

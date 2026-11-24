@@ -58,9 +58,9 @@ function isHighIntent(item?: LeadItem | null): boolean {
 }
 
 function wechatTone(state?: string): string {
-  if (state === 'calibrated') return 'border-[#10B981]/30 bg-[#10B981]/10 text-[#A7F3D0]'
-  if (state === 'connected') return 'border-[#38BDF8]/30 bg-[#38BDF8]/10 text-[#BAE6FD]'
-  return 'border-[#F59E0B]/30 bg-[#F59E0B]/10 text-[#FCD34D]'
+  if (state === 'calibrated') return 'border-[#10B981]/30 bg-[#10B981]/10 text-success-ink'
+  if (state === 'connected') return 'border-[#38BDF8]/30 bg-[#38BDF8]/10 text-info-ink'
+  return 'border-[#F59E0B]/30 bg-[#F59E0B]/10 text-warning-ink'
 }
 
 export default function PrivateDomain() {
@@ -212,8 +212,8 @@ export default function PrivateDomain() {
 
   return (
     <PageShell title={t("私域营销")} subtitle={t("AI 销售员工会从线索里判断需求，生成跟进话术，并辅助你在微信里安全承接客户。")} icon={MessageCircle}>
-      {toast && <div className="fixed right-6 top-20 z-50 rounded-lg border border-[#10B981]/30 bg-[#064E3B] px-4 py-3 text-sm text-[#D1FAE5] shadow-xl">{toast}</div>}
-      {error && <div className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 px-4 py-3 text-sm text-[#FCA5A5]">{error}</div>}
+      {toast && <div className="fixed right-6 top-20 z-50 rounded-lg border border-[#10B981]/30 bg-success-soft px-4 py-3 text-sm text-success-ink shadow-xl">{toast}</div>}
+      {error && <div className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 px-4 py-3 text-sm text-danger-ink">{error}</div>}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <MetricCard label={t("待跟进")} value={metrics.pending} icon={UserCheck} />
@@ -230,7 +230,7 @@ export default function PrivateDomain() {
       <div className="grid gap-5 xl:grid-cols-[340px_minmax(0,1fr)_390px]">
         <Panel title={t("待跟进队列")} description={t("来自智能截流和机会监听的潜在线索。")}>
           {loading ? (
-            <div className="flex h-56 items-center justify-center text-[#64748B]"><Loader2 className="h-6 w-6 animate-spin" /></div>
+            <div className="flex h-56 items-center justify-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin" /></div>
           ) : items.length === 0 ? (
             <EmptyState title={t("暂无线索")} description={t("智能截流或机会监听识别到客户后，会进入这里。")} />
           ) : (
@@ -247,17 +247,17 @@ export default function PrivateDomain() {
                       setNotes('')
                     }}
                     className={`w-full rounded-lg border p-4 text-left transition-colors ${
-                      active ? 'border-[#6366F1] bg-[#6366F1]/10' : 'border-[#1E293B] bg-[#0B0F1A] hover:border-[#334155]'
+                      active ? 'border-[#6366F1] bg-[#6366F1]/10' : 'border-border bg-background hover:border-border'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-[#F1F5F9]">{leadName(item)}</p>
-                        <p className="mt-1 text-xs text-[#64748B]">{platformLabel(item.platform)} · {item.grade || t("未评级")}</p>
+                        <p className="truncate text-sm font-medium text-foreground">{leadName(item)}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{platformLabel(item.platform)} · {item.grade || t("未评级")}</p>
                       </div>
                       <StatusPill status={String(item.private_status || item.status || 'pending')} />
                     </div>
-                    <p className="mt-3 line-clamp-3 text-sm leading-6 text-[#CBD5E1]">{leadText(item) || t("暂无客户上下文")}</p>
+                    <p className="mt-3 line-clamp-3 text-sm leading-6 text-foreground">{leadText(item) || t("暂无客户上下文")}</p>
                   </button>
                 )
               })}
@@ -270,34 +270,34 @@ export default function PrivateDomain() {
             <EmptyState title={t("请选择线索")} description={t("选择一条线索后查看来源、意向和推荐动作。")} />
           ) : (
             <div className="space-y-5">
-              <div className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-5">
+              <div className="rounded-lg border border-border bg-background p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-lg font-semibold text-[#F8FAFC]">{leadName(selected)}</p>
-                    <p className="mt-1 text-sm text-[#64748B]">{platformLabel(selected.platform)} · {selected.source_title || t("来源内容待补充")}</p>
+                    <p className="text-lg font-semibold text-foreground">{leadName(selected)}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{platformLabel(selected.platform)} · {selected.source_title || t("来源内容待补充")}</p>
                   </div>
                   <span className={`rounded-full border px-3 py-1 text-xs ${scoreTone(Number(selected.lead_score || selected.score || 0))}`}>
                     {isHighIntent(selected) ? t("高意向") : t("待确认")} · {selected.grade || selected.lead_score || selected.score || t("未评分")}
                   </span>
                 </div>
-                <div className="mt-5 rounded-lg border border-[#334155] bg-[#020617] p-4">
-                  <p className="text-xs text-[#64748B]">{t("客户原始表达")}</p>
-                  <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-[#E2E8F0]">{selectedText || t("暂无上下文")}</p>
+                <div className="mt-5 rounded-lg border border-border bg-background p-4">
+                  <p className="text-xs text-muted-foreground">{t("客户原始表达")}</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-foreground">{selectedText || t("暂无上下文")}</p>
                 </div>
               </div>
 
               <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
-                  <p className="text-xs text-[#64748B]">{t("判断")}</p>
-                  <p className="mt-2 text-sm leading-6 text-[#CBD5E1]">{isHighIntent(selected) ? t("建议优先进入微信私域承接") : t("先确认需求，再决定是否跟进")}</p>
+                <div className="rounded-lg border border-border bg-background p-4">
+                  <p className="text-xs text-muted-foreground">{t("判断")}</p>
+                  <p className="mt-2 text-sm leading-6 text-foreground">{isHighIntent(selected) ? t("建议优先进入微信私域承接") : t("先确认需求，再决定是否跟进")}</p>
                 </div>
-                <div className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
-                  <p className="text-xs text-[#64748B]">{t("下一步")}</p>
-                  <p className="mt-2 text-sm leading-6 text-[#CBD5E1]">{String(selected.recommended_action || t("生成回复并人工确认"))}</p>
+                <div className="rounded-lg border border-border bg-background p-4">
+                  <p className="text-xs text-muted-foreground">{t("下一步")}</p>
+                  <p className="mt-2 text-sm leading-6 text-foreground">{String(selected.recommended_action || t("生成回复并人工确认"))}</p>
                 </div>
-                <div className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
-                  <p className="text-xs text-[#64748B]">{t("最近更新")}</p>
-                  <p className="mt-2 text-sm leading-6 text-[#CBD5E1]">{formatDateTime(selected.updated_at || selected.created_at)}</p>
+                <div className="rounded-lg border border-border bg-background p-4">
+                  <p className="text-xs text-muted-foreground">{t("最近更新")}</p>
+                  <p className="mt-2 text-sm leading-6 text-foreground">{formatDateTime(selected.updated_at || selected.created_at)}</p>
                 </div>
               </div>
 
@@ -346,7 +346,7 @@ export default function PrivateDomain() {
             </button>
 
             <div>
-              <FieldLabel>{t("AI 建议话术")} {replyGrade && <span className="text-[#64748B]">· {replyGrade}</span>}</FieldLabel>
+              <FieldLabel>{t("AI 建议话术")} {replyGrade && <span className="text-muted-foreground">· {replyGrade}</span>}</FieldLabel>
               <textarea
                 value={reply}
                 onChange={(event) => setReply(event.target.value)}

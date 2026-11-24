@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useLocation } from 'react-router'
 import { apiGet, getErrorMessage } from './api'
 
 /**
@@ -68,4 +69,25 @@ export function useDistribution() {
   return useAsync<{ distribution: { name: string; value: number; color: string }[] }>(
     () => apiGet('/api/dashboard/distribution'),
   )
+}
+
+export function useKeepAlivePageActive() {
+  const location = useLocation()
+  const pagePath = location.pathname + location.search
+  const [active, setActive] = useState(() => {
+    if (typeof window === 'undefined') return true
+    return window.location.pathname + window.location.search === pagePath
+  })
+
+  useEffect(() => {
+    const update = (event?: Event) => {
+      const path = (event as CustomEvent<{ path?: string }> | undefined)?.detail?.path
+      setActive((path || window.location.pathname + window.location.search) === pagePath)
+    }
+    update()
+    window.addEventListener('szyg:keep-alive-active-changed', update)
+    return () => window.removeEventListener('szyg:keep-alive-active-changed', update)
+  }, [pagePath])
+
+  return active
 }

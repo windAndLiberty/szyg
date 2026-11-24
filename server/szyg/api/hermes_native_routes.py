@@ -16,6 +16,7 @@ from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
+from szyg.employee_models import EMPLOYEE_MODELS
 from szyg.execution_kernel import get_execution_kernel
 from szyg.hermes_capabilities import get_hermes_capability_registry
 from szyg.hermes_process_manager import hermes_process_manager
@@ -373,7 +374,11 @@ def _openclaw_reasoning_requested(body: dict[str, Any]) -> bool:
     return bool(reasoning)
 
 
-async def _openai_chat_completion(body: dict[str, Any]):
+async def _openai_chat_completion(body: dict[str, Any], *, employee_runtime: bool = False):
+    selected = str(body.get("model") or "").removeprefix("xiaoyu-managed/")
+    explicit = employee_runtime and selected in EMPLOYEE_MODELS
+    if employee_runtime and not explicit and selected not in {"", "text.fast", "text.reasoning"}:
+        raise HTTPException(400, "不支持的员工模型")
     client = CloudInferenceClient(timeout=90)
     payload = {
         "messages": body.get("messages") or [],
@@ -387,19 +392,24 @@ async def _openai_chat_completion(body: dict[str, Any]):
         payload["tool_choice"] = body["tool_choice"]
     capability = "text.reasoning" if _openclaw_reasoning_requested(body) else "text.fast"
     try:
-        result = await client._request("POST", "/api/v1/inference/chat", client._body(capability, payload))
+        if explicit:
+            if selected != "kimi-k3-1-pro-261024":
+                payload["thinking"] = {"type": "enabled" if _openclaw_reasoning_requested(body) else "disabled"}
+            data = await client.employee_chat(selected, payload)
+        else:
+            result = await client._request("POST", "/api/v1/inference/chat", client._body(capability, payload))
+            data = result.get("data") or {}
     except IntegrationError as exc:
         message = str(exc)
         status_code = int(getattr(exc, "status_code", 503))
         raise HTTPException(status_code=status_code, detail=message) from exc
-    data = result.get("data") or {}
     choice = (data.get("choices") or [{}])[0]
     message = dict(choice.get("message") or {"role": "assistant", "content": ""})
     message["role"] = "assistant"
     if message.get("tool_calls"):
         message["tool_calls"] = _normalize_tool_calls(message["tool_calls"])
     completion_id = str(data.get("id") or f"chatcmpl-{uuid.uuid4().hex}")
-    model = "text.reasoning" if capability == "text.reasoning" else "text.fast"
+    model = selected if explicit else capability
     if not body.get("stream"):
         return JSONResponse({
             "id": completion_id,
@@ -419,6 +429,8 @@ async def _openai_chat_completion(body: dict[str, Any]):
     chunks = [
         f"data: {json.dumps({**base, 'choices': [{'index': 0, 'delta': {'role': 'assistant'}, 'finish_reason': None}]})}\n\n"
     ]
+    if isinstance(message.get("reasoning_content"), str):
+        chunks.append(f"data: {json.dumps({**base, 'choices': [{'index': 0, 'delta': {'reasoning_content': message['reasoning_content']}, 'finish_reason': None}]}, ensure_ascii=False)}\n\n")
     if message.get("tool_calls"):
         delta_calls = []
         for index, item in enumerate(message["tool_calls"]):
@@ -449,4 +461,4 @@ async def openai_chat(body: dict[str, Any], authorization: str = Header(default=
 @router.post("/api/internal/openclaw/v1/chat/completions")
 async def openclaw_chat(body: dict[str, Any], authorization: str = Header(default="")):
     _verify_openclaw_runtime(authorization.removeprefix("Bearer ").strip())
-    return await _openai_chat_completion(body)
+    return await _openai_chat_completion(body, employee_runtime=True)

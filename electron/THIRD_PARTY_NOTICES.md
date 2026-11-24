@@ -4,9 +4,14 @@ SZYG includes selected runtime components from the following open-source
 projects. Only files needed by product features are distributed. Development
 environments, sample media, logs, cookies and account data are excluded.
 
+## OpenMontage
+
+The optional Xiaoyu Director engine downloads the original [OpenMontage source at 2e003e6](https://github.com/OpenMontageInc/OpenMontage/tree/2e003e65fa99a0f329478a2c1cdcf26bc481933a) and runs it in a separate Python environment on the user’s device. The checkout includes the [GNU Affero General Public License v3](https://github.com/OpenMontageInc/OpenMontage/blob/2e003e65fa99a0f329478a2c1cdcf26bc481933a/LICENSE).
+
 ## Agency Agents
 
-- Project: agency-agents
+- Project: [msitarzewski/agency-agents](https://github.com/msitarzewski/agency-agents)
+- The bundled upstream.json lists the 11 profiles refreshed from [8ae6164](https://github.com/msitarzewski/agency-agents/commit/8ae6164602c95ca78828b148b9052460ee426885).
 - License: MIT
 - Distribution: curated expert definitions and upstream license
 

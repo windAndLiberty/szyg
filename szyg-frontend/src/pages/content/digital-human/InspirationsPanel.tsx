@@ -61,7 +61,7 @@ export default function InspirationsPanel({
     <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)]">
       <section>
         <h2 className="text-base font-semibold">{t('digitalHuman.inspiration.add')}</h2>
-        <p className="mt-1 text-xs leading-5 text-[#7F8DA5]">
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
           {t('digitalHuman.inspiration.description')}
         </p>
         <div className="mt-4">
@@ -78,43 +78,43 @@ export default function InspirationsPanel({
         </div>
         <div className="mt-4 flex gap-2">
           <div className="relative min-w-0 flex-1">
-            <Link2 className="absolute left-3 top-2.5 h-4 w-4 text-[#65738A]" />
+            <Link2 className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <input
               value={sourceUrl}
               onChange={(event) => setSourceUrl(event.target.value)}
               onContextMenu={onContextMenu}
               placeholder={t('digitalHuman.inspiration.url')}
-              className="h-9 w-full border border-[#2A3548] bg-[#0D1320] pl-9 pr-3 text-sm outline-none focus:border-[#6571EE]"
+              className="h-9 w-full border border-border bg-card pl-9 pr-3 text-sm outline-none focus:border-[#6571EE]"
             />
           </div>
           <button
             type="button"
             onClick={() => void submitUrl()}
             disabled={!sourceUrl.trim() || importing}
-            className="h-9 border border-[#34425A] px-3 text-sm text-[#CED6E3] disabled:opacity-40"
+            className="h-9 border border-border px-3 text-sm text-foreground disabled:opacity-40"
           >
             {importing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t('digitalHuman.inspiration.import')}
           </button>
         </div>
         {error && (
-          <p className="mt-2 text-xs text-[#F48A9B]">{error}</p>
+          <p className="mt-2 text-xs text-danger-ink">{error}</p>
         )}
       </section>
       <section>
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold">{t('digitalHuman.insight.title')}</h2>
-            <p className="mt-1 text-xs text-[#7F8DA5]">
+            <p className="mt-1 text-xs text-muted-foreground">
               {t('digitalHuman.insight.description')}
             </p>
           </div>
-          <span className="text-xs text-[#687790]">{t('digitalHuman.insight.count', { count: inspirations.length })}</span>
+          <span className="text-xs text-muted-foreground">{t('digitalHuman.insight.count', { count: inspirations.length })}</span>
         </div>
         {inspirations.length === 0 ? (
-          <div className="flex min-h-[200px] flex-col items-center justify-center border border-dashed border-[#2B3850] bg-[#0B101B]/40 px-6 text-center">
-            <FileVideo className="mb-3 h-7 w-7 text-[#7184A3]" />
-            <p className="text-sm font-medium text-[#E7ECF5]">{t('digitalHuman.insight.empty')}</p>
-            <p className="mt-1 max-w-sm text-xs leading-5 text-[#7F8DA5]">
+          <div className="flex min-h-[200px] flex-col items-center justify-center border border-dashed border-border bg-background/40 px-6 text-center">
+            <FileVideo className="mb-3 h-7 w-7 text-muted-foreground" />
+            <p className="text-sm font-medium text-foreground">{t('digitalHuman.insight.empty')}</p>
+            <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
               {t('digitalHuman.insight.emptyDescription')}
             </p>
           </div>
@@ -174,26 +174,26 @@ function InspirationItem({ item, asset, busy, onAnalyze, onRemove, onApply }: In
   const { t } = useI18n()
   const analysis = item.analysis
   return (
-    <article className="border border-[#222D40] bg-[#0C111D] p-4">
+    <article className="border border-border bg-background p-4">
       <div className="flex items-start gap-3">
         {asset ? (
           asset.kind === 'image' ? (
-            <img src={asset.url} alt={asset.name} className="h-14 w-14 shrink-0 rounded-md border border-[#2A3448] object-cover" />
+            <img src={asset.url} alt={asset.name} className="h-14 w-14 shrink-0 rounded-md border border-border object-cover" />
           ) : asset.kind === 'video' ? (
-            <video src={asset.url} muted preload="metadata" className="h-14 w-14 shrink-0 rounded-md border border-[#2A3448] object-cover" />
+            <video src={asset.url} muted preload="metadata" className="h-14 w-14 shrink-0 rounded-md border border-border object-cover" />
           ) : (
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md border border-[#2A3448] bg-[#111827] text-[#65738A]">AUDIO</div>
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md border border-border bg-card text-muted-foreground">AUDIO</div>
           )
         ) : (
-          <div className="flex h-14 w-14 items-center justify-center rounded-md border border-[#2A3448] bg-[#151D2B]">
-            <Link2 className="h-5 w-5 text-[#8090A8]" />
+          <div className="flex h-14 w-14 items-center justify-center rounded-md border border-border bg-card">
+            <Link2 className="h-5 w-5 text-muted-foreground" />
           </div>
         )}
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{item.name}</p>
-          <p className="mt-1 truncate text-xs text-[#718098]">{item.source_url || asset?.name}</p>
+          <p className="mt-1 truncate text-xs text-muted-foreground">{item.source_url || asset?.name}</p>
         </div>
-        <button type="button" onClick={onRemove} aria-label={t('digitalHuman.insight.remove')} className="p-1 text-[#6F7E94] hover:text-[#F48A9B]">
+        <button type="button" onClick={onRemove} aria-label={t('digitalHuman.insight.remove')} className="p-1 text-muted-foreground hover:text-danger-ink">
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
@@ -202,13 +202,13 @@ function InspirationItem({ item, asset, busy, onAnalyze, onRemove, onApply }: In
         <button
           type="button"
           onClick={onAnalyze}
-          className="inline-flex h-8 items-center gap-1.5 border border-[#34425A] px-3 text-xs"
+          className="inline-flex h-8 items-center gap-1.5 border border-border px-3 text-xs"
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
           {t(analysis ? 'digitalHuman.insight.reanalyze' : 'digitalHuman.insight.analyze')}
         </button>
         {analysis && (
-          <button type="button" onClick={onApply} className="inline-flex h-8 items-center gap-1.5 bg-[#5965E8] px-3 text-xs">
+          <button type="button" onClick={onApply} className="inline-flex h-8 items-center gap-1.5 bg-primary text-primary-foreground px-3 text-xs">
             <ArrowRight className="h-3.5 w-3.5" />
             {t('digitalHuman.insight.apply')}
           </button>
@@ -221,18 +221,18 @@ function InspirationItem({ item, asset, busy, onAnalyze, onRemove, onApply }: In
 function AnalysisPanel({ analysis }: { analysis: InspirationAnalysis }) {
   const { t } = useI18n()
   return (
-    <div className="mt-4 grid gap-3 border-t border-[#1E2939] pt-4 md:grid-cols-2">
+    <div className="mt-4 grid gap-3 border-t border-border pt-4 md:grid-cols-2">
       <div>
-        <span className="text-[11px] text-[#718098]">{t('digitalHuman.insight.hook')}</span>
-        <p className="mt-1 text-sm leading-6 text-[#D7DDE8]">{analysis.hook || t('digitalHuman.insight.understood')}</p>
+        <span className="text-[11px] text-muted-foreground">{t('digitalHuman.insight.hook')}</span>
+        <p className="mt-1 text-sm leading-6 text-foreground">{analysis.hook || t('digitalHuman.insight.understood')}</p>
       </div>
       <div>
-        <span className="text-[11px] text-[#718098]">{t('digitalHuman.insight.sellingPoints')}</span>
-        <p className="mt-1 text-sm leading-6 text-[#D7DDE8]">{analysis.selling_points?.join(' · ') || t('digitalHuman.insight.pending')}</p>
+        <span className="text-[11px] text-muted-foreground">{t('digitalHuman.insight.sellingPoints')}</span>
+        <p className="mt-1 text-sm leading-6 text-foreground">{analysis.selling_points?.join(' · ') || t('digitalHuman.insight.pending')}</p>
       </div>
       <div className="md:col-span-2">
-        <span className="text-[11px] text-[#718098]">{t('digitalHuman.insight.script')}</span>
-        <p className="mt-1 line-clamp-3 text-sm leading-6 text-[#AEB9CA]">{analysis.transcript || t('digitalHuman.insight.noTranscript')}</p>
+        <span className="text-[11px] text-muted-foreground">{t('digitalHuman.insight.script')}</span>
+        <p className="mt-1 line-clamp-3 text-sm leading-6 text-muted-foreground">{analysis.transcript || t('digitalHuman.insight.noTranscript')}</p>
       </div>
     </div>
   )
@@ -258,16 +258,16 @@ function ContextMenu({
       }}
     >
       <div
-        className="fixed w-32 overflow-hidden rounded-md border border-[#344158] bg-[#111827] p-1 shadow-[0_14px_36px_rgba(0,0,0,0.45)]"
+        className="fixed w-32 overflow-hidden rounded-md border border-border bg-card p-1 shadow-[0_14px_36px_rgba(0,0,0,0.45)]"
         style={{ left: position.x, top: position.y }}
         onPointerDown={(event) => event.stopPropagation()}
       >
         <button
           type="button"
           onClick={onPaste}
-          className="flex h-8 w-full items-center gap-2 rounded px-2.5 text-left text-sm text-[#E2E8F0] transition hover:bg-[#202B3D]"
+          className="flex h-8 w-full items-center gap-2 rounded px-2.5 text-left text-sm text-foreground transition hover:bg-muted"
         >
-          <ClipboardPaste className="h-4 w-4 text-[#8F9BFF]" />{t('digitalHuman.paste')}
+          <ClipboardPaste className="h-4 w-4 text-accent-ink" />{t('digitalHuman.paste')}
         </button>
       </div>
     </div>

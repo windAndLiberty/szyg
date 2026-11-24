@@ -183,11 +183,11 @@ function Toast({ message, type, onClose }: { message: string; type: 'success' | 
       }}
     >
       {type === 'success'
-        ? <CheckCircle2 className="w-5 h-5 text-[#10B981] shrink-0" />
-        : <AlertCircle className="w-5 h-5 text-[#EF4444] shrink-0" />
+        ? <CheckCircle2 className="w-5 h-5 text-success-ink shrink-0" />
+        : <AlertCircle className="w-5 h-5 text-danger-ink shrink-0" />
       }
-      <span className="text-sm text-[#F1F5F9]">{message}</span>
-      <button onClick={onClose} className="ml-2 text-[#64748B] hover:text-[#94A3B8]">
+      <span className="text-sm text-foreground">{message}</span>
+      <button onClick={onClose} className="ml-2 text-muted-foreground hover:text-muted-foreground">
         <X className="w-4 h-4" />
       </button>
     </motion.div>
@@ -242,7 +242,7 @@ function AccountCard({
       transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
       className="relative rounded-card border group"
       style={{
-        background: 'linear-gradient(180deg, rgba(26,34,53,0.8) 0%, rgba(17,24,39,0.95) 100%)',
+        background: 'linear-gradient(180deg, hsl(var(--muted) / 0.8) 0%, hsl(var(--card) / 0.95) 100%)',
         borderColor: '#1E293B',
       }}
       onMouseEnter={() => {}}
@@ -264,7 +264,7 @@ function AccountCard({
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="text-[15px] font-semibold text-[#F1F5F9] truncate">
+            <h3 className="text-[15px] font-semibold text-foreground truncate">
               {platform.nickname || cfg.label}
             </h3>
             <Badge variant={stCfg.variant}>
@@ -272,7 +272,7 @@ function AccountCard({
               {stCfg.label}
             </Badge>
           </div>
-          <div className="flex items-center gap-3 mt-1.5 text-xs text-[#64748B]">
+          <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <Users className="w-3 h-3" />
 
@@ -287,7 +287,7 @@ function AccountCard({
           </div>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {capability.types.map((item) => (
-              <span key={item} className="rounded-md bg-[#0D1321] px-2 py-0.5 text-[11px] text-[#94A3B8]">
+              <span key={item} className="rounded-md bg-background px-2 py-0.5 text-[11px] text-muted-foreground">
                 {t(item)}
               </span>
             ))}
@@ -298,7 +298,7 @@ function AccountCard({
         <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
           {/* Expand indicator — only for connected accounts */}
           {platform.session?.has_session && (
-            <button className="w-8 h-8 flex items-center justify-center rounded-lg text-[#64748B] hover:text-[#F1F5F9] hover:bg-[rgba(255,255,255,0.05)] transition-colors">
+            <button className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors">
               {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
           )}
@@ -307,7 +307,7 @@ function AccountCard({
           <div className="relative">
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-[#64748B] hover:text-[#F1F5F9] hover:bg-[rgba(255,255,255,0.05)] transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
             >
               <MoreHorizontal className="w-4 h-4" />
             </button>
@@ -320,7 +320,7 @@ function AccountCard({
                   transition={{ duration: 0.15 }}
                   className="absolute right-0 top-full mt-1 w-36 rounded-card-lg border py-1 z-20"
                   style={{
-                    background: 'rgba(17,24,39,0.98)',
+                    background: 'hsl(var(--card) / 0.98)',
                     borderColor: '#1E293B',
                     boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
                   }}
@@ -328,7 +328,7 @@ function AccountCard({
                   {!confirmDelete ? (
                     <button
                       onClick={() => { setConfirmDelete(true); setShowMenu(false) }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#EF4444] hover:bg-[rgba(239,68,68,0.1)] transition-colors"
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-danger-ink hover:bg-[rgba(239,68,68,0.1)] transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
 
@@ -362,7 +362,7 @@ function AccountCard({
                 <DetailItem icon={Cookie} label={t("登录数据")} value={platform.session?.cookie_count ? t("已保存") : t("未保存")} />
                 <DetailItem icon={BarChart3} label={t("渠道能力")} value={capability.state} />
               </div>
-              <div className="rounded-lg border border-[#1E293B] bg-[#0D1321] px-3 py-2 text-xs leading-5 text-[#94A3B8]">
+              <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
                 {capability.note}
               </div>
 
@@ -414,11 +414,11 @@ function AccountCard({
             className="absolute inset-0 rounded-card flex flex-col items-center justify-center gap-3 z-10 px-6"
             style={{ background: 'rgba(11,15,26,0.95)' }}
           >
-            <p className="text-sm text-[#F1F5F9] text-center">
+            <p className="text-sm text-foreground text-center">
 
               {t("确定要删除")} <span className="font-semibold">{platform.nickname || cfg.label}</span>  {t("的登录态吗？")}
             </p>
-            <p className="text-xs text-[#64748B]">{t("删除后需要重新登录才能使用")}</p>
+            <p className="text-xs text-muted-foreground">{t("删除后需要重新登录才能使用")}</p>
             <div className="flex gap-3 mt-1">
               <Button variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>
 
@@ -442,10 +442,10 @@ function AccountCard({
 function DetailItem({ icon: Icon, label, value }: { icon: typeof Clock; label: string; value: string }) {
   return (
     <div className="flex items-start gap-2">
-      <Icon className="w-3.5 h-3.5 text-[#64748B] mt-0.5 shrink-0" />
+      <Icon className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
       <div className="flex flex-col min-w-0">
-        <span className="text-[11px] text-[#64748B]">{label}</span>
-        <span className="text-sm text-[#F1F5F9]">{value}</span>
+        <span className="text-[11px] text-muted-foreground">{label}</span>
+        <span className="text-sm text-foreground">{value}</span>
       </div>
     </div>
   )
@@ -512,7 +512,7 @@ function AddModal({ isOpen, onClose, onAdd, loadingPlatform }: {
           onClick={e => e.stopPropagation()}
           className="w-full max-w-md rounded-card-lg border overflow-hidden"
           style={{
-            background: 'linear-gradient(180deg, rgba(26,34,53,0.98) 0%, rgba(17,24,39,0.98) 100%)',
+            background: 'linear-gradient(180deg, hsl(var(--muted) / 0.98) 0%, hsl(var(--card) / 0.98) 100%)',
             borderColor: '#1E293B',
           }}
         >
@@ -520,15 +520,15 @@ function AddModal({ isOpen, onClose, onAdd, loadingPlatform }: {
           <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: '#1E293B' }}>
             <div className="flex items-center gap-3">
               {step === 'method' && (
-                <button onClick={handleBack} className="text-[#64748B] hover:text-[#F1F5F9] transition-colors">
+                <button onClick={handleBack} className="text-muted-foreground hover:text-foreground transition-colors">
                   <ChevronDown className="w-5 h-5 rotate-90" />
                 </button>
               )}
-              <h2 className="text-[16px] font-semibold text-[#F1F5F9]">
+              <h2 className="text-[16px] font-semibold text-foreground">
                 {step === 'platform' ? t("选择平台") : t("选择登录方式")}
               </h2>
             </div>
-            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#64748B] hover:text-[#F1F5F9] hover:bg-[rgba(255,255,255,0.05)] transition-colors">
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -557,7 +557,7 @@ function AddModal({ isOpen, onClose, onAdd, loadingPlatform }: {
                       >
                         <Icon className="w-6 h-6" style={{ color: cfg.color }} />
                       </div>
-                      <span className="text-sm font-medium text-[#F1F5F9]">{cfg.label}</span>
+                      <span className="text-sm font-medium text-foreground">{cfg.label}</span>
                     </button>
                   )
                 })}
@@ -581,14 +581,14 @@ function AddModal({ isOpen, onClose, onAdd, loadingPlatform }: {
                         className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
                         style={{ background: 'rgba(99,102,241,0.12)' }}
                       >
-                        <MIcon className="w-5 h-5 text-[#6366F1]" />
+                        <MIcon className="w-5 h-5 text-accent-ink" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-[#F1F5F9]">{method.label}</div>
-                        <div className="text-xs text-[#64748B] mt-0.5">{method.desc}</div>
+                        <div className="text-sm font-medium text-foreground">{method.label}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">{method.desc}</div>
                       </div>
                       {isSelected && (
-                        <CheckCircle2 className="w-5 h-5 text-[#6366F1] shrink-0 mt-2" />
+                        <CheckCircle2 className="w-5 h-5 text-accent-ink shrink-0 mt-2" />
                       )}
                     </button>
                   )
@@ -860,7 +860,7 @@ export default function Accounts() {
         <div className="h-10 w-48 rounded-lg mb-8" style={{ background: 'rgba(255,255,255,0.03)' }} />
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-40 animate-pulse rounded-card border border-[#1E293B] bg-white/[0.02]" />
+            <div key={i} className="h-40 animate-pulse rounded-card border border-border bg-muted/40" />
           ))}
         </div>
       </div>
@@ -885,36 +885,36 @@ export default function Accounts() {
               initial={{ opacity: 0, scale: 0.96, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 10 }}
-              className="w-full max-w-lg rounded-xl border border-[#1E293B] bg-[#0D1422] shadow-2xl shadow-black/40"
+              className="w-full max-w-lg rounded-xl border border-border bg-background shadow-2xl shadow-black/40"
             >
-              <div className="flex items-center justify-between border-b border-[#1E293B] px-5 py-4">
+              <div className="flex items-center justify-between border-b border-border px-5 py-4">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#07C160]/15 text-[#07C160]">
                     <MessageCircle className="h-5 w-5" />
                   </div>
                   <div>
-                    <div className="font-medium text-[#F8FAFC]">{t("添加微信")}</div>
-                    <div className="mt-0.5 text-xs text-[#64748B]">{t("仅识别输入区位置，不写入、不发送消息")}</div>
+                    <div className="font-medium text-foreground">{t("添加微信")}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">{t("仅识别输入区位置，不写入、不发送消息")}</div>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setWechatSetup((prev) => ({ ...prev, open: false }))}
-                  className="rounded-lg p-1.5 text-[#64748B] transition-colors hover:bg-white/5 hover:text-[#F8FAFC]"
+                  className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
 
               <div className="space-y-4 px-5 py-5">
-                <div className="rounded-lg border border-[#1E293B] bg-[#020617] p-4">
+                <div className="rounded-lg border border-border bg-background p-4">
                   <div className="flex items-start gap-3">
                     <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
                       wechatSetup.step === 'success'
-                        ? 'bg-[#10B981]/15 text-[#10B981]'
+                        ? 'bg-[#10B981]/15 text-success-ink'
                         : wechatSetup.step === 'error'
-                          ? 'bg-[#EF4444]/15 text-[#FCA5A5]'
-                          : 'bg-[#6366F1]/15 text-[#A5B4FC]'
+                          ? 'bg-[#EF4444]/15 text-danger-ink'
+                          : 'bg-[#6366F1]/15 text-accent-ink'
                     }`}>
                       {wechatSetup.step === 'capturing' || wechatSetup.step === 'opening'
                         ? <Loader2 className="h-4 w-4 animate-spin" />
@@ -926,21 +926,21 @@ export default function Accounts() {
                       }
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-[#F8FAFC]">
+                      <div className="text-sm font-medium text-foreground">
                         {wechatSetup.step === 'opening' && t("正在打开微信")}
                         {wechatSetup.step === 'ready' && t("微信已就绪")}
                         {wechatSetup.step === 'capturing' && t("等待你点击输入框")}
                         {wechatSetup.step === 'success' && t("输入区已识别")}
                         {wechatSetup.step === 'error' && t("需要重试")}
                       </div>
-                      <div className="mt-2 text-sm leading-6 text-[#CBD5E1]">{wechatSetup.message}</div>
+                      <div className="mt-2 text-sm leading-6 text-foreground">{wechatSetup.message}</div>
                     </div>
                   </div>
                 </div>
 
               </div>
 
-              <div className="flex items-center justify-end gap-2 border-t border-[#1E293B] px-5 py-4">
+              <div className="flex items-center justify-end gap-2 border-t border-border px-5 py-4">
                 <Button variant="outline" onClick={() => setWechatSetup((prev) => ({ ...prev, open: false }))}>
                   {wechatSetup.step === 'success' ? t("完成") : t("稍后处理")}
                 </Button>
@@ -960,20 +960,20 @@ export default function Accounts() {
         )}
       </AnimatePresence>
 
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 flex flex-col gap-4 rounded-md border border-[#1E293B] bg-[#0D1422] p-4 lg:flex-row lg:items-center lg:justify-between">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6 flex flex-col gap-4 rounded-md border border-border bg-background p-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-sm text-[#94A3B8]">
+          <p className="text-sm text-muted-foreground">
 
             {t("管理各平台账号、登录态和发布配置档案")}
-            <span className="text-[#10B981]"> · {totalConnected}  {t("个在线")}</span>
-            <span className="text-[#64748B]">  {t("· 全部账号")} {visibleAccounts.length}/50</span>
+            <span className="text-success-ink"> · {totalConnected}  {t("个在线")}</span>
+            <span className="text-muted-foreground">  {t("· 全部账号")} {visibleAccounts.length}/50</span>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select
             value={addingPlatform}
             onChange={(event) => setAddingPlatform(event.target.value)}
-            className="h-10 rounded-lg border border-[#334155] bg-[#020617] px-3 text-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+            className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-[#6366F1]"
           >
             {platformIds.map((id) => (
               <option key={id} value={id}>{PLATFORM_CONFIG[id]?.label || id}</option>
@@ -986,11 +986,11 @@ export default function Accounts() {
       </motion.div>
 
       {error && (
-        <div className="mb-5 flex items-start gap-3 rounded-md border border-[#7F1D1D] bg-[#450A0A]/35 px-4 py-3 text-sm text-[#FCA5A5]">
+        <div className="mb-5 flex items-start gap-3 rounded-md border border-danger-ink/35 bg-danger-soft/35 px-4 py-3 text-sm text-danger-ink">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div className="min-w-0 flex-1">
-            <div className="font-medium text-[#FEE2E2]">{t("渠道账号暂不可用")}</div>
-            <div className="mt-1 text-xs leading-5 text-[#FCA5A5]">{error}</div>
+            <div className="font-medium text-danger-ink">{t("渠道账号暂不可用")}</div>
+            <div className="mt-1 text-xs leading-5 text-danger-ink">{error}</div>
           </div>
           <Button variant="outline" size="sm" onClick={loadAccounts}>
             <RefreshCw className="w-4 h-4" />  {t("重试")}
@@ -999,17 +999,17 @@ export default function Accounts() {
       )}
 
       <section className="mb-6 grid gap-3 md:grid-cols-3">
-        <div className="rounded-md border border-[#1E293B] bg-[#0D1422] px-4 py-3">
-          <div className="text-xs text-[#64748B]">{t("全部账号")}</div>
-          <div className="mt-1 text-2xl font-semibold text-[#F8FAFC]">{visibleAccounts.length}/50</div>
+        <div className="rounded-md border border-border bg-background px-4 py-3">
+          <div className="text-xs text-muted-foreground">{t("全部账号")}</div>
+          <div className="mt-1 text-2xl font-semibold text-foreground">{visibleAccounts.length}/50</div>
         </div>
-        <div className="rounded-md border border-[#1E293B] bg-[#0D1422] px-4 py-3">
-          <div className="text-xs text-[#64748B]">{t("在线账号")}</div>
-          <div className="mt-1 text-2xl font-semibold text-[#22C55E]">{totalConnected}</div>
+        <div className="rounded-md border border-border bg-background px-4 py-3">
+          <div className="text-xs text-muted-foreground">{t("在线账号")}</div>
+          <div className="mt-1 text-2xl font-semibold text-success-ink">{totalConnected}</div>
         </div>
-        <div className="rounded-md border border-[#1E293B] bg-[#0D1422] px-4 py-3">
-          <div className="text-xs text-[#64748B]">{t("发布配置档案")}</div>
-          <div className="mt-1 text-2xl font-semibold text-[#A78BFA]">{visibleProfiles.length}</div>
+        <div className="rounded-md border border-border bg-background px-4 py-3">
+          <div className="text-xs text-muted-foreground">{t("发布配置档案")}</div>
+          <div className="mt-1 text-2xl font-semibold text-accent-ink">{visibleProfiles.length}</div>
         </div>
       </section>
 
@@ -1019,15 +1019,15 @@ export default function Accounts() {
           const Icon = cfg.icon
           const connected = platformAccounts.filter((item) => item.status === 'connected' && (platformId === 'tencent' || platformId === 'weibo' || item.session?.valid)).length
           return (
-            <section key={platformId} className="rounded-md border border-[#1E293B] bg-[#0D1422]">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1E293B] px-4 py-3">
+            <section key={platformId} className="rounded-md border border-border bg-background">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: cfg.bg, color: cfg.color }}>
                     <Icon className="h-5 w-5" />
                   </div>
                   <div>
-                    <div className="font-medium text-[#F8FAFC]">{cfg.label}</div>
-                    <div className="text-xs text-[#64748B]">
+                    <div className="font-medium text-foreground">{cfg.label}</div>
+                    <div className="text-xs text-muted-foreground">
                         {platformId === 'tencent' || platformId === 'weibo'
                           ? platformAccounts.length > 0
                             ? t("{v0}/{v1} 在线 · 桌面辅助", { v0: connected, v1: platformAccounts.length })
@@ -1053,7 +1053,7 @@ export default function Accounts() {
               </div>
               <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
                 {platformAccounts.length === 0 ? (
-                  <div className="col-span-full rounded-lg border border-dashed border-[#334155] bg-[#020617] px-4 py-6 text-center text-sm text-[#64748B]">
+                  <div className="col-span-full rounded-lg border border-dashed border-border bg-background px-4 py-6 text-center text-sm text-muted-foreground">
 
                     {t("暂无账号，添加后即可在素材管理与发布中选择。")}
                   </div>
@@ -1072,51 +1072,51 @@ export default function Accounts() {
                         { label: t("获赞"), value: account.likes_count },
                       ]
                   return (
-                    <div key={account.id} className={`relative rounded-lg border p-4 ${online ? 'border-[#10B981]/40 bg-[#10B981]/5' : 'border-[#334155] bg-[#020617]'}`}>
+                    <div key={account.id} className={`relative rounded-lg border p-4 ${online ? 'border-[#10B981]/40 bg-[#10B981]/5' : 'border-border bg-background'}`}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-3">
                           {account.avatar_url ? (
-                            <img src={accountAvatarUrl(account)} alt={displayName} className="h-10 w-10 shrink-0 rounded-full border border-[#334155] object-cover" />
+                            <img src={accountAvatarUrl(account)} alt={displayName} className="h-10 w-10 shrink-0 rounded-full border border-border object-cover" />
                           ) : (
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#334155] bg-[#111827] text-sm font-semibold text-[#94A3B8]">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-card text-sm font-semibold text-muted-foreground">
                               {displayName.slice(0, 1)}
                             </div>
                           )}
                           <div className="min-w-0">
-                            <div className="truncate font-medium text-[#F8FAFC]">{displayName}</div>
-                            <div className="mt-1 text-xs text-[#64748B]">{account.label && account.label !== displayName ? account.label : (account.is_default ? t("默认账号") : account.id)}</div>
+                            <div className="truncate font-medium text-foreground">{displayName}</div>
+                            <div className="mt-1 text-xs text-muted-foreground">{account.label && account.label !== displayName ? account.label : (account.is_default ? t("默认账号") : account.id)}</div>
                           </div>
                         </div>
                         <Badge variant={online ? 'success' : account.session?.has_session ? 'warning' : 'muted'}>
                           {online ? t("在线") : account.session?.has_session ? t("需重登") : t("未登录")}
                         </Badge>
                       </div>
-                      <div className="mt-4 grid grid-cols-4 gap-2 rounded-lg border border-[#1E293B] bg-[#0B1120] px-3 py-2 text-xs text-[#94A3B8]">
+                      <div className="mt-4 grid grid-cols-4 gap-2 rounded-lg border border-border bg-background px-3 py-2 text-xs text-muted-foreground">
                         {metricItems.map((item) => (
                           <div key={item.label}>
-                            <div className="text-[#64748B]">{item.label}</div>
-                            <div className="mt-0.5 text-[#E2E8F0]">{fmtNumber(item.value)}</div>
+                            <div className="text-muted-foreground">{item.label}</div>
+                            <div className="mt-0.5 text-foreground">{fmtNumber(item.value)}</div>
                           </div>
                         ))}
                         <div>
-                          <div className="text-[#64748B]">{t("同步")}</div>
-                          <div className="mt-0.5 truncate text-[#E2E8F0]" title={fmtDateTime(account.last_profile_sync_at)}>
+                          <div className="text-muted-foreground">{t("同步")}</div>
+                          <div className="mt-0.5 truncate text-foreground" title={fmtDateTime(account.last_profile_sync_at)}>
                             {fmtRelativeTimeShort(account.last_profile_sync_at)}
                           </div>
                         </div>
                       </div>
                       {account.sync_status === 'failed' && account.sync_message && (
-                        <div className="mt-3 rounded-md border border-[#F59E0B]/30 bg-[#F59E0B]/10 px-3 py-2 text-xs leading-5 text-[#FCD34D]">
+                        <div className="mt-3 rounded-md border border-[#F59E0B]/30 bg-[#F59E0B]/10 px-3 py-2 text-xs leading-5 text-warning-ink">
                           {account.sync_message}
                         </div>
                       )}
-                      <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-[#94A3B8]">
+                      <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                         <div>
-                          <div className="text-[#64748B]">{t("最近登录")}</div>
+                          <div className="text-muted-foreground">{t("最近登录")}</div>
                           <div>{fmtDateTime(account.last_login_at || account.session?.saved_at)}</div>
                         </div>
                         <div>
-                          <div className="text-[#64748B]">{t("最近发布")}</div>
+                          <div className="text-muted-foreground">{t("最近发布")}</div>
                           <div>{fmtDateTime(account.last_publish_at)}</div>
                         </div>
                       </div>
@@ -1138,16 +1138,16 @@ export default function Accounts() {
                             onClick={() => setDeleteExpandedAccount((current) => current === account.id ? null : account.id)}
                             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors ${
                               deleteExpandedAccount === account.id
-                                ? 'border-[#EF4444]/50 bg-[#EF4444]/15 text-[#FCA5A5]'
-                                : 'border-[#334155] bg-[#0B1120] text-[#64748B] hover:border-[#EF4444]/40 hover:text-[#FCA5A5]'
+                                ? 'border-[#EF4444]/50 bg-[#EF4444]/15 text-danger-ink'
+                                : 'border-border bg-background text-muted-foreground hover:border-[#EF4444]/40 hover:text-danger-ink'
                             }`}
                             title={t("展开删除账号")}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
                           {deleteExpandedAccount === account.id && (
-                            <div className="absolute right-0 top-11 z-30 w-64 rounded-lg border border-[#334155] bg-[#020617] p-2 shadow-2xl shadow-black/40">
-                              <div className="px-2 pb-2 text-xs leading-5 text-[#94A3B8]">
+                            <div className="absolute right-0 top-11 z-30 w-64 rounded-lg border border-border bg-background p-2 shadow-2xl shadow-black/40">
+                              <div className="px-2 pb-2 text-xs leading-5 text-muted-foreground">
 
                                 {t("删除此账号、登录信息和已同步资料。")}
                               </div>
@@ -1173,23 +1173,23 @@ export default function Accounts() {
         })}
       </motion.div>
 
-      <section className="mt-6 rounded-md border border-[#1E293B] bg-[#0D1422]">
-        <div className="border-b border-[#1E293B] px-4 py-3">
-          <div className="font-medium text-[#F8FAFC]">{t("发布配置档案")}</div>
-          <div className="mt-1 text-xs text-[#64748B]">{t("把常用账号保存为一组，发布时一键选择。")}</div>
+      <section className="mt-6 rounded-md border border-border bg-background">
+        <div className="border-b border-border px-4 py-3">
+          <div className="font-medium text-foreground">{t("发布配置档案")}</div>
+          <div className="mt-1 text-xs text-muted-foreground">{t("把常用账号保存为一组，发布时一键选择。")}</div>
         </div>
         <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="rounded-lg border border-[#1E293B] bg-[#020617] p-4">
-            <div className="mb-3 text-sm font-medium text-[#E2E8F0]">{t("新建档案")}</div>
+          <div className="rounded-lg border border-border bg-background p-4">
+            <div className="mb-3 text-sm font-medium text-foreground">{t("新建档案")}</div>
             <input
               value={profileName}
               onChange={(event) => setProfileName(event.target.value)}
               placeholder={t("例如：品牌A全渠道")}
-              className="mb-3 h-10 w-full rounded-lg border border-[#334155] bg-[#0B1120] px-3 text-sm text-[#F1F5F9] outline-none focus:border-[#6366F1]"
+              className="mb-3 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-[#6366F1]"
             />
             <div className="grid max-h-[260px] gap-2 overflow-y-auto md:grid-cols-2">
               {visibleAccounts.length === 0 ? (
-                <div className="text-sm text-[#64748B]">{t("暂无账号可加入档案。")}</div>
+                <div className="text-sm text-muted-foreground">{t("暂无账号可加入档案。")}</div>
               ) : visibleAccounts.map((account) => {
                 const checked = profileAccountIds.includes(account.id)
                 const profileAccountName = account.nickname?.trim() || t("未同步昵称")
@@ -1198,13 +1198,13 @@ export default function Accounts() {
                     key={account.id}
                     type="button"
                     onClick={() => setProfileAccountIds((prev) => checked ? prev.filter((id) => id !== account.id) : [...prev, account.id])}
-                    className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${checked ? 'border-[#6366F1] bg-[#6366F1]/15' : 'border-[#334155] hover:bg-[#111827]'}`}
+                    className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${checked ? 'border-[#6366F1] bg-[#6366F1]/15' : 'border-border hover:bg-card'}`}
                   >
                     <div className="min-w-0">
-                      <div className="truncate text-sm text-[#F8FAFC]">{profileAccountName}</div>
-                      <div className="text-xs text-[#64748B]">{PLATFORM_CONFIG[account.platform]?.label || account.platform}</div>
+                      <div className="truncate text-sm text-foreground">{profileAccountName}</div>
+                      <div className="text-xs text-muted-foreground">{PLATFORM_CONFIG[account.platform]?.label || account.platform}</div>
                     </div>
-                    {checked && <CheckCircle2 className="h-4 w-4 shrink-0 text-[#6366F1]" />}
+                    {checked && <CheckCircle2 className="h-4 w-4 shrink-0 text-accent-ink" />}
                   </button>
                 )
               })}
@@ -1218,7 +1218,7 @@ export default function Accounts() {
           </div>
           <div className="space-y-2">
             {visibleProfiles.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-[#334155] bg-[#020617] p-6 text-center text-sm text-[#64748B]">
+              <div className="rounded-lg border border-dashed border-border bg-background p-6 text-center text-sm text-muted-foreground">
 
                 {t("暂无发布配置档案")}
               </div>
@@ -1240,21 +1240,21 @@ export default function Accounts() {
                       setExpandedProfileId((current) => current === profile.id ? null : profile.id)
                     }
                   }}
-                  className={`w-full rounded-lg border bg-[#020617] p-3 text-left transition-all ${
+                  className={`w-full rounded-lg border bg-background p-3 text-left transition-all ${
                     expanded
                       ? 'border-[#6366F1]/60 shadow-lg shadow-[#6366F1]/10'
-                      : 'border-[#1E293B] hover:border-[#6366F1]/35 hover:bg-[#0B1120]'
+                      : 'border-border hover:border-[#6366F1]/35 hover:bg-background'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-medium text-[#F8FAFC]">{profile.name}</div>
-                      <div className="mt-1 text-xs text-[#64748B]">
+                      <div className="truncate text-sm font-medium text-foreground">{profile.name}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">
                         {profile.account_ids.length}  {t("个账号 ·")} {onlineCount}  {t("个在线 ·")} {fmtDateTime(profile.updated_at)}
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      <span className="rounded-md border border-[#334155] bg-[#0B1120] px-2 py-1 text-[11px] text-[#94A3B8]">
+                      <span className="rounded-md border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground">
                         {expanded ? t("收起") : t("详情")}
                       </span>
                       <Button
@@ -1271,13 +1271,13 @@ export default function Accounts() {
                   </div>
 
                   {expanded && (
-                    <div className="mt-3 space-y-2 border-t border-[#1E293B] pt-3">
-                      <div className="rounded-lg border border-[#1E293B] bg-[#0B1120] px-3 py-2 text-xs leading-5 text-[#94A3B8]">
+                    <div className="mt-3 space-y-2 border-t border-border pt-3">
+                      <div className="rounded-lg border border-border bg-background px-3 py-2 text-xs leading-5 text-muted-foreground">
 
                         {t("发布时选择这个档案，会自动带上下面这些账号。")}
                       </div>
                       {profileAccounts.length === 0 ? (
-                        <div className="rounded-lg border border-dashed border-[#334155] bg-[#020617] px-3 py-3 text-xs text-[#64748B]">
+                        <div className="rounded-lg border border-dashed border-border bg-background px-3 py-3 text-xs text-muted-foreground">
 
                           {t("这组里的账号已经被移除，可以重新创建一个新的档案。")}
                         </div>
@@ -1286,18 +1286,18 @@ export default function Accounts() {
                         const platformLabel = PLATFORM_CONFIG[account.platform]?.label || account.platform
                         const online = account.status === 'connected' && Boolean(account.session?.valid)
                         return (
-                          <div key={account.id} className="flex items-center justify-between gap-3 rounded-lg border border-[#1E293B] bg-[#020617] px-3 py-2">
+                          <div key={account.id} className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2">
                             <div className="flex min-w-0 items-center gap-2">
                               {account.avatar_url ? (
-                                <img src={accountAvatarUrl(account)} alt={displayName} className="h-7 w-7 shrink-0 rounded-full border border-[#334155] object-cover" />
+                                <img src={accountAvatarUrl(account)} alt={displayName} className="h-7 w-7 shrink-0 rounded-full border border-border object-cover" />
                               ) : (
-                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#334155] bg-[#111827] text-xs font-semibold text-[#94A3B8]">
+                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-card text-xs font-semibold text-muted-foreground">
                                   {displayName.slice(0, 1)}
                                 </div>
                               )}
                               <div className="min-w-0">
-                                <div className="truncate text-sm text-[#F8FAFC]">{displayName}</div>
-                                <div className="text-xs text-[#64748B]">{platformLabel}</div>
+                                <div className="truncate text-sm text-foreground">{displayName}</div>
+                                <div className="text-xs text-muted-foreground">{platformLabel}</div>
                               </div>
                             </div>
                             <Badge variant={online ? 'success' : account.session?.has_session ? 'warning' : 'muted'}>

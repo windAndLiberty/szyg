@@ -141,9 +141,9 @@ def infer_media_kind(path: str | Path) -> MediaKind:
     ext = Path(path).suffix.lower()
     if ext in {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"}:
         return "image"
-    if ext in {".mp4", ".mov", ".avi", ".mkv", ".webm"}:
+    if ext in {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v"}:
         return "video"
-    if ext in {".mp3", ".wav", ".m4a", ".aac", ".flac"}:
+    if ext in {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus"}:
         return "audio"
     return "document"
 
@@ -188,8 +188,8 @@ def resolve_managed_media_path(path_or_url: str) -> Path:
 
     normalized = value.replace("\\", "/")
     if normalized.startswith("/api/media/files/"):
-        parts = normalized.split("/")
-        if len(parts) >= 5:
+        parts = normalized.lstrip("/").split("/")
+        if len(parts) == 5:
             kind = parts[3]
             filename = parts[4]
             if kind in _KEYS:

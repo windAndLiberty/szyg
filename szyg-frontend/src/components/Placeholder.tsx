@@ -44,7 +44,7 @@ export default function Placeholder({ description, icon: Icon, module }: Placeho
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.2 }}
-        className="text-body-lg text-[#94A3B8] text-center max-w-md mb-8"
+        className="text-body-lg text-muted-foreground text-center max-w-md mb-8"
       >
         {t(description)}
       </motion.p>
@@ -53,17 +53,17 @@ export default function Placeholder({ description, icon: Icon, module }: Placeho
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.3 }}
-        className="glass-card rounded-card-lg border border-[#1E293B] px-6 py-4 flex items-center gap-3"
-        style={{ background: 'linear-gradient(135deg, rgba(26,34,53,0.8) 0%, rgba(17,24,39,0.95) 100%)' }}
+        className="glass-card rounded-card-lg border border-border px-6 py-4 flex items-center gap-3"
+        style={{ background: 'linear-gradient(135deg, hsl(var(--muted) / 0.8) 0%, hsl(var(--card) / 0.95) 100%)' }}
       >
-        <Construction className="w-5 h-5 text-[#F59E0B] shrink-0" />
+        <Construction className="w-5 h-5 text-warning-ink shrink-0" />
         <div className="flex flex-col">
-          <span className="text-body-md text-[#F1F5F9] font-medium">{t('模块开发中')}</span>
-          <span className="text-body-sm text-[#64748B]">
+          <span className="text-body-md text-foreground font-medium">{t('模块开发中')}</span>
+          <span className="text-body-sm text-muted-foreground">
             {module ? module : t('骨架阶段占位页面')}
           </span>
         </div>
-        <Sparkles className="w-4 h-4 text-[#6366F1] ml-2" />
+        <Sparkles className="w-4 h-4 text-accent-ink ml-2" />
       </motion.div>
     </motion.div>
   )

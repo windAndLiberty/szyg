@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import { ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { navGroups } from '@/lib/navConfig'
 import { SIDEBAR_WIDTH_COLLAPSED, SIDEBAR_WIDTH_EXPANDED, useLayout } from '@/lib/layout'
@@ -29,7 +29,6 @@ export default function Sidebar() {
   const { collapsed, setCollapsed } = useLayout()
   const { t } = useI18n()
   const location = useLocation()
-  const navigate = useNavigate()
   const activeGroup = navGroups.find((group) => group.children.some((child) => location.pathname === child.path))
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => loadExpandedGroups(activeGroup?.id))
   const [workDone, setWorkDone] = useState<Set<string>>(() => new Set(Object.keys(getWorkDoneNotices())))
@@ -54,14 +53,11 @@ export default function Sidebar() {
     if (workDone.has(location.pathname)) clearWorkDone(location.pathname)
   }, [location.pathname, workDone])
 
-  const toggleGroup = (id: string, defaultChild: string) => {
-    if (collapsed) {
-      navigate(defaultChild)
-      return
-    }
+  const toggleGroup = (id: string) => {
+    if (collapsed) setCollapsed(false)
     setExpandedGroups((current) => {
       const next = new Set(current)
-      if (next.has(id)) next.delete(id)
+      if (!collapsed && next.has(id)) next.delete(id)
       else next.add(id)
       saveExpandedGroups(next)
       return next
@@ -75,7 +71,7 @@ export default function Sidebar() {
     <div className={cn('flex h-16 shrink-0 items-center', collapsed ? 'justify-center px-2' : 'px-4')}>
       <Link to="/" className="flex min-w-0 items-center gap-3" title={collapsed ? t(product.name) : undefined}>
         <img src={product.logoUrl} alt={t(product.name)} className="h-8 w-8 shrink-0 rounded-md object-cover" />
-        {!collapsed && <div className="min-w-0"><p className="whitespace-nowrap font-display text-xl font-bold text-foreground">{t(product.name)}</p><p className="-mt-0.5 whitespace-nowrap text-[10px] text-muted-foreground">{t('navigation.superWorkforce')}</p></div>}
+        {!collapsed && <p className="truncate font-display text-xl font-bold text-foreground">{t(product.name)}</p>}
       </Link>
     </div>
 
@@ -88,8 +84,9 @@ export default function Sidebar() {
           return <section key={group.id} className={cn('overflow-hidden rounded-lg', isGroupActive ? 'bg-muted/50' : 'bg-transparent')}>
             <button
               type="button"
-              onClick={() => toggleGroup(group.id, group.defaultChild)}
+              onClick={() => toggleGroup(group.id)}
               className={cn('flex h-11 w-full items-center text-left outline-none transition-colors duration-100 hover:bg-muted focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#6366F1]', collapsed ? 'justify-center px-2' : 'gap-3 px-3')}
+              aria-label={t(group.label)}
               aria-expanded={isExpanded}
               aria-controls={`sidebar-group-${group.id}`}
               title={collapsed ? t(group.label) : undefined}
@@ -107,6 +104,7 @@ export default function Sidebar() {
                     return <Link
                       key={child.path}
                       to={child.path}
+                      aria-current={isActive ? 'page' : undefined}
                       onClick={() => { if (window.matchMedia('(max-width: 760px)').matches) setCollapsed(true) }}
                       tabIndex={isExpanded ? 0 : -1}
                       className={cn('relative flex h-9 items-center gap-2.5 rounded-md px-3 text-[13px] transition-colors duration-100', isActive ? 'bg-muted text-foreground font-semibold' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}
@@ -124,7 +122,7 @@ export default function Sidebar() {
       </div>
     </nav>
 
-    <div className="shrink-0 border-t border-[#1E293B] p-3">
+    <div className="shrink-0 border-t border-border p-3">
       <button type="button" onClick={() => setCollapsed(!collapsed)} className="flex h-10 w-full items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors duration-100 hover:bg-muted hover:text-foreground focus-visible:ring-1 focus-visible:ring-[#6366F1]" aria-label={t(collapsed ? 'navigation.expandSidebar' : 'navigation.collapseSidebar')}>
         {collapsed ? <ChevronRight className="h-5 w-5" /> : <span className="flex items-center gap-2 text-sm"><ChevronLeft className="h-5 w-5" />{t('common.collapse')}</span>}
       </button>

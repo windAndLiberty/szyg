@@ -12,7 +12,7 @@ import {
 import UserAvatar from '@/components/ui/UserAvatar'
 import type { ChatMessage } from '@/types'
 import { cn } from '@/lib/utils'
-import { product } from '@/lib/product'
+import RobotAvatar from '@/components/ui/RobotAvatar'
 import { translateCurrent, useI18n } from '@/lib/i18n'
 
 type ChatMessageViewProps = {
@@ -53,7 +53,7 @@ function renderRichText(text: string): React.ReactNode[] {
       const token = match[0]
       if (token.startsWith('**')) {
         parts.push(
-          <strong key={key++} className="font-semibold text-[#F1F5F9]">
+          <strong key={key++} className="font-semibold text-foreground">
             {token.slice(2, -2)}
           </strong>,
         )
@@ -61,7 +61,7 @@ function renderRichText(text: string): React.ReactNode[] {
         parts.push(
           <code
             key={key++}
-            className="px-1.5 py-0.5 rounded bg-[#0D1321] border border-[#1E293B] text-[12px] font-mono text-[#A78BFA]"
+            className="px-1.5 py-0.5 rounded bg-background border border-border text-[12px] font-mono text-accent-ink"
           >
             {token.slice(1, -1)}
           </code>,
@@ -88,11 +88,7 @@ const Avatar: React.FC<{ role: string; userName?: string }> = ({ role, userName 
   if (role === 'user') {
     return <UserAvatar className="h-8 w-8 shrink-0" />
   }
-  return (
-    <div className="w-8 h-8 rounded-full bg-[#0B1020] flex items-center justify-center shrink-0 shadow-glow overflow-hidden p-0.5">
-      <img src={product.logoUrl} alt={t("超级员工")} className="w-full h-full object-contain" />
-    </div>
-  )
+  return <span role="img" aria-label={t("小妤")} className="inline-flex h-8 w-8 shrink-0"><RobotAvatar identity="main" primary className="h-full w-full rounded-lg" /></span>
 }
 
 // === ChatMessageView component body ===
@@ -113,7 +109,7 @@ const ChatMessageView: React.FC<ChatMessageViewProps> = ({ message, statusText, 
         {isUser && (message.skill_name || (message.attachments?.length || 0) > 0) && (
           <div className="mb-2 flex flex-wrap items-center justify-end gap-1.5">
             {message.skill_name && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#4F46E5]/50 bg-[#312E81]/30 px-2.5 py-1 text-[11px] text-[#C7D2FE]">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#4F46E5]/50 bg-accent-soft/30 px-2.5 py-1 text-[11px] text-accent-ink">
                 <span className="text-xs leading-none" aria-hidden="true">{message.skill_icon || '🧩'}</span>
                 {message.skill_name}
               </span>
@@ -121,10 +117,10 @@ const ChatMessageView: React.FC<ChatMessageViewProps> = ({ message, statusText, 
             {message.attachments?.map((attachment) => (
               <span
                 key={attachment.id}
-                className="inline-flex max-w-[230px] items-center gap-1.5 rounded-full border border-[#334155] bg-[#0B1220] px-2.5 py-1 text-[11px] text-[#CBD5E1]"
+                className="inline-flex max-w-[230px] items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] text-foreground"
                 title={attachment.name}
               >
-                <Paperclip className="h-3 w-3 shrink-0 text-[#94A3B8]" />
+                <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground" />
                 <span className="truncate">{attachment.name}</span>
               </span>
             ))}
@@ -138,8 +134,8 @@ const ChatMessageView: React.FC<ChatMessageViewProps> = ({ message, statusText, 
               className={cn(
                 'inline-block rounded-card px-4 py-2.5 text-body-md leading-relaxed',
                 isUser
-                  ? 'ml-auto max-w-[70%] bg-[rgba(99,102,241,0.15)] border border-[rgba(99,102,241,0.25)] text-[#F1F5F9] shadow-[0_0_12px_rgba(99,102,241,0.08)]'
-                  : 'mr-auto max-w-[75%] bg-[rgba(17,24,39,0.5)] border-l-2 border-[rgba(99,102,241,0.2)] rounded-r-card px-4 py-2.5 text-[#94A3B8]',
+                  ? 'ml-auto max-w-[70%] bg-[rgba(99,102,241,0.15)] border border-[rgba(99,102,241,0.25)] text-foreground shadow-[0_0_12px_rgba(99,102,241,0.08)]'
+                  : 'mr-auto max-w-[75%] bg-card/50 border-l-2 border-[rgba(99,102,241,0.2)] rounded-r-card px-4 py-2.5 text-muted-foreground',
               )}
             >
               <span className="whitespace-pre-wrap break-words">{renderRichText(message.content)}</span>
@@ -149,60 +145,60 @@ const ChatMessageView: React.FC<ChatMessageViewProps> = ({ message, statusText, 
             </div>
           ) : message.isStreaming ? (
             <div className="flex items-center gap-2 py-2">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#818CF8]" />
-              <span className="text-[13px] text-[#94A3B8]">{statusText || t("思考中…")}</span>
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-accent-ink" />
+              <span className="text-[13px] text-muted-foreground">{statusText || t("思考中…")}</span>
             </div>
           ) : null
         )}
 
         {/* Tool result */}
         {message.type === 'tool_result' && message.toolCall && (
-          <div className="inline-flex items-center gap-2 rounded-lg bg-[#0D1321]/60 border border-[#1E293B] px-3 py-2">
+          <div className="inline-flex items-center gap-2 rounded-lg bg-background/60 border border-border px-3 py-2">
             {message.toolCall.status === 'success' ? (
-              <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981]" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-success-ink" />
             ) : message.toolCall.status === 'error' ? (
-              <AlertCircle className="w-3.5 h-3.5 text-[#EF4444]" />
+              <AlertCircle className="w-3.5 h-3.5 text-danger-ink" />
             ) : (
-              <Loader2 className="w-3.5 h-3.5 text-[#F59E0B] animate-spin" />
+              <Loader2 className="w-3.5 h-3.5 text-warning-ink animate-spin" />
             )}
-            <Wrench className="w-3.5 h-3.5 text-[#64748B]" />
-            <span className="text-[12px] font-medium text-[#94A3B8]">{toolActionLabel(message.toolCall.tool)}</span>
-            <span className="text-[12px] text-[#64748B]">{toolStatusLabel(message.toolCall.status)}</span>
+            <Wrench className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-[12px] font-medium text-muted-foreground">{toolActionLabel(message.toolCall.tool)}</span>
+            <span className="text-[12px] text-muted-foreground">{toolStatusLabel(message.toolCall.status)}</span>
           </div>
         )}
 
         {/* Image (real backend image_url) */}
         {message.type === 'image' && message.image_url && (
-          <div className="max-w-md rounded-card overflow-hidden border border-[#1E293B] bg-[#111827]">
+          <div className="max-w-md rounded-card overflow-hidden border border-border bg-card">
             <img src={message.image_url} alt={message.prompt || t("生成图片")} className="w-full h-auto block" />
             {message.prompt && (
-              <p className="px-3 py-2 text-[12px] text-[#94A3B8] border-t border-[#1E293B]">{message.prompt}</p>
+              <p className="px-3 py-2 text-[12px] text-muted-foreground border-t border-border">{message.prompt}</p>
             )}
           </div>
         )}
 
         {/* Video pending (real backend task progress) */}
         {message.type === 'video_pending' && (
-          <div className="max-w-md rounded-card border border-[#1E293B] bg-[#0D1321] p-4">
+          <div className="max-w-md rounded-card border border-border bg-background p-4">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-lg bg-[rgba(99,102,241,0.15)] flex items-center justify-center shrink-0">
-                <Loader2 className="w-5 h-5 text-[#6366F1] animate-spin" />
+                <Loader2 className="w-5 h-5 text-accent-ink animate-spin" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 text-[13px] font-medium text-[#F1F5F9]">
-                  <Film className="w-3.5 h-3.5 text-[#06B6D4]" />
+                <div className="flex items-center gap-1.5 text-[13px] font-medium text-foreground">
+                  <Film className="w-3.5 h-3.5 text-info-ink" />
 
                   {t("视频生成中…")}
                 </div>
-                <p className="mt-0.5 text-[12px] text-[#64748B] line-clamp-2">{message.prompt}</p>
+                <p className="mt-0.5 text-[12px] text-muted-foreground line-clamp-2">{message.prompt}</p>
                 <div className="mt-2 flex items-center gap-2">
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#1E293B]">
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                     <div
                       className="h-full rounded-full bg-[#6366F1] transition-all"
                       style={{ width: `${message.progress || 0}%` }}
                     />
                   </div>
-                  <span className="text-[11px] text-[#94A3B8] tabular-nums">
+                  <span className="text-[11px] text-muted-foreground tabular-nums">
                     {message.status || t("排队中")}
                     {message.progress ? ` · ${message.progress}%` : ''}
                   </span>
@@ -214,14 +210,14 @@ const ChatMessageView: React.FC<ChatMessageViewProps> = ({ message, statusText, 
 
         {/* Video ready (real backend video_url) */}
         {message.type === 'video' && message.video_url && (
-          <div className="max-w-lg rounded-card overflow-hidden border border-[#1E293B] bg-[#111827]">
+          <div className="max-w-lg rounded-card overflow-hidden border border-border bg-card">
             <video src={message.video_url} controls preload="metadata" className="w-full h-auto block" />
-            <div className="flex items-center justify-between px-3 py-2 border-t border-[#1E293B]">
-              <span className="text-[12px] text-[#94A3B8] line-clamp-1">{message.prompt}</span>
+            <div className="flex items-center justify-between px-3 py-2 border-t border-border">
+              <span className="text-[12px] text-muted-foreground line-clamp-1">{message.prompt}</span>
               <a
                 href={message.video_url}
                 download
-                className="inline-flex items-center gap-1 text-[12px] text-[#6366F1] hover:text-[#818CF8] shrink-0"
+                className="inline-flex items-center gap-1 text-[12px] text-accent-ink hover:text-accent-ink shrink-0"
               >
                 <Download className="w-3.5 h-3.5" />  {t("下载")}
               </a>

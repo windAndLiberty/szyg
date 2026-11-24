@@ -295,15 +295,6 @@ useEffect(() => {
 
   useEffect(() => {
     const handler = (event: Event) => {
-      const detail = (event as CustomEvent<{ collapsed?: boolean }>).detail
-      setHistoryCollapsed((current) => detail?.collapsed ?? !current)
-    }
-    window.addEventListener('szyg:toggle-super-agent-history', handler)
-    return () => window.removeEventListener('szyg:toggle-super-agent-history', handler)
-  }, [])
-
-  useEffect(() => {
-    const handler = (event: Event) => {
       const path = (event as CustomEvent<{ path?: string }>).detail?.path
       // 与「本 slot 自己的路径」比较，而不是全局 window.location——
       // keep-alive 下切换页面后 window.location 已变为新页面地址，
@@ -907,7 +898,7 @@ case 'run.failed':
 
   // === RENDER ===
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-[#0B0F1A] overflow-hidden">
+    <div className="flex h-[calc(100vh-4rem)] bg-background overflow-hidden">
       {!historyCollapsed && (
         <ConversationPanel
           conversations={conversations}
@@ -925,7 +916,7 @@ case 'run.failed':
         {!workViewOpen && (workEvents.length > 0 || workPhase !== 'idle') && (
           <button
             onClick={() => setWorkViewOpen(true)}
-            className="absolute right-4 top-3 z-10 inline-flex h-9 items-center gap-2 rounded-lg border border-[#273449] bg-[#111827]/90 px-3 text-xs text-[#94A3B8] hover:text-[#E2E8F0] hover:border-[#475569]"
+            className="absolute right-4 top-3 z-10 inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card/90 px-3 text-xs text-muted-foreground hover:text-foreground hover:border-border"
             aria-label={t("查看工作现场")}
             title={t("查看超级员工正在处理的网页")}
           >
@@ -976,7 +967,7 @@ case 'run.failed':
             </div>
 
             {/* Input bar */}
-            <div className="shrink-0 border-t border-[#1E293B] bg-[#111827]/80 backdrop-blur-md">
+            <div className="shrink-0 border-t border-border bg-card/80 backdrop-blur-md">
               {/* 微渐变装饰线 */}
               <div className="h-px bg-gradient-to-r from-[rgba(99,102,241,0.2)] via-transparent to-transparent" />
               <div className="mx-auto max-w-4xl px-5 py-4">

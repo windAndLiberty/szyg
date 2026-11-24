@@ -14,8 +14,9 @@ if [[ ! -x "$ELECTRON_DIR/node_modules/electron/dist/electron" ]]; then
   echo "Electron runtime is missing. Run: npm --prefix electron ci && npm --prefix electron run install:electron" >&2
   exit 1
 fi
-if curl --noproxy '*' --silent --max-time 1 http://127.0.0.1:8000/api/health >/dev/null 2>&1; then
-  echo "Port 8000 is already in use by a running desktop or standalone backend." >&2
+backend_port=${SZYG_DEV_BACKEND_PORT:-8000}
+if curl --noproxy '*' --silent --max-time 1 "http://127.0.0.1:$backend_port/api/health" >/dev/null 2>&1; then
+  echo "Port $backend_port is already in use by a running desktop or standalone backend." >&2
   echo "Close it first so the new Electron process can inject its browser-control service." >&2
   exit 1
 fi

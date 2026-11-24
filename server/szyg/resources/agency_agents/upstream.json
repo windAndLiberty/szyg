@@ -1,0 +1,18 @@
+{
+  "repository": "https://github.com/msitarzewski/agency-agents",
+  "reviewed_commit": "8ae6164602c95ca78828b148b9052460ee426885",
+  "license": "MIT",
+  "updated_profiles": [
+    "design/design-ui-designer.md",
+    "design/design-ux-architect.md",
+    "marketing/marketing-private-domain-operator.md",
+    "product/product-feedback-synthesizer.md",
+    "product/product-trend-researcher.md",
+    "project-management/project-management-experiment-tracker.md",
+    "specialized/recruitment-specialist.md",
+    "specialized/supply-chain-strategist.md",
+    "support/support-analytics-reporter.md",
+    "support/support-finance-tracker.md",
+    "support/support-support-responder.md"
+  ]
+}

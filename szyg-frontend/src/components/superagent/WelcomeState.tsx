@@ -11,7 +11,6 @@ import {
   Globe2,
 } from 'lucide-react'
 import type { CaseCard } from '@/types'
-import { product } from '@/lib/product'
 import { translateCurrent, useI18n } from '@/lib/i18n'
 
 type WelcomeStateProps = {
@@ -81,38 +80,23 @@ const WelcomeState: React.FC<WelcomeStateProps> = ({
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      {/* Brand block */}
       <motion.div
         className="flex flex-col items-center gap-4 mb-8"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
       >
-        <div className="relative">
-          <div
-            className="absolute inset-0 rounded-2xl blur-2xl opacity-40"
-            style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.6) 0%, transparent 70%)' }}
-          />
-          <div className="relative w-32 h-32 rounded-2xl overflow-hidden bg-[#0B1020]/70 p-2 shadow-glow-strong">
-            <img src={product.logoUrl} alt={t("超级员工")} className="w-full h-full object-contain" />
-          </div>
-        </div>
         <div className="text-center">
-          <p className="text-body-md text-[#94A3B8]">{t("一个超级员工，按需组合内容、获客、转化与运营技能")}</p>
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-[11px] text-[#64748B]">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#334155] bg-[#111827]/70 px-2.5 py-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#10B981] shadow-[0_0_6px_rgba(16,185,129,0.7)]" />
-
-              {t("超级员工已就绪")}
-            </span>
+          <h2 className="text-2xl font-medium tracking-tight">{t("把一项工作交给{v0}", { v0: t("小妤") })}</h2>
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-[11px] text-muted-foreground empty:hidden">
             {skillCount > 0 && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#334155] bg-[#111827]/70 px-2.5 py-1">
-                <BrainCircuit className="h-3 w-3 text-[#818CF8]" />
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/70 px-2.5 py-1">
+                <BrainCircuit className="h-3 w-3 text-accent-ink" />
                 {skillCount}  {t("项可复用技能")}
               </span>
             )}
             {memoryEnabled && (
-              <span className="rounded-full border border-[#334155] bg-[#111827]/70 px-2.5 py-1">{t("长期记忆已开启")}</span>
+              <span className="rounded-full border border-border bg-card/70 px-2.5 py-1">{t("长期记忆已开启")}</span>
             )}
           </div>
         </div>
@@ -142,9 +126,9 @@ const WelcomeState: React.FC<WelcomeStateProps> = ({
               type="button"
               onClick={() => setInputText(item.prompt)}
               disabled={streaming}
-              className="flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-[#1E293B] bg-[#111827]/60 px-3 text-xs text-[#94A3B8] transition-all hover:border-[#6366F1]/40 hover:bg-[#6366F1]/8 hover:text-[#E0E7FF] disabled:opacity-50"
+              className="flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-border bg-card/60 px-3 text-xs text-muted-foreground transition-all hover:border-[#6366F1]/40 hover:bg-[#6366F1]/8 hover:text-accent-ink disabled:opacity-50"
             >
-              <Icon className="h-3.5 w-3.5 shrink-0 text-[#818CF8]" />
+              <Icon className="h-3.5 w-3.5 shrink-0 text-accent-ink" />
               <span className="truncate">{item.label}</span>
             </button>
           )
@@ -159,18 +143,18 @@ const WelcomeState: React.FC<WelcomeStateProps> = ({
         transition={{ duration: 0.6, delay: 0.3, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
       >
         <div className="flex items-center gap-2 mb-4">
-          <Film className="w-4 h-4 text-[#6366F1]" />
-          <span className="text-heading-sm text-[#F1F5F9]">{t("智能员工 · 精选案例")}</span>
+          <Film className="w-4 h-4 text-accent-ink" />
+          <span className="text-heading-sm text-foreground">{t("智能员工 · 精选案例")}</span>
         </div>
 
         <div className="h-[132px] overflow-x-auto overflow-y-hidden">
           {caseCardsLoading ? (
-            <div className="flex h-full items-center justify-center text-[#64748B] gap-2">
+            <div className="flex h-full items-center justify-center text-muted-foreground gap-2">
               <Loader2 className="w-4 h-4 animate-spin" />
               <span className="text-[13px]">{t("正在搜索真实推荐案例…")}</span>
             </div>
           ) : caseCards.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center text-[#64748B] gap-1">
+            <div className="flex h-full flex-col items-center justify-center text-muted-foreground gap-1">
               <span className="text-[13px]">{t("暂无推荐案例")}</span>
               <span className="text-[11px]">{t("发送一条消息即可开始对话")}</span>
             </div>
@@ -179,7 +163,7 @@ const WelcomeState: React.FC<WelcomeStateProps> = ({
               {caseCards.slice(0, 3).map((card, i) => (
                 <motion.div
                   key={`${card.video_url}-${i}`}
-                  className="group relative h-full min-w-0 overflow-hidden rounded-card border border-[#1E293B] bg-[#111827] transition-all hover:border-[#6366F1]/30 hover:shadow-card-hover"
+                  className="group relative h-full min-w-0 overflow-hidden rounded-card border border-border bg-card transition-all hover:border-[#6366F1]/30 hover:shadow-card-hover"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 + i * 0.06, duration: 0.4 }}
@@ -192,16 +176,16 @@ const WelcomeState: React.FC<WelcomeStateProps> = ({
                     className="flex h-full w-full min-w-0 flex-col p-4 text-left disabled:opacity-50"
                   >
                     <div className="flex w-full items-center justify-between gap-2 text-[11px]">
-                      <span className="inline-flex items-center gap-1.5 font-medium text-[#818CF8]">
+                      <span className="inline-flex items-center gap-1.5 font-medium text-accent-ink">
                         <Film className="h-3.5 w-3.5" />
                         {sourceLabel[card.source] || t("视频案例")}
                       </span>
-                      <span className="shrink-0 text-[#64748B]">♥ {formatLikes(card.likes)}</span>
+                      <span className="shrink-0 text-muted-foreground">♥ {formatLikes(card.likes)}</span>
                     </div>
-                    <p className="mt-2 line-clamp-2 text-body-sm font-medium leading-6 text-[#F1F5F9] transition-colors group-hover:text-[#A5B4FC]">
+                    <p className="mt-2 line-clamp-2 text-body-sm font-medium leading-6 text-foreground transition-colors group-hover:text-accent-ink">
                       {card.title}
                     </p>
-                    <p className="mt-auto max-w-[calc(100%-28px)] truncate text-[11px] text-[#64748B]">
+                    <p className="mt-auto max-w-[calc(100%-28px)] truncate text-[11px] text-muted-foreground">
                       {card.author || t("平台作者")}
                     </p>
                   </button>
@@ -211,7 +195,7 @@ const WelcomeState: React.FC<WelcomeStateProps> = ({
                       target="_blank"
                       rel="noreferrer"
                       onClick={(event) => event.stopPropagation()}
-                      className="absolute bottom-3 right-3 inline-flex h-7 w-7 items-center justify-center rounded-md text-[#64748B] transition-colors hover:bg-[#1E293B] hover:text-[#C7D2FE] focus:outline-none focus:ring-1 focus:ring-[#6366F1]/50"
+                      className="absolute bottom-3 right-3 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-accent-ink focus:outline-none focus:ring-1 focus:ring-[#6366F1]/50"
                       aria-label={t("打开{v0}", { v0: card.title })}
                       title={t("打开原视频")}
                     >

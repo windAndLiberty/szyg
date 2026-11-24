@@ -83,10 +83,10 @@ export default function AcquisitionAnalytics() {
 
   return (
     <PageShell title={t("获客洞察")} subtitle={t("复盘目标发现、评论执行、线索识别和转化阶段表现。")} icon={TrendingUp}>
-      {error && <div className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 px-4 py-3 text-sm text-[#FCA5A5]">{error}</div>}
+      {error && <div className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 px-4 py-3 text-sm text-danger-ink">{error}</div>}
 
       {loading ? (
-        <div className="flex h-64 items-center justify-center text-[#64748B]"><Loader2 className="h-8 w-8 animate-spin" /></div>
+        <div className="flex h-64 items-center justify-center text-muted-foreground"><Loader2 className="h-8 w-8 animate-spin" /></div>
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -107,10 +107,10 @@ export default function AcquisitionAnalytics() {
                     return (
                       <div key={item.stage}>
                         <div className="mb-1 flex justify-between text-xs">
-                          <span className="text-[#CBD5E1]">{item.label}</span>
-                          <span className="text-[#64748B]">{item.count}</span>
+                          <span className="text-foreground">{item.label}</span>
+                          <span className="text-muted-foreground">{item.count}</span>
                         </div>
-                        <div className="h-2 rounded-full bg-[#0B0F1A]">
+                        <div className="h-2 rounded-full bg-background">
                           <div className="h-2 rounded-full bg-[#6366F1]" style={{ width: `${Math.max(6, (item.count / max) * 100)}%` }} />
                         </div>
                       </div>
@@ -126,12 +126,12 @@ export default function AcquisitionAnalytics() {
               ) : (
                 <div className="space-y-3">
                   {platformCounts.map(([platform, count]) => (
-                    <div key={platform} className="flex items-center justify-between rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-3">
-                      <div className="flex items-center gap-2 text-sm text-[#F1F5F9]">
-                        <PieChart className="h-4 w-4 text-[#818CF8]" />
+                    <div key={platform} className="flex items-center justify-between rounded-lg border border-border bg-background p-3">
+                      <div className="flex items-center gap-2 text-sm text-foreground">
+                        <PieChart className="h-4 w-4 text-accent-ink" />
                         {platformLabel(platform)}
                       </div>
-                      <span className="text-sm text-[#94A3B8]">{count}  {t("条线索")}</span>
+                      <span className="text-sm text-muted-foreground">{count}  {t("条线索")}</span>
                     </div>
                   ))}
                 </div>
@@ -142,17 +142,17 @@ export default function AcquisitionAnalytics() {
           <div className="grid gap-5 xl:grid-cols-2">
             <Panel title={t("评论执行概览")} description={t("用于观察发送成功、失败和排队压力。")}>
               <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
-                  <p className="text-xs text-[#64748B]">{t("已发送")}</p>
-                  <p className="mt-2 text-2xl font-semibold text-[#10B981]">{formatNumber(sent)}</p>
+                <div className="rounded-lg border border-border bg-background p-4">
+                  <p className="text-xs text-muted-foreground">{t("已发送")}</p>
+                  <p className="mt-2 text-2xl font-semibold text-success-ink">{formatNumber(sent)}</p>
                 </div>
-                <div className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
-                  <p className="text-xs text-[#64748B]">{t("失败")}</p>
-                  <p className="mt-2 text-2xl font-semibold text-[#EF4444]">{formatNumber(failed)}</p>
+                <div className="rounded-lg border border-border bg-background p-4">
+                  <p className="text-xs text-muted-foreground">{t("失败")}</p>
+                  <p className="mt-2 text-2xl font-semibold text-danger-ink">{formatNumber(failed)}</p>
                 </div>
-                <div className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
-                  <p className="text-xs text-[#64748B]">{t("排队")}</p>
-                  <p className="mt-2 text-2xl font-semibold text-[#F59E0B]">{formatNumber(queued)}</p>
+                <div className="rounded-lg border border-border bg-background p-4">
+                  <p className="text-xs text-muted-foreground">{t("排队")}</p>
+                  <p className="mt-2 text-2xl font-semibold text-warning-ink">{formatNumber(queued)}</p>
                 </div>
               </div>
             </Panel>
@@ -163,9 +163,9 @@ export default function AcquisitionAnalytics() {
               ) : (
                 <div className="grid gap-3 md:grid-cols-2">
                   {leadStatEntries.map(([key, value]) => (
-                    <div key={key} className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
-                      <p className="text-xs text-[#64748B]">{key}</p>
-                      <p className="mt-2 text-xl font-semibold text-[#F1F5F9]">{formatNumber(value)}</p>
+                    <div key={key} className="rounded-lg border border-border bg-background p-4">
+                      <p className="text-xs text-muted-foreground">{key}</p>
+                      <p className="mt-2 text-xl font-semibold text-foreground">{formatNumber(value)}</p>
                     </div>
                   ))}
                 </div>
@@ -177,9 +177,9 @@ export default function AcquisitionAnalytics() {
             {conversions.length === 0 ? (
               <EmptyState title={t("暂无转化记录")} description={t("客户跟进和状态推进后，会在这里出现转化记录。")} />
             ) : (
-              <div className="overflow-hidden rounded-lg border border-[#1E293B]">
+              <div className="overflow-hidden rounded-lg border border-border">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-[#0B0F1A] text-xs text-[#64748B]">
+                  <thead className="bg-background text-xs text-muted-foreground">
                     <tr>
                       <th className="px-3 py-3">{t("客户")}</th>
                       <th className="px-3 py-3">{t("平台")}</th>
@@ -187,13 +187,13 @@ export default function AcquisitionAnalytics() {
                       <th className="px-3 py-3">{t("更新时间")}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#1E293B]">
+                  <tbody className="divide-y divide-border">
                     {conversions.map((item, index) => (
                       <tr key={String(item.id || index)}>
-                        <td className="px-3 py-3 text-[#F1F5F9]">{String(item.customer_name || item.user_name || item.name || t("未知客户"))}</td>
-                        <td className="px-3 py-3 text-[#94A3B8]">{platformLabel(String(item.platform || ''))}</td>
-                        <td className="px-3 py-3 text-[#CBD5E1]">{String(item.stage || item.status || '-')}</td>
-                        <td className="px-3 py-3 text-[#64748B]">{String(item.updated_at || item.created_at || '-')}</td>
+                        <td className="px-3 py-3 text-foreground">{String(item.customer_name || item.user_name || item.name || t("未知客户"))}</td>
+                        <td className="px-3 py-3 text-muted-foreground">{platformLabel(String(item.platform || ''))}</td>
+                        <td className="px-3 py-3 text-foreground">{String(item.stage || item.status || '-')}</td>
+                        <td className="px-3 py-3 text-muted-foreground">{String(item.updated_at || item.created_at || '-')}</td>
                       </tr>
                     ))}
                   </tbody>

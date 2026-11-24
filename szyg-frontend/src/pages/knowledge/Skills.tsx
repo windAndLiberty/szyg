@@ -105,10 +105,10 @@ const BUILTIN_MARKET_SKILLS: MarketSkill[] = BUILTIN_SKILL_DEFINITIONS.map(([
   emoji,
 }))
 
-const primaryButton = 'inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md bg-[#6366F1] px-4 text-sm font-medium text-white transition hover:bg-[#5558E8] disabled:cursor-not-allowed disabled:opacity-45'
-const secondaryButton = 'inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-[#2A3547] bg-[#111827] px-3 text-sm text-[#CBD5E1] transition hover:border-[#46536A] hover:bg-[#172033] disabled:cursor-not-allowed disabled:opacity-45'
-const itemActionButton = 'inline-flex h-9 shrink-0 items-center justify-center text-sm font-medium text-[#A5B4FC] underline decoration-[#6366F1]/65 underline-offset-4 transition hover:text-white hover:decoration-[#A5B4FC] disabled:cursor-not-allowed disabled:text-[#64748B] disabled:decoration-[#475569]'
-const itemRemoveButton = 'inline-flex h-9 shrink-0 items-center justify-center text-sm text-[#94A3B8] underline decoration-[#475569] underline-offset-4 transition hover:text-[#FCA5A5] hover:decoration-[#EF4444]/70 disabled:cursor-not-allowed disabled:opacity-45'
+const primaryButton = 'inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:brightness-90 disabled:cursor-not-allowed disabled:opacity-45'
+const secondaryButton = 'inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-border bg-card px-3 text-sm text-foreground transition hover:border-border hover:bg-muted disabled:cursor-not-allowed disabled:opacity-45'
+const itemActionButton = 'inline-flex h-9 shrink-0 items-center justify-center text-sm font-medium text-accent-ink underline decoration-[#6366F1]/65 underline-offset-4 transition hover:text-foreground hover:decoration-[#A5B4FC] disabled:cursor-not-allowed disabled:text-muted-foreground disabled:decoration-[#475569]'
+const itemRemoveButton = 'inline-flex h-9 shrink-0 items-center justify-center text-sm text-muted-foreground underline decoration-[#475569] underline-offset-4 transition hover:text-danger-ink hover:decoration-[#EF4444]/70 disabled:cursor-not-allowed disabled:opacity-45'
 
 function formatCount(value: number) {
   if (value >= 10000) return translateCurrent("{v0}万次使用", { v0: Math.floor(value / 1000) / 10 })
@@ -251,20 +251,20 @@ export default function Skills() {
   }
 
   return (
-    <div className="min-h-full bg-[#080C14] text-[#E5E7EB]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1E293B] px-6 py-4">
+    <div className="min-h-full bg-background text-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-4">
         <div>
-          <div className="font-medium text-[#E2E8F0]">{t("技能市场")}</div>
-          <div className="mt-1 text-sm text-[#94A3B8]">{t("查看系统内置技能，或为超级员工添加需要的外部技能。")}</div>
+          <div className="font-medium text-foreground">{t("技能市场")}</div>
+          <div className="mt-1 text-sm text-muted-foreground">{t("查看系统内置技能，或为超级员工添加需要的外部技能。")}</div>
         </div>
         <button className={secondaryButton} onClick={() => navigate('/')}>
           <ArrowLeft className="h-4 w-4" />{t("返回超级员工")}
         </button>
       </div>
 
-      <div className="flex flex-col gap-4 border-b border-[#1E293B] px-6 py-5">
+      <div className="flex flex-col gap-4 border-b border-border px-6 py-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap rounded-md border border-[#273449] bg-[#0B0F1A] p-1">
+          <div className="flex flex-wrap rounded-md border border-border bg-background p-1">
             {([
               ['all', t("全部")],
               ['builtin', t("SZYG 内置")],
@@ -273,7 +273,7 @@ export default function Skills() {
             ] as const).map(([id, label]) => (
               <button
                 key={id}
-                className={`h-8 rounded px-4 text-sm transition ${view === id ? 'bg-[#273449] text-white' : 'text-[#94A3B8] hover:text-white'}`}
+                className={`h-8 rounded px-4 text-sm transition ${view === id ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                 onClick={() => changeView(id)}
               >
                 {label}
@@ -284,13 +284,13 @@ export default function Skills() {
           {view !== 'installed' && (
             <div className="flex w-full max-w-md items-center gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#64748B]" />
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   onKeyDown={(event) => { if (event.key === 'Enter') submitSearch() }}
                   placeholder={t("搜索想让超级员工完成的工作")}
-                  className="h-9 w-full rounded-md border border-[#273449] bg-[#0B0F1A] pl-9 pr-3 text-sm outline-none transition focus:border-[#6366F1]"
+                  className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm outline-none transition focus:border-[#6366F1]"
                 />
               </div>
               <button className={secondaryButton} onClick={submitSearch}>{t("搜索")}</button>
@@ -306,7 +306,7 @@ export default function Skills() {
                 <button
                   key={item.id}
                   onClick={() => changeCategory(item.id)}
-                  className={`inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm transition ${category === item.id ? 'border-[#6366F1]/60 bg-[#6366F1]/12 text-[#C7D2FE]' : 'border-[#273449] bg-[#0D131F] text-[#94A3B8] hover:border-[#46536A] hover:text-white'}`}
+                  className={`inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm transition ${category === item.id ? 'border-[#6366F1]/60 bg-[#6366F1]/12 text-accent-ink' : 'border-border bg-background text-muted-foreground hover:border-border hover:text-foreground'}`}
                 >
                   <Icon className="h-4 w-4" />
                   {t(item.label)}
@@ -317,36 +317,36 @@ export default function Skills() {
         )}
       </div>
 
-      {error && <div className="mx-6 mt-4 rounded-md border border-[#7F1D1D] bg-[#450A0A]/30 px-4 py-3 text-sm text-[#FCA5A5]">{error}</div>}
+      {error && <div className="mx-6 mt-4 rounded-md border border-danger-ink/35 bg-danger-soft/30 px-4 py-3 text-sm text-danger-ink">{error}</div>}
       {notice && (
-        <div className="mx-6 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#14532D] bg-[#052E16]/30 px-4 py-3 text-sm text-[#86EFAC]">
+        <div className="mx-6 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-success-ink/35 bg-success-soft/30 px-4 py-3 text-sm text-success-ink">
           <span>{notice}</span>
-          <button className="font-medium text-[#BBF7D0] underline underline-offset-4 hover:text-white" onClick={() => navigate('/')}>{t("返回超级员工")}</button>
+          <button className="font-medium text-success-ink underline underline-offset-4 hover:text-foreground" onClick={() => navigate('/')}>{t("返回超级员工")}</button>
         </div>
       )}
 
       <div className="px-6 py-5">
         {view !== 'installed' ? (
           loading ? (
-            <div className="flex h-56 items-center justify-center text-sm text-[#94A3B8]"><Loader2 className="mr-2 h-5 w-5 animate-spin" />{t("正在寻找实用能力")}</div>
+            <div className="flex h-56 items-center justify-center text-sm text-muted-foreground"><Loader2 className="mr-2 h-5 w-5 animate-spin" />{t("正在寻找实用能力")}</div>
           ) : market.length > 0 ? (
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
               {market.map((item) => {
                 const added = item.builtin || installedIds.has(item.identifier)
                 return (
-                  <div key={item.identifier} className="flex min-h-[132px] items-center gap-4 rounded-md border border-[#1E293B] bg-[#0D131F] px-5 py-4 transition hover:-translate-y-0.5 hover:border-[#46536A] hover:bg-[#111A29]">
-                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-[#273449] bg-[#111827] text-xl" aria-hidden="true">{item.emoji || (item.builtin ? '✨' : '🧩')}</div>
+                  <div key={item.identifier} className="flex min-h-[132px] items-center gap-4 rounded-md border border-border bg-background px-5 py-4 transition hover:-translate-y-0.5 hover:border-border hover:bg-card">
+                    <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-border bg-card text-xl" aria-hidden="true">{item.emoji || (item.builtin ? '✨' : '🧩')}</div>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium text-[#E2E8F0]">{t(item.name)}</div>
-                      <p className="mt-1.5 line-clamp-2 text-sm leading-6 text-[#94A3B8]">{t(item.description)}</p>
-                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#64748B]">
+                      <div className="truncate font-medium text-foreground">{t(item.name)}</div>
+                      <p className="mt-1.5 line-clamp-2 text-sm leading-6 text-muted-foreground">{t(item.description)}</p>
+                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                         <span>{t(item.category_label)}</span>
                         {!item.builtin && <span>{formatCount(item.downloads)}</span>}
-                        {!item.builtin && <span className="text-[#86EFAC]">{t(item.availability_label)}</span>}
+                        {!item.builtin && <span className="text-success-ink">{t(item.availability_label)}</span>}
                       </div>
                     </div>
                     {item.builtin ? (
-                      <span className="shrink-0 rounded-full border border-[#334155] bg-[#111827] px-3 py-1.5 text-xs text-[#94A3B8]">{t("系统内置")}</span>
+                      <span className="shrink-0 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground">{t("系统内置")}</span>
                     ) : (
                       <button className={itemActionButton} onClick={() => !added && install(item)} disabled={added || working === item.identifier}>
                         {working === item.identifier ? <Loader2 className="h-4 w-4 animate-spin" /> : added ? t("已添加") : t("添加")}
@@ -358,19 +358,19 @@ export default function Skills() {
             </div>
           ) : (
             <div className="py-24 text-center">
-              <Search className="mx-auto h-8 w-8 text-[#475569]" />
-              <div className="mt-4 text-sm text-[#CBD5E1]">{t("没有找到合适的能力")}</div>
-              <div className="mt-1 text-xs text-[#64748B]">{t("换一个更简单的工作描述试试")}</div>
+              <Search className="mx-auto h-8 w-8 text-muted-foreground" />
+              <div className="mt-4 text-sm text-foreground">{t("没有找到合适的能力")}</div>
+              <div className="mt-1 text-xs text-muted-foreground">{t("换一个更简单的工作描述试试")}</div>
             </div>
           )
         ) : installed.length > 0 ? (
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
             {installed.map((item) => (
-              <div key={item.name} className="flex min-h-[112px] items-center gap-4 rounded-md border border-[#1E293B] bg-[#0D131F] px-5 py-4">
-                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-[#273449] bg-[#111827] text-xl" aria-hidden="true">🧩</div>
+              <div key={item.name} className="flex min-h-[112px] items-center gap-4 rounded-md border border-border bg-background px-5 py-4">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-border bg-card text-xl" aria-hidden="true">🧩</div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium text-[#E2E8F0]">{t(friendlyName(item.name))}</div>
-                  <p className="mt-1.5 text-sm leading-6 text-[#94A3B8]">{t(item.description)}</p>
+                  <div className="truncate font-medium text-foreground">{t(friendlyName(item.name))}</div>
+                  <p className="mt-1.5 text-sm leading-6 text-muted-foreground">{t(item.description)}</p>
                 </div>
                 <button className={itemRemoveButton} title={t("移除能力")} onClick={() => remove(item)} disabled={working === (item.skill_name || item.name)}>
                   {working === (item.skill_name || item.name) ? <Loader2 className="h-4 w-4 animate-spin" /> : t("移除")}
@@ -380,8 +380,8 @@ export default function Skills() {
           </div>
         ) : (
           <div className="py-24 text-center">
-            <Sparkles className="mx-auto h-8 w-8 text-[#475569]" />
-            <div className="mt-4 text-sm text-[#CBD5E1]">{t("还没有添加新的能力")}</div>
+            <Sparkles className="mx-auto h-8 w-8 text-muted-foreground" />
+            <div className="mt-4 text-sm text-foreground">{t("还没有添加新的能力")}</div>
             <button className={`${primaryButton} mt-4`} onClick={() => changeView('external')}>{t("去看看外部技能")}</button>
           </div>
         )}

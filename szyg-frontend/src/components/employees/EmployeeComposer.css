@@ -1,0 +1,126 @@
+.employee-composer-frame {
+  flex: none;
+  padding: 8px clamp(12px, 2.5vw, 36px) 18px;
+}
+.employee-composer {
+  container-type: inline-size;
+  width: 100%;
+  max-width: 768px;
+  margin: 0 auto;
+  padding: 10px 10px 8px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 22px;
+  color: hsl(var(--foreground));
+  background: hsl(var(--popover));
+  box-shadow: 0 3px 14px hsl(220 15% 8% / .06);
+}
+.employee-composer:focus-within { border-color: hsl(var(--muted-foreground) / .65); }
+.employee-composer textarea {
+  display: block;
+  width: 100%;
+  field-sizing: content;
+  min-height: 48px;
+  max-height: min(168px, 23dvh);
+  padding: 4px 7px 7px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.55;
+  resize: none;
+  outline: none;
+  background: transparent;
+}
+.employee-composer textarea::placeholder { color: hsl(var(--muted-foreground)); }
+.composer-toolbar { position: relative; display: flex; align-items: center; gap: 3px; }
+.composer-control, .composer-send, .composer-option, .composer-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.composer-control, .composer-send { flex: none; height: 32px; border-radius: 100px; }
+.composer-control { padding: 0 8px; color: hsl(var(--muted-foreground)); font-size: 12px; font-weight: 500; }
+.composer-control:hover, .composer-control[aria-expanded="true"] { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
+.composer-icon, .composer-send { width: 32px; padding: 0; }
+.composer-model { min-width: 30px; max-width: 46%; flex-shrink: 1; }
+.composer-model span, .composer-access span, .composer-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composer-control svg, .composer-option svg { flex: none; }
+.composer-spacer { flex: 1; }
+.composer-send { margin-left: 3px; background: hsl(var(--foreground)); color: hsl(var(--background)); }
+.composer-send:hover:enabled { opacity: .82; }
+.composer-send:disabled { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
+.composer-control:disabled, .composer-chip:disabled, .composer-option:disabled { opacity: .57; }
+.employee-composer button:focus-visible, .composer-search:focus-within { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
+.composer-danger, .composer-control.composer-danger:hover, .composer-control.composer-danger[aria-expanded="true"] { color: hsl(var(--danger-ink)); }
+.composer-popup {
+  position: absolute;
+  bottom: calc(100% + 9px);
+  left: 0;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  width: min(288px, 100%);
+  max-height: min(335px, 46dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 5px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 15px;
+  background: hsl(var(--popover));
+  box-shadow: 0 8px 30px hsl(220 10% 5% / .14), 0 2px 5px hsl(220 10% 5% / .06);
+}
+.composer-popup-model { left: auto; right: min(65px, 10%); width: min(235px, 90%); }
+.composer-popup-add { width: min(335px, 100%); }
+.composer-popup h3 { padding: 7px 10px 5px; font-size: 11px; font-weight: 600; color: hsl(var(--muted-foreground)); }
+.composer-option { flex: none; width: 100%; justify-content: flex-start; padding: 8px 10px; min-height: 34px; border-radius: 9px; text-align: left; gap: 8px; font-size: 13px; }
+.composer-option > span { flex: 1; }
+.composer-option:hover:enabled, .composer-option:focus-visible, .composer-option[aria-pressed="true"] { background: hsl(var(--muted) / .7); }
+.composer-menu-footer { border-top: 1px solid hsl(var(--border)); padding-top: 4px; margin-top: 4px; }
+.composer-switch { display: flex; align-items: center; width: 24px; height: 15px; padding: 2px; border-radius: 12px; background: hsl(var(--muted-foreground) / .55); }
+.composer-switch::after { content: ''; width: 11px; height: 11px; border-radius: 50%; background: white; }
+.composer-switch.is-on { justify-content: flex-end; background: hsl(var(--primary)); }
+.composer-search { display: flex; align-items: center; gap: 8px; flex: none; padding: 7px 10px; margin: 2px; border-radius: 8px; color: hsl(var(--muted-foreground)); }
+.composer-search input { min-width: 0; width: 100%; background: transparent; color: hsl(var(--foreground)); font-size: 13px; outline: none; }
+.composer-results { min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.composer-expert-info { min-width: 0; }
+.composer-expert-info strong, .composer-expert-info small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.composer-expert-info strong { font-weight: 500; }
+.composer-expert-info small { margin-top: 2px; font-size: 11px; color: hsl(var(--muted-foreground)); }
+.composer-risk, .composer-notice { margin: 2px 7px 6px; font-size: 12px; line-height: 1.55; }
+.composer-notice { color: hsl(var(--muted-foreground)); }
+.composer-notice[role="alert"], .composer-risk { color: hsl(var(--danger-ink)); }
+.composer-risk { padding: 3px 3px 0; font-size: 11px; }
+.composer-voice { display: flex; align-items: center; gap: 6px; }
+.composer-voice button, .composer-notice button { text-decoration: underline; text-underline-offset: 2px; }
+.composer-voice button { margin-left: 4px; }
+.composer-record-dot { width: 7px; height: 7px; border-radius: 50%; background: hsl(var(--destructive)); }
+.composer-chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 1px 5px 5px; }
+.composer-chip { max-width: 100%; padding: 3px 7px 3px 9px; border-radius: 8px; border: 1px solid hsl(var(--border)); color: hsl(var(--foreground)); font-size: 12px; line-height: 18px; }
+.composer-chip:hover:enabled { background: hsl(var(--muted)); }
+@container (max-width: 340px) {
+  .composer-access > span, .composer-access > svg:last-child { display: none; }
+  .composer-control { padding-inline: 5px; }
+  .composer-icon { width: 29px; }
+  .composer-model { max-width: 43%; }
+}
+
+.composer-add-categories {
+  display: flex;
+  flex: none;
+  gap: 4px;
+  margin: 3px 4px;
+  padding: 3px;
+  border-radius: 9px;
+  background: hsl(var(--muted) / .55);
+}
+.composer-add-categories button {
+  flex: 1;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+.composer-add-categories button[aria-pressed="true"] {
+  background: hsl(var(--popover));
+  color: hsl(var(--foreground));
+  box-shadow: 0 1px 3px hsl(220 15% 8% / .12);
+}

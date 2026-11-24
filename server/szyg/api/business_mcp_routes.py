@@ -48,7 +48,8 @@ def _tool_catalog() -> list[dict[str, Any]]:
             "inputSchema": {
                 "type": "object",
                 "properties": item.get("parameters") or {},
-                "additionalProperties": True,
+                "additionalProperties": item.get("domain") != "director",
+                **({"required": item["required"]} if item.get("required") else {}),
             },
             "annotations": {
                 "readOnlyHint": item.get("risk") == "read",

@@ -28,7 +28,7 @@ const enableDevTools = isDev || process.env.SZYG_DEBUG === '1'
 app.setPath('userData', path.join(app.getPath('appData'), product.userDataDirectory))
 app.setAppUserModelId(product.appUserModelId)
 
-let PORT = 8000
+let PORT = isDev ? Number(process.env.SZYG_DEV_BACKEND_PORT || 8000) : 8000
 const FRONTEND_PORT = 5173
 const PRODUCTION_CONTROL_URL = 'https://szyg.qdtracing.com'
 
@@ -180,6 +180,7 @@ function startupCopy() {
 
 async function loadStartupPage() {
   const copy = startupCopy()
+  const logoUrl = nativeImage.createFromPath(TRAY_ICON_PATH).toDataURL()
   await mainWindow?.loadURL(dataPage(`
     <!doctype html>
     <html lang="${currentUiLocale}">
@@ -189,21 +190,23 @@ async function loadStartupPage() {
         <style>
           :root{color-scheme:light dark;font:14px/1.5 system-ui,sans-serif;background:Canvas;color:CanvasText}
           *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center}
-          .shell{width:min(480px,calc(100vw - 48px));padding:32px}
-          .brand{display:flex;align-items:center;gap:8px;font-weight:600}.mark{width:8px;height:8px;border-radius:50%;background:currentColor}
-          h1{margin:24px 0 8px;font-size:28px;line-height:1.25}.status{margin:0}.detail,.note{color:color-mix(in srgb,CanvasText 72%,Canvas)}.note{font-size:12px}
-          .track{height:3px;margin-top:24px;overflow:hidden;border-radius:8px;background:color-mix(in srgb,CanvasText 18%,Canvas)}.bar{width:38%;height:100%;background:currentColor;animation:move 1.7s ease-in-out infinite}
-          @keyframes move{0%{transform:translateX(-105%)}50%{transform:translateX(175%)}100%{transform:translateX(-105%)}}
-          @media (prefers-reduced-motion:reduce){.bar{animation:none;width:100%;opacity:.65}}
+          .shell{width:min(520px,calc(100vw - 48px));padding:32px 16px;text-align:center}
+          .brand{display:grid;justify-items:center;gap:16px;font-weight:600}
+          .mark{position:relative;display:grid;place-items:center;width:96px;height:96px}
+          .mark img{width:58px;height:58px;border-radius:18px;object-fit:cover}
+          .mark::before{content:'';position:absolute;inset:0;border:3px solid color-mix(in srgb,CanvasText 15%,Canvas);border-top-color:#818cf8;border-right-color:#818cf880;border-radius:50%;animation:turn 1.4s linear infinite}
+          .mark.failed::before{animation:none;border-color:#e34e61}
+          h1{margin:12px 0 8px;font-size:26px;line-height:1.3}.status{margin:0}.detail,.note{color:color-mix(in srgb,CanvasText 72%,Canvas)}.note{font-size:12px}
+          @keyframes turn{to{transform:rotate(1turn)}}
+          @media (prefers-reduced-motion:reduce){.mark::before{animation:none}}
         </style>
       </head>
       <body>
         <main class="shell" role="status" aria-live="polite">
-          <div class="brand"><span class="mark"></span><span>${escapeHtml(copy.brand)}</span></div>
+          <div class="brand"><span class="mark" aria-hidden="true"><img src="${logoUrl}" alt=""></span><span>${escapeHtml(copy.brand)}</span></div>
           <h1>${escapeHtml(copy.title)}</h1>
           <p class="status" id="startup-status">${escapeHtml(copy.status)}</p>
           <p class="detail" id="startup-detail">${escapeHtml(copy.detail)}</p>
-          <div class="track" aria-hidden="true"><div class="bar"></div></div>
           <p class="note">${escapeHtml(copy.note)}</p>
         </main>
       </body>
@@ -273,13 +276,11 @@ async function showStartupFailure(error) {
     const title = document.querySelector('h1');
     const status = document.getElementById('startup-status');
     const detail = document.getElementById('startup-detail');
-    const bar = document.querySelector('.bar');
     const mark = document.querySelector('.mark');
     if (title) title.textContent = ${JSON.stringify(title)};
     if (status) status.textContent = ${JSON.stringify(status)};
     if (detail) { detail.textContent = ${JSON.stringify(detail)}; detail.style.whiteSpace = 'pre-line'; }
-    if (bar) { bar.style.animation = 'none'; bar.style.width = '100%'; bar.style.background = '#ef4444'; }
-    if (mark) { mark.style.background = '#ef4444'; mark.style.boxShadow = '0 0 20px #ef4444'; }
+    mark?.classList.add('failed');
   })()`
   try { await mainWindow.webContents.executeJavaScript(script) } catch (_) {
     loadBackendErrorPage(message, 'STARTUP_FAILED', '')
@@ -502,7 +503,7 @@ async function startBackend() {
       ? path.join(projectRoot, 'electron', 'providers', 'cua', 'cua-driver.exe')
       : path.join(process.resourcesPath, 'runtime', 'cua', 'cua-driver.exe'),
     SZYG_CORS_ORIGINS: isDev
-      ? 'http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:8000'
+      ? `http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:${PORT}`
       : `http://127.0.0.1:${PORT}`,
     // Resolve the frozen Playwright driver and its matching browser together.
     PLAYWRIGHT_BROWSERS_PATH: linuxBundle ? path.join(projectRoot, 'browsers') : isDev ? (process.env.PLAYWRIGHT_BROWSERS_PATH || '') : '0',
@@ -587,7 +588,9 @@ function stopBackend() {
 
 function waitForBackend(retries = 30) {
   return new Promise((resolve, reject) => {
+    let ready = false
     function check(i) {
+      if (ready) return
       if (backendLaunchError) return reject(new Error(backendLaunchError))
       const endpoint = isDev ? '/api/health' : '/api/config'
       const req = http.get({
@@ -596,7 +599,10 @@ function waitForBackend(retries = 30) {
         path: endpoint,
         headers: isDev ? {} : { 'X-SZYG-Desktop-Token': desktopToken },
       }, (res) => {
+        res.resume()
         if (res.statusCode === 200) {
+          ready = true
+          req.setTimeout(0)
           backendReady = true
           writeDesktopLog(`Backend ready on http://127.0.0.1:${PORT}${endpoint}`)
           return resolve()
@@ -608,7 +614,7 @@ function waitForBackend(retries = 30) {
         if (i > 0) setTimeout(() => check(i - 1), 500)
         else reject(new Error('Backend timeout'))
       })
-      req.setTimeout(2000, () => { req.destroy(); if (i > 0) setTimeout(() => check(i - 1), 500) })
+      req.setTimeout(2000, () => req.destroy(new Error('Backend readiness check timed out')))
     }
     check(retries)
   })
@@ -669,10 +675,7 @@ async function createWindow() {
     return { action: 'deny' }
   })
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    const allowed = isDev
-      ? url.startsWith(`http://127.0.0.1:${FRONTEND_PORT}`)
-      : url.startsWith(`http://127.0.0.1:${PORT}`)
-    if (!allowed && !url.startsWith('data:')) {
+    if (!isLocalAppPage(url)) {
       event.preventDefault()
       if (/^https?:\/\//i.test(url)) shell.openExternal(url)
     }
@@ -755,52 +758,81 @@ function requireOpenClaw() {
   return openClawRuntime
 }
 
+function isLocalAppPage(url) {
+  try {
+    return new URL(url).origin === `http://127.0.0.1:${isDev ? FRONTEND_PORT : PORT}`
+  } catch {
+    return false
+  }
+}
+
+function handleWorkspaceIpc(channel, action) {
+  ipcMain.handle(channel, (event, ...args) => {
+    const frame = event.senderFrame
+    if (!mainWindow || event.sender !== mainWindow.webContents || !frame || frame.parent || !isLocalAppPage(frame.url)) {
+      throw new Error('此操作仅可由小妤本机应用发起')
+    }
+    return action(event, ...args)
+  })
+}
+
 // OpenClaw is owned by the Electron main process. The renderer receives only
 // narrow, intention-revealing IPC methods and never sees Gateway credentials.
-ipcMain.handle('openclaw-runtime-start', () => requireOpenClaw().start())
-ipcMain.handle('openclaw-runtime-status', () => requireOpenClaw().snapshot())
-ipcMain.handle('openclaw-runtime-version', () => ({
+handleWorkspaceIpc('openclaw-runtime-start', () => requireOpenClaw().start())
+handleWorkspaceIpc('openclaw-runtime-status', () => requireOpenClaw().snapshot())
+handleWorkspaceIpc('openclaw-runtime-version', () => ({
   version: requireOpenClaw().snapshot().version,
   gatewayClientVersion: requireOpenClaw().snapshot().gatewayClientVersion,
   protocolVersion: requireOpenClaw().snapshot().protocolVersion,
   wireVersion: requireOpenClaw().snapshot().wireVersion,
 }))
-ipcMain.handle('openclaw-runtime-restart', () => requireOpenClaw().restart())
-ipcMain.handle('openclaw-bots-list', (_event, params) => requireOpenClaw().listBots(params || {}))
-ipcMain.handle('openclaw-bots-create', (_event, params) => requireOpenClaw().createBot(params || {}))
-ipcMain.handle('openclaw-bots-update', (_event, params) => requireOpenClaw().updateBot(params || {}))
-ipcMain.handle('openclaw-bots-archive', (_event, params) => requireOpenClaw().archiveBot(String(params?.agentId || ''), params?.archived !== false))
-ipcMain.handle('openclaw-sessions-list', (_event, params) => requireOpenClaw().rpc('sessions.list', params || {}))
-ipcMain.handle('openclaw-sessions-create', (_event, params) => requireOpenClaw().createSession(params || {}))
-ipcMain.handle('openclaw-sessions-history', (_event, params) => requireOpenClaw().rpc('chat.history', params || {}))
-ipcMain.handle('openclaw-runs-send', (_event, params) => requireOpenClaw().sendRun(params || {}))
-ipcMain.handle('openclaw-runs-interrupt', (_event, params) => requireOpenClaw().interruptRun(params || {}))
-ipcMain.handle('openclaw-approvals-resolve', (_event, params) => requireOpenClaw().rpc('exec.approval.resolve', params || {}))
-ipcMain.handle('openclaw-questions-answer', (_event, params) => requireOpenClaw().rpc('question.resolve', params || {}))
-ipcMain.handle('openclaw-skills-list', (_event, params) => requireOpenClaw().rpc('skills.status', params || {}))
-ipcMain.handle('openclaw-skills-read-status', (_event, params) => requireOpenClaw().rpc('skills.detail', params || {}))
-ipcMain.handle('openclaw-routines-list', (_event, params) => requireOpenClaw().rpc('cron.list', params || {}))
-ipcMain.handle('openclaw-routines-save', (_event, params) => requireOpenClaw().saveRoutine(params || {}))
-ipcMain.handle('openclaw-routines-run', (_event, params) => requireOpenClaw().rpc('cron.run', params || {}))
-ipcMain.handle('openclaw-routines-pause', (_event, params) => requireOpenClaw().rpc('cron.update', { id: params?.id, patch: { enabled: !params?.paused } }))
-ipcMain.handle('openclaw-computer-status', (_event, params) => {
+handleWorkspaceIpc('openclaw-runtime-restart', () => requireOpenClaw().restart())
+handleWorkspaceIpc('openclaw-bots-list', (_event, params) => requireOpenClaw().listBots(params || {}))
+handleWorkspaceIpc('openclaw-bots-create', (_event, params) => requireOpenClaw().createBot(params || {}))
+handleWorkspaceIpc('openclaw-bots-update', (_event, params) => requireOpenClaw().updateBot(params || {}))
+handleWorkspaceIpc('openclaw-bots-archive', (_event, params) => requireOpenClaw().archiveBot(String(params?.agentId || ''), params?.archived !== false))
+handleWorkspaceIpc('openclaw-sessions-list', (_event, params) => requireOpenClaw().listSessions(params || {}))
+handleWorkspaceIpc('openclaw-sessions-configure', (_event, params) => requireOpenClaw().configureSession(params || {}))
+handleWorkspaceIpc('openclaw-sessions-create', (_event, params) => requireOpenClaw().createSession(params || {}))
+handleWorkspaceIpc('openclaw-sessions-director-renders', (_event, params) => requireOpenClaw().sessionDirectorRenders(params || {}))
+handleWorkspaceIpc('openclaw-sessions-history', (_event, params) => requireOpenClaw().sessionHistory(params || {}))
+handleWorkspaceIpc('openclaw-runs-status', (_event, params) => requireOpenClaw().runStatus(params || {}))
+handleWorkspaceIpc('openclaw-runs-send', (_event, params) => requireOpenClaw().sendRun(params || {}))
+handleWorkspaceIpc('openclaw-runs-interrupt', (_event, params) => requireOpenClaw().interruptRun(params || {}))
+handleWorkspaceIpc('openclaw-approvals-resolve', (_event, params) => requireOpenClaw().rpc('exec.approval.resolve', params || {}))
+handleWorkspaceIpc('openclaw-questions-answer', (_event, params) => requireOpenClaw().rpc('question.resolve', params || {}))
+handleWorkspaceIpc('openclaw-skills-catalog', (_event, params) => requireOpenClaw().skillCatalog(params || {}))
+handleWorkspaceIpc('openclaw-skills-selection', (_event, params) => requireOpenClaw().skillSelection(params || {}))
+handleWorkspaceIpc('openclaw-skills-attach', (_event, params) => requireOpenClaw().changeSkillSelection(params || {}, true))
+handleWorkspaceIpc('openclaw-skills-detach', (_event, params) => requireOpenClaw().changeSkillSelection(params || {}, false))
+handleWorkspaceIpc('openclaw-skills-list', (_event, params) => requireOpenClaw().rpc('skills.status', params || {}))
+handleWorkspaceIpc('openclaw-skills-read-status', (_event, params) => requireOpenClaw().rpc('skills.detail', params || {}))
+handleWorkspaceIpc('openclaw-capabilities-catalog', (_event, params) => requireOpenClaw().capabilityCatalog(params || {}))
+handleWorkspaceIpc('openclaw-capabilities-selection', (_event, params) => requireOpenClaw().capabilitySelection(params || {}))
+handleWorkspaceIpc('openclaw-capabilities-attach', (_event, params) => requireOpenClaw().changeCapabilitySelection(params || {}, true))
+handleWorkspaceIpc('openclaw-capabilities-detach', (_event, params) => requireOpenClaw().changeCapabilitySelection(params || {}, false))
+handleWorkspaceIpc('openclaw-routines-list', (_event, params) => requireOpenClaw().rpc('cron.list', params || {}))
+handleWorkspaceIpc('openclaw-routines-save', (_event, params) => requireOpenClaw().saveRoutine(params || {}))
+handleWorkspaceIpc('openclaw-routines-run', (_event, params) => requireOpenClaw().rpc('cron.run', params || {}))
+handleWorkspaceIpc('openclaw-routines-pause', (_event, params) => requireOpenClaw().rpc('cron.update', { id: params?.id, patch: { enabled: !params?.paused } }))
+handleWorkspaceIpc('openclaw-computer-status', (_event, params) => {
   if (params?.agentId) browserManager.useAgentProfile(params.agentId)
   return { runtime: requireOpenClaw().snapshot(), browser: browserManager.state() }
 })
-ipcMain.handle('openclaw-computer-preview', (_event, params) => {
+handleWorkspaceIpc('openclaw-computer-preview', (_event, params) => {
   if (params?.agentId) browserManager.useAgentProfile(params.agentId)
   return browserManager.setVisible(true)
 })
-ipcMain.handle('openclaw-computer-takeover', (_event, params) => {
+handleWorkspaceIpc('openclaw-computer-takeover', (_event, params) => {
   if (params?.agentId) browserManager.useAgentProfile(params.agentId)
   return browserManager.takeover()
 })
-ipcMain.handle('openclaw-computer-return', (_event, params) => {
+handleWorkspaceIpc('openclaw-computer-return', (_event, params) => {
   if (params?.agentId) browserManager.useAgentProfile(params.agentId)
   return browserManager.resume()
 })
-ipcMain.handle('openclaw-artifacts-list', (_event, params) => requireOpenClaw().rpc('artifacts.list', params || {}))
-ipcMain.handle('openclaw-artifacts-open', async (_event, params) => {
+handleWorkspaceIpc('openclaw-artifacts-list', (_event, params) => requireOpenClaw().rpc('artifacts.list', params || {}))
+handleWorkspaceIpc('openclaw-artifacts-open', async (_event, params) => {
   const filePath = path.resolve(String(params?.path || ''))
   const allowedRoot = path.resolve(getRuntimeDataDir()) + path.sep
   if (!filePath.startsWith(allowedRoot)) throw new Error('Only Xiaoyu-managed local artifacts can be opened directly')
@@ -894,6 +926,7 @@ app.whenReady().then(async () => {
       resourcesPath: process.resourcesPath,
       dataDir: getRuntimeDataDir(),
       backendPort: PORT,
+      desktopToken,
       businessMcpToken,
       openClawModelToken,
       appVersion: app.getVersion(),
@@ -928,7 +961,7 @@ app.on('before-quit', () => {
   browserControlServer?.close()
   browserControlServer = null
   stopBackend()
-  void openClawRuntime?.stop()
+  void openClawRuntime?.stop().catch(error => console.warn('[openclaw] shutdown:', error.message))
 })
 
 app.on('window-all-closed', () => {

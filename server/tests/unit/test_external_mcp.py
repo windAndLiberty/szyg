@@ -9,6 +9,7 @@ def test_desktop_grant_scope_and_revocation(tmp_path, monkeypatch):
     monkeypatch.setenv("SZYG_DESKTOP_TOKEN", "desktop")
     monkeypatch.setenv("SZYG_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(cloud_auth, "_access_token", "session")
+    monkeypatch.setattr(cloud_auth, "_access_expires_at", 2**40)
     monkeypatch.setattr(cloud_auth, "_profile", {"user": {"id": "owner"}})
     app = FastAPI()
     app.include_router(router)

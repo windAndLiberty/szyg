@@ -26,18 +26,18 @@ class AppErrorBoundaryCore extends Component<AppErrorBoundaryProps, AppErrorBoun
     if (!this.state.hasError) return this.props.children
 
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0B0F1A] px-6 text-[#F1F5F9]">
-        <div className="w-full max-w-md rounded-lg border border-[#1E293B] bg-[#111827] p-6 text-center shadow-card-lift">
-          <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-lg bg-[#F59E0B]/10 text-[#FBBF24]">
+      <div className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
+        <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 text-center shadow-card-lift">
+          <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-lg bg-[#F59E0B]/10 text-warning-ink">
             <AlertTriangle className="h-5 w-5" />
           </span>
           <h1 className="mt-4 text-lg font-semibold">{this.props.t('errors.pageUnavailable')}</h1>
-          <p className="mt-2 text-sm leading-6 text-[#64748B]">{this.props.t('errors.pageUnavailableDescription')}</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">{this.props.t('errors.pageUnavailableDescription')}</p>
           <div className="mt-6 flex justify-center gap-3">
-            <button type="button" onClick={() => window.location.reload()} className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#334155] px-3 text-sm text-[#94A3B8] transition-colors hover:text-[#F1F5F9]">
+            <button type="button" onClick={() => window.location.reload()} className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-sm text-muted-foreground transition-colors hover:text-foreground">
               <RefreshCw className="h-4 w-4" />{this.props.t('common.reload')}
             </button>
-            <button type="button" onClick={() => { window.location.href = '/' }} className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#6366F1] px-3 text-sm text-white transition-colors hover:bg-[#5558E6]">
+            <button type="button" onClick={() => { window.location.href = '/' }} className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3 text-sm text-primary-foreground transition-colors hover:brightness-90">
               <Home className="h-4 w-4" />{this.props.t('common.backHome')}
             </button>
           </div>

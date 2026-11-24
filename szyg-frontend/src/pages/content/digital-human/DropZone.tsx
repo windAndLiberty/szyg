@@ -59,10 +59,10 @@ export default function DropZone({
 
   const base =
     variant === 'dashed'
-      ? 'border-dashed border-[#33425A] bg-[#0D1320] text-[#B9C4D5]'
-      : 'border-solid border-[#2A3548] bg-[#0D1320] text-[#B9C4D5]'
+      ? 'border-dashed border-border bg-card text-muted-foreground'
+      : 'border-solid border-border bg-card text-muted-foreground'
   const draggingClass = dragging
-    ? 'border-[#818CF8] bg-[#6366F1]/10 text-[#C7D2FE]'
+    ? 'border-[#818CF8] bg-[#6366F1]/10 text-accent-ink'
     : ''
   const busyClass = busy ? 'cursor-wait opacity-70' : ''
 
@@ -75,7 +75,7 @@ export default function DropZone({
       className={`relative flex w-full flex-col items-center justify-center rounded-md border transition-colors ${SIZE_CLASSES[size]} ${base} ${draggingClass} ${busyClass} ${className}`}
     >
       {dragging && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-md bg-[#0B0F1A]/85 text-sm font-medium text-[#C4B5FD]">
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-md bg-background/85 text-sm font-medium text-accent-ink">
           {overlayLabel || t('digitalHuman.drop.release')}
         </div>
       )}
@@ -87,7 +87,7 @@ export default function DropZone({
       >
         {iconNode}
         <span className="font-medium">{title}</span>
-        {hint && <span className="mt-1 text-[11px] text-[#7F8DA5]">{hint}</span>}
+        {hint && <span className="mt-1 text-[11px] text-muted-foreground">{hint}</span>}
         {children}
       </button>
       <input

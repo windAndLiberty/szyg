@@ -380,9 +380,9 @@ export default function Intercept() {
       icon={Fish}
     >
       {error && (
-        <div className="flex items-center justify-between rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 px-4 py-3 text-sm text-[#FCA5A5]">
+        <div className="flex items-center justify-between rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 px-4 py-3 text-sm text-danger-ink">
           <span>{error}</span>
-          <button onClick={() => setError('')} className="text-[#FCA5A5] hover:text-white">{t("关闭")}</button>
+          <button onClick={() => setError('')} className="text-danger-ink hover:text-foreground">{t("关闭")}</button>
         </div>
       )}
 
@@ -411,8 +411,8 @@ export default function Intercept() {
                     onClick={() => togglePlatform(item.value)}
                     className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
                       platforms.includes(item.value)
-                        ? 'border-[#6366F1] bg-[#6366F1]/15 text-[#C4B5FD]'
-                        : 'border-[#334155] bg-[#0B0F1A] text-[#94A3B8] hover:border-[#6366F1]'
+                        ? 'border-[#6366F1] bg-[#6366F1]/15 text-accent-ink'
+                        : 'border-border bg-background text-muted-foreground hover:border-[#6366F1]'
                     }`}
                   >
                     {item.label}
@@ -468,7 +468,7 @@ export default function Intercept() {
           description={t("勾选需要触达的视频，一次最多选择 {v0} 个。", { v0: MAX_SELECTED_TARGETS })}
           action={(
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {selectedTargets.length > 0 && <span className="text-xs text-[#A5B4FC]">{t("已选")} {selectedTargets.length}  {t("个")}</span>}
+              {selectedTargets.length > 0 && <span className="text-xs text-accent-ink">{t("已选")} {selectedTargets.length}  {t("个")}</span>}
               <button onClick={generateForSelected} disabled={selectedTargets.length === 0 || loadingComments} className={buttonPrimary}>
                 {loadingComments ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
 
@@ -481,9 +481,9 @@ export default function Intercept() {
           {targets.length === 0 ? (
             <EmptyState title={t("还没有目标内容")} description={t("输入关键词后先搜索目标，系统会返回平台、作者、互动数据和质量评分。")} />
           ) : (
-            <div className="overflow-hidden rounded-lg border border-[#1E293B]">
+            <div className="overflow-hidden rounded-lg border border-border">
               <table className="w-full text-left text-sm">
-                <thead className="bg-[#0B0F1A] text-xs text-[#64748B]">
+                <thead className="bg-background text-xs text-muted-foreground">
                   <tr>
                     <th className="w-12 px-3 py-3 text-center">{t("选择")}</th>
                     <th className="px-3 py-3">{t("平台")}</th>
@@ -494,29 +494,29 @@ export default function Intercept() {
                     <th className="px-3 py-3">{t("操作")}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#1E293B]">
+                <tbody className="divide-y divide-border">
                   {targets.map((item, index) => {
                     const sourceUrl = targetSourceUrl(item)
                     const itemKey = targetKey(item)
                     const isSelected = selectedTargetKeys.includes(itemKey)
                     return (
-                    <tr key={`${item.platform}-${item.video_id || index}`} className={isSelected ? 'bg-[#6366F1]/10' : 'hover:bg-[#0B0F1A]/60'}>
+                    <tr key={`${item.platform}-${item.video_id || index}`} className={isSelected ? 'bg-[#6366F1]/10' : 'hover:bg-background/60'}>
                       <td className="px-3 py-3 text-center">
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleTarget(item)}
                           aria-label={t("选择视频：{v0}", { v0: item.title })}
-                          className="h-4 w-4 cursor-pointer rounded border-[#475569] bg-[#0B0F1A] accent-[#6366F1]"
+                          className="h-4 w-4 cursor-pointer rounded border-border bg-background accent-[#6366F1]"
                         />
                       </td>
-                      <td className="px-3 py-3 text-[#CBD5E1]">{platformLabel(item.platform)}</td>
+                      <td className="px-3 py-3 text-foreground">{platformLabel(item.platform)}</td>
                       <td className="max-w-sm px-3 py-3">
-                        <p className="truncate font-medium text-[#F1F5F9]">{item.title}</p>
-                        <p className="mt-1 truncate text-xs text-[#64748B]">{scoreDetailText(item.score_detail)}</p>
+                        <p className="truncate font-medium text-foreground">{item.title}</p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">{scoreDetailText(item.score_detail)}</p>
                       </td>
-                      <td className="px-3 py-3 text-[#94A3B8]">{item.author || '-'}</td>
-                      <td className="px-3 py-3 text-xs text-[#94A3B8]">
+                      <td className="px-3 py-3 text-muted-foreground">{item.author || '-'}</td>
+                      <td className="px-3 py-3 text-xs text-muted-foreground">
 
                         {t("播放")} {formatNumber(item.plays)}  {t("· 评")} {formatNumber(item.comments_count)}
                       </td>
@@ -564,9 +564,9 @@ export default function Intercept() {
             <EmptyState title={t("还没有评论草稿")} description={t("在上方列表勾选视频，然后点击生成评论。")} />
           ) : (
             <div className="space-y-3">
-              <div className="flex items-center justify-between rounded-lg border border-[#334155] bg-[#0B0F1A] px-4 py-3">
-                <p className="text-sm text-[#CBD5E1]">{t("将发送到")} <span className="font-semibold text-[#A5B4FC]">{selectedTargets.length}</span>  {t("个已选视频")}</p>
-                <span className="text-xs text-[#64748B]">{t("后台按顺序执行")}</span>
+              <div className="flex items-center justify-between rounded-lg border border-border bg-background px-4 py-3">
+                <p className="text-sm text-foreground">{t("将发送到")} <span className="font-semibold text-accent-ink">{selectedTargets.length}</span>  {t("个已选视频")}</p>
+                <span className="text-xs text-muted-foreground">{t("后台按顺序执行")}</span>
               </div>
               {comments.map((item, index) => {
                 const passed = item.preflight?.pass ?? item.preflight?.passed ?? item.preflight?.ok
@@ -585,9 +585,9 @@ export default function Intercept() {
                 const blocked = decision === 'needs_human' || decision === 'skip' || risk === 'high'
                 const isSelected = selectedCommentIndex === index
                 return (
-                  <div key={index} className={`rounded-lg border p-4 transition-colors ${isSelected ? 'border-[#6366F1] bg-[#6366F1]/10' : 'border-[#1E293B] bg-[#0B0F1A]'}`}>
+                  <div key={index} className={`rounded-lg border p-4 transition-colors ${isSelected ? 'border-[#6366F1] bg-[#6366F1]/10' : 'border-border bg-background'}`}>
                     <div className="flex items-start justify-between gap-3">
-                      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-sm font-medium text-[#E2E8F0]">
+                      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-sm font-medium text-foreground">
                         <input
                           type="radio"
                           name="comment-candidate"
@@ -598,7 +598,7 @@ export default function Intercept() {
 
                         {t("候选评论")} {index + 1}
                       </label>
-                      <span className={`shrink-0 rounded-full border px-2 py-1 text-xs ${blocked ? 'border-[#EF4444]/25 bg-[#EF4444]/10 text-[#FCA5A5]' : risk === 'medium' ? 'border-[#F59E0B]/25 bg-[#F59E0B]/10 text-[#FCD34D]' : 'border-[#10B981]/25 bg-[#10B981]/10 text-[#86EFAC]'}`}>
+                      <span className={`shrink-0 rounded-full border px-2 py-1 text-xs ${blocked ? 'border-[#EF4444]/25 bg-[#EF4444]/10 text-danger-ink' : risk === 'medium' ? 'border-[#F59E0B]/25 bg-[#F59E0B]/10 text-warning-ink' : 'border-[#10B981]/25 bg-[#10B981]/10 text-success-ink'}`}>
                         {decisionLabel}
                       </span>
                     </div>
@@ -607,18 +607,18 @@ export default function Intercept() {
                       onFocus={() => setSelectedCommentIndex(index)}
                       onChange={(event) => updateCandidate(index, event.target.value)}
                       rows={3}
-                      className="mt-3 w-full resize-y rounded-lg border border-[#334155] bg-[#111827] px-3 py-2 text-sm leading-6 text-[#F1F5F9] outline-none transition-colors focus:border-[#6366F1]"
+                      className="mt-3 w-full resize-y rounded-lg border border-border bg-card px-3 py-2 text-sm leading-6 text-foreground outline-none transition-colors focus:border-[#6366F1]"
                       aria-label={t("编辑候选评论 {v0}", { v0: index + 1 })}
                     />
-                    <div className="mt-2 flex items-center justify-between text-xs text-[#64748B]">
+                    <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
                       <span>{item.processed.length}  {t("字")}</span>
                       {item.original !== item.processed && item.preflight && <span>{t("已优化表达")}</span>}
                     </div>
-                    {item.preflight?.message && <p className="mt-3 text-xs text-[#94A3B8]">{item.preflight.message}</p>}
+                    {item.preflight?.message && <p className="mt-3 text-xs text-muted-foreground">{item.preflight.message}</p>}
                     {risks.length > 0 && (
                       <div className="mt-3 rounded-lg border border-[#F59E0B]/20 bg-[#F59E0B]/10 p-3">
-                        <p className="text-xs font-medium text-[#FCD34D]">{t("风险提示")}</p>
-                        <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-[#FDE68A]">
+                        <p className="text-xs font-medium text-warning-ink">{t("风险提示")}</p>
+                        <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-warning-ink">
                           {risks.map((reason, reasonIndex) => <li key={`${reason}-${reasonIndex}`}>{reason}</li>)}
                         </ul>
                       </div>
@@ -653,11 +653,11 @@ export default function Intercept() {
             : t("已结束的较早批次保留 180 天，最多保存 3,000 个批次。")}
         >
           <div className="mb-4 flex items-center justify-between gap-3">
-            <div className="inline-flex rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-1">
+            <div className="inline-flex rounded-lg border border-border bg-background p-1">
               <button
                 type="button"
                 onClick={() => setQueueView('active')}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${queueView === 'active' ? 'bg-[#6366F1] text-white' : 'text-[#94A3B8] hover:text-[#E2E8F0]'}`}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${queueView === 'active' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
               >
 
                 {t("当前队列")}
@@ -665,14 +665,14 @@ export default function Intercept() {
               <button
                 type="button"
                 onClick={() => setQueueView('archived')}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${queueView === 'archived' ? 'bg-[#6366F1] text-white' : 'text-[#94A3B8] hover:text-[#E2E8F0]'}`}
+                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${queueView === 'archived' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
               >
                 <Archive className="h-3.5 w-3.5" />
 
                 {t("历史归档")}
               </button>
             </div>
-            {queueView === 'archived' && <span className="text-xs text-[#64748B]">{t("自动清理 180 天前记录")}</span>}
+            {queueView === 'archived' && <span className="text-xs text-muted-foreground">{t("自动清理 180 天前记录")}</span>}
           </div>
           {queueGroups.length === 0 ? (
             <EmptyState
@@ -692,18 +692,18 @@ export default function Intercept() {
                 const singleItem = total === 1 ? group.items[0] : null
                 const singleUrl = singleItem ? queueSourceUrl(singleItem) : ''
                 return (
-                  <div key={group.id} className="overflow-hidden rounded-lg border border-[#1E293B] bg-[#0B0F1A] transition-colors hover:border-[#334155]">
+                  <div key={group.id} className="overflow-hidden rounded-lg border border-border bg-background transition-colors hover:border-border">
                     <div className="p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-[#94A3B8]">
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                             <span>{platformsInGroup.join('、')}</span>
                             <span className="h-1 w-1 rounded-full bg-[#475569]" />
                             <span>{total > 1 ? t("{v0} 个视频", { v0: total }) : t("单条评论")}</span>
-                            {queueView === 'archived' && <span className="text-[#A5B4FC]">{t("已归档")}</span>}
+                            {queueView === 'archived' && <span className="text-accent-ink">{t("已归档")}</span>}
                             {group.createdAt && <span>{group.createdAt.slice(5, 16).replace('T', ' ')}</span>}
                           </div>
-                          <p className="mt-2 line-clamp-2 text-sm leading-6 text-[#F1F5F9]">{group.commentText}</p>
+                          <p className="mt-2 line-clamp-2 text-sm leading-6 text-foreground">{group.commentText}</p>
                         </div>
                         <StatusPill status={queueGroupStatus(group.items)} />
                       </div>
@@ -711,26 +711,26 @@ export default function Intercept() {
                       {total > 1 ? (
                         <div className="mt-4">
                           <div className="mb-2 flex items-center justify-between text-xs">
-                            <span className="text-[#94A3B8]">{t("发送进度")}</span>
-                            <span className="font-medium text-[#CBD5E1]">{sentCount}/{total}</span>
+                            <span className="text-muted-foreground">{t("发送进度")}</span>
+                            <span className="font-medium text-foreground">{sentCount}/{total}</span>
                           </div>
-                          <div className="h-1.5 overflow-hidden rounded-full bg-[#1E293B]">
+                          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                             <div className="h-full rounded-full bg-[#10B981] transition-[width] duration-300" style={{ width: `${progress}%` }} />
                           </div>
                           <button
                             type="button"
                             onClick={() => toggleQueueGroup(group.id)}
-                            className="mt-3 flex items-center gap-1.5 text-xs font-medium text-[#A5B4FC] transition-colors hover:text-[#C4B5FD]"
+                            className="mt-3 flex items-center gap-1.5 text-xs font-medium text-accent-ink transition-colors hover:text-accent-ink"
                           >
                             {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                             {expanded ? t("收起发送明细") : t("展开 {v0} 条发送明细", { v0: total })}
                           </button>
                         </div>
                       ) : (
-                        <div className="mt-3 flex items-center justify-between gap-3 border-t border-[#1E293B] pt-3">
-                          <span className="min-w-0 truncate text-xs text-[#94A3B8]">{String(singleItem?.video_title || t("原视频"))}</span>
+                        <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
+                          <span className="min-w-0 truncate text-xs text-muted-foreground">{String(singleItem?.video_title || t("原视频"))}</span>
                           {singleUrl && (
-                            <a href={singleUrl} target="_blank" rel="noreferrer" className="flex shrink-0 items-center gap-1 text-xs font-medium text-[#A5B4FC] hover:text-[#C4B5FD]">
+                            <a href={singleUrl} target="_blank" rel="noreferrer" className="flex shrink-0 items-center gap-1 text-xs font-medium text-accent-ink hover:text-accent-ink">
 
                               {t("查看原视频")} <ExternalLink className="h-3.5 w-3.5" />
                             </a>
@@ -740,22 +740,22 @@ export default function Intercept() {
                     </div>
 
                     {total > 1 && expanded && (
-                      <div className="border-t border-[#1E293B] bg-[#0F1420] px-4">
+                      <div className="border-t border-border bg-card px-4">
                         {group.items.map((item, index) => {
                           const sourceUrl = queueSourceUrl(item)
                           return (
-                            <div key={item.id || item.item_id || index} className="flex items-start gap-3 border-b border-[#1E293B] py-3 last:border-b-0">
+                            <div key={item.id || item.item_id || index} className="flex items-start gap-3 border-b border-border py-3 last:border-b-0">
                               <div className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${isQueueSent(item) ? 'bg-[#10B981]' : 'bg-[#64748B]'}`} />
                               <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <span title={String(item.video_title || '')} className="truncate text-sm text-[#E2E8F0]">{String(item.video_title || t("目标视频 {v0}", { v0: index + 1 }))}</span>
+                                  <span title={String(item.video_title || '')} className="truncate text-sm text-foreground">{String(item.video_title || t("目标视频 {v0}", { v0: index + 1 }))}</span>
                                   <StatusPill status={item.status} />
                                 </div>
-                                {(item.error || item.error_msg) && <p className="mt-1 line-clamp-2 text-xs text-[#FCA5A5]">{String(item.error || item.error_msg)}</p>}
-                                {item.next_run_at && <p className="mt-1 text-xs text-[#A5B4FC]">{t("预计执行：")}{String(item.next_run_at).slice(5, 16).replace('T', ' ')}</p>}
+                                {(item.error || item.error_msg) && <p className="mt-1 line-clamp-2 text-xs text-danger-ink">{String(item.error || item.error_msg)}</p>}
+                                {item.next_run_at && <p className="mt-1 text-xs text-accent-ink">{t("预计执行：")}{String(item.next_run_at).slice(5, 16).replace('T', ' ')}</p>}
                               </div>
                               {sourceUrl && (
-                                <a href={sourceUrl} target="_blank" rel="noreferrer" className="mt-0.5 flex shrink-0 items-center gap-1 text-xs font-medium text-[#A5B4FC] hover:text-[#C4B5FD]">
+                                <a href={sourceUrl} target="_blank" rel="noreferrer" className="mt-0.5 flex shrink-0 items-center gap-1 text-xs font-medium text-accent-ink hover:text-accent-ink">
 
                                   {t("查看原视频")} <ExternalLink className="h-3.5 w-3.5" />
                                 </a>
@@ -770,9 +770,9 @@ export default function Intercept() {
               })}
             </div>
           )}
-          <div className="mt-4 rounded-lg border border-[#334155] bg-[#0B0F1A] p-3 text-xs leading-5 text-[#64748B]">
-            <div className="mb-2 flex items-center gap-2 text-[#CBD5E1]">
-              <CheckCircle2 className="h-4 w-4 text-[#10B981]" />
+          <div className="mt-4 rounded-lg border border-border bg-background p-3 text-xs leading-5 text-muted-foreground">
+            <div className="mb-2 flex items-center gap-2 text-foreground">
+              <CheckCircle2 className="h-4 w-4 text-success-ink" />
 
               {t("安全执行规则")}
             </div>

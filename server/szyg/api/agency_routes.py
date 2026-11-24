@@ -8,15 +8,16 @@ import json
 import logging
 import re
 from pathlib import Path
-from typing import Optional
+from threading import Lock
+from typing import Annotated, Optional
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 
 import uuid
 from datetime import datetime, timezone
 
-from szyg import agency_state
+from szyg import agency_state, conversation_experts
 from szyg.agency_manifest import EXCLUDED_DIVISIONS, RESOURCE_DIRNAME, RETAINED_DIVISIONS
 from szyg.data_path import DATA_DIR
 
@@ -42,13 +43,20 @@ _cache_divisions: list[dict] = []       # [{id, label, icon, color, count}, ...]
 _cache_division_set: dict[str, dict] = {}  # division_id → division info
 _search_index: dict[str, set[str]] = {}  # 倒排索引：关键词 → slug 集合
 _cache_loaded = False
+_cache_lock = Lock()
 
 
 def _build_cache() -> None:
-    """启动时一次性加载全部 agent，构建倒排索引。"""
-    global _cache_agents, _cache_divisions, _cache_division_set, _search_index, _cache_loaded
     if _cache_loaded:
         return
+    with _cache_lock:
+        if not _cache_loaded:
+            _populate_cache()
+
+
+def _populate_cache() -> None:
+    """启动时一次性加载全部 agent，构建倒排索引。"""
+    global _cache_agents, _cache_divisions, _cache_division_set, _search_index, _cache_loaded
 
     logger.info("Building agency agent cache (155 agents, 11 divisions)...")
     # 1) 扫描 divisions
@@ -1112,6 +1120,8 @@ def _scan_division(division: str) -> list[dict]:
 
 def _find_md(slug: str) -> Optional[tuple[str, Path]]:
     """按 slug 查找 .md 文件，返回 (division, path)。"""
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,96}", slug):
+        return None
     for division in RETAINED_DIVISIONS:
         p = AGENCY_ROOT / division / f"{slug}.md"
         if p.exists():
@@ -1128,10 +1138,102 @@ async def list_divisions(locale: Optional[str] = None):
 
 
 @router.get("/agents", response_model=list[AgentSummary])
-async def list_agents(division: Optional[str] = None, search: Optional[str] = None, locale: Optional[str] = None):
+async def list_agents(
+    division: Optional[str] = None,
+    search: Optional[str] = None,
+    locale: Optional[str] = None,
+    limit: Annotated[int | None, Query(ge=1, le=100)] = None,
+):
     """列出/搜索专家。倒排索引 O(1) 关键词查找。"""
     items = _cache_query(division, search)
-    return [AgentSummary(**_localized_agent(it, locale)) for it in items]
+    return [AgentSummary(**_localized_agent(it, locale)) for it in items[:limit]]
+
+
+class ConversationExpertRequest(BaseModel):
+    session_key: str = Field(max_length=192)
+    agent_id: str = Field(max_length=128)
+    locale: str | None = None
+
+
+class ExpertChange(ConversationExpertRequest):
+    slug: str = Field(min_length=1, max_length=96)
+
+
+class ExpertTurn(ConversationExpertRequest):
+    message: str = Field(max_length=8192)
+
+
+def _conversation_catalog() -> dict[str, dict]:
+    return {a["slug"]: a for a in _cache_query(None, None) if conversation_experts.available(a)}
+
+
+@router.get("/conversation-experts/catalog")
+def conversation_expert_catalog(locale: str | None = None):
+    return [_localized_agent(item, locale) for item in _conversation_catalog().values()]
+
+
+def _expert_reference(item: dict, limit: int) -> str:
+    # Only explanatory prose from a reviewed, bundled profile, never tools or example code.
+    _, body = _parse_frontmatter((AGENCY_ROOT / item["division"] / (item["slug"] + ".md")).read_text(encoding="utf-8"))
+    mission = re.search(r"^## [^\n]*(?:core mission|core responsibilities|primary responsibilities)[^\n]*\n(.*?)(?=^## |\Z)", body, re.I | re.M | re.S) if body else None
+    excerpt = mission.group(1).split("```")[0] if mission else ""
+    lines = [re.sub(r"[*#`]", "", line.lstrip("- ").strip()) for line in excerpt.splitlines() if line.strip() and not line.startswith("#")]
+    prose = " ".join(lines) or item["description_en"]
+    text = f'{item["name"]} ({item["name_en"]}) — {prose}'
+    if len(text) > limit:
+        text = text[:limit - 1].rsplit(" ", 1)[0] + "…"
+    return text
+
+
+def _conversation_expert_state(request: ConversationExpertRequest, action: str = "get", value: str = ""):
+    catalog = _conversation_catalog()
+    try:
+        state = conversation_experts.selection(request.agent_id, request.session_key, catalog, action=action, value=value)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except KeyError as exc:
+        raise HTTPException(404, "该专家不可用") from exc
+    roles = [(slug, "manual") for slug in state["manual"]]
+    if state.get("auto"):
+        roles.append((state["auto"], "auto"))
+    active = [{**_localized_agent(catalog[slug], request.locale), "source": source} for slug, source in roles if slug in catalog]
+    response = {"active": active}
+    if action == "resolve":
+        if active:
+            limit = (620 - (len(active) - 1) * 2) // len(active)
+            response["workContext"] = {
+                "page": "小妤 · 当前对话领域专家",
+                "title": "仅本轮有效的领域参考，遵从用户任务、员工设定及现有权限",
+                "selection": "\n".join(_expert_reference(catalog[a["slug"]], limit) for a in active),
+                "detail": {f"expert{i + 1}": a["slug"] for i, a in enumerate(active)},
+            }
+        elif state.get("previously_active") or state["excluded"]:
+            response["workContext"] = {"page": "小妤 · 当前对话领域专家", "title": "本轮没有已加载的专家，之前的专家资料已卸载。"}
+    return response
+
+
+@router.get("/conversation-experts")
+def get_conversation_experts(
+    agent_id: Annotated[str, Query(max_length=128)],
+    session_key: Annotated[str, Query(max_length=192)],
+    locale: str | None = None,
+):
+    return _conversation_expert_state(ConversationExpertRequest(agent_id=agent_id, session_key=session_key, locale=locale))
+
+
+@router.post("/conversation-experts/attach")
+def attach_conversation_expert(request: ExpertChange):
+    return _conversation_expert_state(request, "attach", request.slug)
+
+
+@router.post("/conversation-experts/detach")
+def detach_conversation_expert(request: ExpertChange):
+    return _conversation_expert_state(request, "detach", request.slug)
+
+
+@router.post("/conversation-experts/resolve")
+def resolve_conversation_experts(request: ExpertTurn):
+    return _conversation_expert_state(request, "resolve", request.message)
 
 
 @router.get("/market-init")
@@ -1296,9 +1398,15 @@ async def list_agency_conversations(locale: Optional[str] = None):
 
 
 @router.post("/conversations", response_model=AgencyConversation)
-async def create_agency_conversation(locale: Optional[str] = None):
-    """基于当前激活专家创建新对话。"""
-    expert = agency_state.get_active_expert()
+async def create_agency_conversation(locale: Optional[str] = None, expert_slug: Optional[str] = None):
+    """Bind this conversation to the requested expert, including when other views switch roles."""
+    if expert_slug is not None:
+        _build_cache()
+        expert = next((item for item in _cache_agents if item["slug"] == expert_slug), None)
+        if not expert:
+            raise HTTPException(404, "专家不存在")
+    else:
+        expert = agency_state.get_active_expert()
     if not expert:
         raise HTTPException(400, "请先激活一位专家")
     now = datetime.now(timezone.utc).isoformat()

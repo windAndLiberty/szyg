@@ -1,9 +1,10 @@
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 
 from szyg.cloud_auth import CloudAuthError, cloud_auth
+from szyg.employee_models import employee_model_catalog
 
 
 router = APIRouter(prefix="/api/cloud", tags=["cloud-account"])
@@ -80,6 +81,15 @@ def config():
     return {"enabled": cfg["enabled"], "configured": bool(cfg["control_url"])}
 
 
+@router.get("/employee-models")
+def employee_models():
+    try:
+        capabilities = cloud_auth.proxy("GET", "/api/v1/models/capabilities")
+    except CloudAuthError:
+        capabilities = None
+    return employee_model_catalog(capabilities)
+
+
 @router.get("/session")
 def session():
     return cloud_auth.session()
@@ -140,8 +150,8 @@ def device_replacement(body: DeviceReplacementBody):
 
 
 @router.post("/logout")
-def logout():
-    cloud_auth.logout()
+def logout(background_tasks: BackgroundTasks):
+    cloud_auth.logout(defer=background_tasks.add_task)
     return {"ok": True}
 
 

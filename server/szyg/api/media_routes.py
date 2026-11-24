@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 from datetime import datetime
 import re
 import os
 import subprocess
+import io
+import tempfile
+import wave
+from pathlib import Path
+from uuid import UUID
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from szyg.media_storage import (
     get_media_storage_config,
@@ -20,9 +25,70 @@ from szyg.media_storage import (
     resolve_media_file,
     update_media_storage_config,
 )
+from szyg.integrations.cloud_inference_client import CloudInferenceClient, CloudInferenceError
 from szyg.content_reference_service import delete_reference, get_reference, save_reference
+from szyg.conversation_media import import_conversation_asset, inspect_conversation_media
 
 router = APIRouter(prefix="/api/media", tags=["media"])
+
+
+@router.post("/conversation-assets")
+def upload_conversation_asset(file: UploadFile):
+    return import_conversation_asset(file)
+
+
+class MediaInspection(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    source: str = Field(min_length=1, max_length=320)
+    question: str = Field(default="", max_length=1200)
+    focus: Literal["auto", "visual", "audio", "both"] = "auto"
+
+
+@router.post("/conversation-inspect")
+async def inspect_conversation_asset(body: MediaInspection):
+    return await inspect_conversation_media(body.source, body.question, body.focus)
+
+
+@router.post("/dictation/{recording_id}")
+async def transcribe_dictation(recording_id: UUID, request: Request) -> dict[str, str]:
+    """Transcribe a short mono 16 kHz voice draft without adding it to the media library."""
+    if request.headers.get("content-type", "").split(";")[0] != "audio/wav":
+        raise HTTPException(415, "需要 WAV 录音")
+    max_frames = 120 * 16000
+    data = bytearray()
+    async for part in request.stream():
+        if len(data) + len(part) > max_frames * 2 + 4096:
+            raise HTTPException(413, "单段录音最长为两分钟")
+        data.extend(part)
+    try:
+        with wave.open(io.BytesIO(data), "rb") as source:
+            frames = source.getnframes()
+            if (source.getnchannels(), source.getframerate(), source.getsampwidth()) != (1, 16000, 2):
+                raise ValueError()
+            if not 0 < frames <= max_frames:
+                raise ValueError()
+            samples = source.readframes(frames)
+            if len(samples) != frames * 2:
+                raise ValueError()
+    except (ValueError, wave.Error, EOFError) as exc:
+        raise HTTPException(422, "录音无效，请重新录制") from exc
+
+    client = CloudInferenceClient(timeout=120)
+    try:
+        with tempfile.TemporaryDirectory(prefix="xiaoyu-dictation-") as directory:
+            path = Path(directory) / "dictation.wav"
+            with wave.open(str(path), "wb") as output:
+                output.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+                output.writeframes(samples)
+            url = await client.upload_reference(str(path))
+            result = await client.asr_transcribe(url, audio_format="wav", idempotency_key=str(recording_id))
+    except CloudInferenceError as exc:
+        raise HTTPException(exc.status_code or 503, str(exc)) from exc
+    text = result["text"].strip()
+    if not text:
+        raise HTTPException(422, "没有识别到语音，请重新录制")
+    return {"text": text}
 
 
 class MediaStorageUpdate(BaseModel):

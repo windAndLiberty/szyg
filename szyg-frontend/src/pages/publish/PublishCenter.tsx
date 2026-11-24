@@ -22,6 +22,7 @@ import {
   type ExecutionRun,
   type PlatformInfo,
 } from '@/lib/api'
+import { useKeepAlivePageActive } from '@/lib/hooks'
 import { getPublishedPostInfo } from '@/components/publish/PublishedPostLink'
 import { translateCurrent, useI18n } from '@/lib/i18n'
 
@@ -132,6 +133,7 @@ export default function PublishCenter() {
   const [includeArchived, setIncludeArchived] = useState(false)
   const [page, setPage] = useState(1)
 
+  const pageActive = useKeepAlivePageActive()
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     if (!silent) setLoadError('')
@@ -161,10 +163,11 @@ export default function PublishCenter() {
   }, [includeArchived, keyword, platformFilter, sortBy, sortDir, statusFilter])
 
   useEffect(() => {
+    if (!pageActive) return
     load()
     const timer = window.setInterval(() => load(true), 8000)
     return () => window.clearInterval(timer)
-  }, [load])
+  }, [load, pageActive])
 
   useEffect(() => {
     setPage(1)
@@ -190,46 +193,46 @@ export default function PublishCenter() {
   }, [totalPages])
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[#080D16] px-4 py-5 sm:px-6 lg:px-8">
+    <div className="min-h-[calc(100vh-4rem)] bg-background px-4 py-5 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-[1480px] flex-col gap-5">
-        <p className="px-1 text-sm text-[#94A3B8]">
+        <p className="px-1 text-sm text-muted-foreground">
 
           {t("查看多平台发布结果、队列进度、作品入口和需要处理的问题。")}
         </p>
 
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {[
-            { label: t("今日已发布"), value: summary.published, hint: t("已拿到平台结果"), color: 'text-[#22C55E]' },
-            { label: t("发布中"), value: summary.running, hint: t("正在自动执行"), color: 'text-[#38BDF8]' },
-            { label: t("待处理"), value: summary.needsHuman, hint: t("失败或需人工"), color: 'text-[#F59E0B]' },
-            { label: t("可用渠道"), value: summary.available, hint: t("共 {v0} 个渠道", { v0: PLATFORM_CAPABILITIES.length }), color: 'text-[#A78BFA]' },
+            { label: t("今日已发布"), value: summary.published, hint: t("已拿到平台结果"), color: 'text-success-ink' },
+            { label: t("发布中"), value: summary.running, hint: t("正在自动执行"), color: 'text-info-ink' },
+            { label: t("待处理"), value: summary.needsHuman, hint: t("失败或需人工"), color: 'text-warning-ink' },
+            { label: t("可用渠道"), value: summary.available, hint: t("共 {v0} 个渠道", { v0: PLATFORM_CAPABILITIES.length }), color: 'text-accent-ink' },
           ].map((metric) => (
-            <div key={metric.label} className="rounded-md border border-[#1C2940] bg-[#0D1422] px-4 py-3">
-              <div className="text-xs text-[#64748B]">{metric.label}</div>
+            <div key={metric.label} className="rounded-md border border-border bg-background px-4 py-3">
+              <div className="text-xs text-muted-foreground">{metric.label}</div>
               <div className="mt-1 flex items-end gap-3">
                 <span className={`text-2xl font-semibold ${metric.color}`}>{metric.value}</span>
-                <span className="pb-1 text-xs text-[#94A3B8]">{metric.hint}</span>
+                <span className="pb-1 text-xs text-muted-foreground">{metric.hint}</span>
               </div>
             </div>
           ))}
         </section>
 
         {loadError && (
-          <section className="flex items-start gap-3 rounded-md border border-[#7F1D1D] bg-[#450A0A]/35 px-4 py-3 text-sm text-[#FCA5A5]">
+          <section className="flex items-start gap-3 rounded-md border border-danger-ink/35 bg-danger-soft/35 px-4 py-3 text-sm text-danger-ink">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
-              <div className="font-medium text-[#FEE2E2]">{t("发布数据暂不可用")}</div>
-              <div className="mt-1 text-xs leading-5 text-[#FCA5A5]">{loadError}</div>
+              <div className="font-medium text-danger-ink">{t("发布数据暂不可用")}</div>
+              <div className="mt-1 text-xs leading-5 text-danger-ink">{loadError}</div>
             </div>
           </section>
         )}
 
         <section>
-          <main className="rounded-md border border-[#1C2940] bg-[#0D1422]">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1C2940] px-5 py-4">
+          <main className="rounded-md border border-border bg-background">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
               <div>
-                <h2 className="text-base font-semibold text-[#F8FAFC]">{t("发布记录")}</h2>
-                <p className="mt-1 text-sm text-[#64748B]">{t("最近发布任务、执行状态和作品链接集中在这里。")}</p>
+                <h2 className="text-base font-semibold text-foreground">{t("发布记录")}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{t("最近发布任务、执行状态和作品链接集中在这里。")}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {archiveInfo && (
@@ -243,20 +246,20 @@ export default function PublishCenter() {
               </div>
             </div>
 
-            <div className="grid gap-3 border-b border-[#1C2940] px-5 py-4 lg:grid-cols-[minmax(220px,1fr)_160px_160px_160px_120px]">
+            <div className="grid gap-3 border-b border-border px-5 py-4 lg:grid-cols-[minmax(220px,1fr)_160px_160px_160px_120px]">
               <label className="relative block">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <input
                   value={keyword}
                   onChange={(event) => setKeyword(event.target.value)}
                   placeholder={t("搜索标题、账号、平台、错误原因或任务ID")}
-                  className="h-10 w-full rounded-md border border-[#1C2940] bg-[#080D16] pl-9 pr-3 text-sm text-[#F8FAFC] outline-none transition-colors placeholder:text-[#475569] focus:border-[#6366F1]"
+                  className="h-10 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-[#6366F1]"
                 />
               </label>
               <select
                 value={platformFilter}
                 onChange={(event) => setPlatformFilter(event.target.value)}
-                className="h-10 rounded-md border border-[#1C2940] bg-[#080D16] px-3 text-sm text-[#CBD5E1] outline-none focus:border-[#6366F1]"
+                className="h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-[#6366F1]"
               >
                 <option value="all">{t("全部平台")}</option>
                 {PLATFORM_CAPABILITIES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
@@ -264,7 +267,7 @@ export default function PublishCenter() {
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value)}
-                className="h-10 rounded-md border border-[#1C2940] bg-[#080D16] px-3 text-sm text-[#CBD5E1] outline-none focus:border-[#6366F1]"
+                className="h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-[#6366F1]"
               >
                 <option value="all">{t("全部状态")}</option>
                 <option value="success">{t("已发布")}</option>
@@ -277,7 +280,7 @@ export default function PublishCenter() {
               <select
                 value={sortBy}
                 onChange={(event) => setSortBy(event.target.value)}
-                className="h-10 rounded-md border border-[#1C2940] bg-[#080D16] px-3 text-sm text-[#CBD5E1] outline-none focus:border-[#6366F1]"
+                className="h-10 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-[#6366F1]"
               >
                 <option value="created_at">{t("创建时间")}</option>
                 <option value="finished_at">{t("完成时间")}</option>
@@ -289,11 +292,11 @@ export default function PublishCenter() {
               <button
                 type="button"
                 onClick={() => setSortDir((value) => value === 'desc' ? 'asc' : 'desc')}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-[#1C2940] bg-[#080D16] px-3 text-sm text-[#CBD5E1] transition-colors hover:border-[#6366F1] hover:text-[#F8FAFC]"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-border bg-background px-3 text-sm text-foreground transition-colors hover:border-[#6366F1] hover:text-foreground"
               >
                 {sortDir === 'desc' ? t("降序") : t("升序")}
               </button>
-              <label className="flex items-center gap-2 text-xs text-[#94A3B8] lg:col-span-5">
+              <label className="flex items-center gap-2 text-xs text-muted-foreground lg:col-span-5">
                 <input
                   type="checkbox"
                   checked={includeArchived}
@@ -307,7 +310,7 @@ export default function PublishCenter() {
 
             <div className="overflow-x-auto">
               <table className="w-full min-w-[900px] text-left text-sm">
-                <thead className="border-b border-[#1C2940] text-xs uppercase tracking-[0.08em] text-[#64748B]">
+                <thead className="border-b border-border text-xs uppercase tracking-[0.08em] text-muted-foreground">
                   <tr>
                     <th className="px-5 py-3 font-medium">{t("内容")}</th>
                     <th className="px-4 py-3 font-medium">{t("平台")}</th>
@@ -322,7 +325,7 @@ export default function PublishCenter() {
                 <tbody>
                   {runs.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-5 py-16 text-center text-[#64748B]">
+                      <td colSpan={8} className="px-5 py-16 text-center text-muted-foreground">
 
                         {t("暂无发布记录。请在“素材管理与发布”中选择素材并确认发布。")}
                       </td>
@@ -332,28 +335,28 @@ export default function PublishCenter() {
                     const showPostLink = run.status === 'success' && post?.url
                     const progress = publishProgress(run)
                     return (
-                      <tr key={run.id} className="border-b border-[#111827] hover:bg-[#111827]/60">
+                      <tr key={run.id} className="border-b border-border hover:bg-card/60">
                         <td className="max-w-[340px] px-5 py-4">
-                          <div className="truncate font-medium text-[#F8FAFC]">{run.title || run.input?.title as string || run.task_type}</div>
+                          <div className="truncate font-medium text-foreground">{run.title || run.input?.title as string || run.task_type}</div>
                           {run.archived && (
-                            <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-[#64748B]">
-                              <span className="shrink-0 rounded bg-[#1E293B] px-1.5 py-0.5 text-[10px] text-[#94A3B8]">{t("已归档")}</span>
+                            <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{t("已归档")}</span>
                             </div>
                           )}
                         </td>
-                        <td className="px-4 py-4 text-[#CBD5E1]">{platformLabel(run.platform)}</td>
-                        <td className="px-4 py-4 text-[#CBD5E1]">{run.account_label || (run.input?.account_label as string) || '-'}</td>
-                        <td className="px-4 py-4 text-[#CBD5E1]">{run.task_type === 'publish_note' ? t("图文") : t("视频")}</td>
+                        <td className="px-4 py-4 text-foreground">{platformLabel(run.platform)}</td>
+                        <td className="px-4 py-4 text-foreground">{run.account_label || (run.input?.account_label as string) || '-'}</td>
+                        <td className="px-4 py-4 text-foreground">{run.task_type === 'publish_note' ? t("图文") : t("视频")}</td>
                         <td className="px-4 py-4">
                           <div className="flex flex-col items-start gap-1">
                             <Badge variant={statusVariant(run.status)}>{statusText(run.status)}</Badge>
                             {(run.status === 'queued' || run.status === 'running') && (
                               <div className="mt-1 w-36">
-                                <div className="mb-1 flex items-center justify-between text-[11px] text-[#64748B]">
+                                <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
                                   <span>{progress.label}</span>
                                   <span>{progress.percent}%</span>
                                 </div>
-                                <div className="h-1.5 overflow-hidden rounded-full bg-[#1E293B]">
+                                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                                   <div
                                     className={`h-full rounded-full transition-all duration-500 ${progressTone(run.status)}`}
                                     style={{ width: `${progress.percent}%` }}
@@ -362,14 +365,14 @@ export default function PublishCenter() {
                               </div>
                             )}
                             {run.status !== 'success' && runFailureMessage(run) && (
-                              <span className="max-w-[180px] text-xs leading-5 text-[#FCA5A5]" title={runFailureMessage(run)}>
+                              <span className="max-w-[180px] text-xs leading-5 text-danger-ink" title={runFailureMessage(run)}>
                                 {runFailureMessage(run)}
                               </span>
                             )}
                           </div>
                         </td>
-                        <td className="px-4 py-4 text-xs text-[#94A3B8]">{formatTime(run.finished_at || run.started_at || run.created_at)}</td>
-                        <td className="px-4 py-4 text-xs text-[#94A3B8]">{formatDuration(run.duration_ms)}</td>
+                        <td className="px-4 py-4 text-xs text-muted-foreground">{formatTime(run.finished_at || run.started_at || run.created_at)}</td>
+                        <td className="px-4 py-4 text-xs text-muted-foreground">{formatDuration(run.duration_ms)}</td>
                         <td className="px-4 py-4">
                           {showPostLink ? (
                             <Button type="button" size="sm" variant="outline" onClick={() => window.open(post.url, '_blank', 'noopener,noreferrer')}>
@@ -377,7 +380,7 @@ export default function PublishCenter() {
                               {post.label}
                             </Button>
                           ) : (
-                            <span className="text-xs text-[#64748B]">-</span>
+                            <span className="text-xs text-muted-foreground">-</span>
                           )}
                         </td>
                       </tr>
@@ -387,7 +390,7 @@ export default function PublishCenter() {
               </table>
             </div>
             {runs.length > 0 && (
-              <div className="flex flex-col gap-3 border-t border-[#1C2940] px-5 py-4 text-sm text-[#94A3B8] sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 border-t border-border px-5 py-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
                 <div>
 
                   {t("第")} {pageStart + 1}-{Math.min(pageStart + PAGE_SIZE, runs.length)}  {t("条，共")} {runs.length}  {t("条")}
@@ -403,7 +406,7 @@ export default function PublishCenter() {
 
                     {t("上一页")}
                   </Button>
-                  <span className="min-w-16 text-center text-xs text-[#64748B]">
+                  <span className="min-w-16 text-center text-xs text-muted-foreground">
                     {currentPage} / {totalPages}
                   </span>
                   <Button

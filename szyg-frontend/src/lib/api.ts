@@ -99,7 +99,7 @@ async function request<T>(method: string, url: string, body?: unknown, _retry = 
       detail && typeof detail === 'object' && 'message' in detail
         ? String((detail as { message: unknown }).message)
         : String(detail)
-    if (res.status === 401 && !url.startsWith('/api/cloud/login')) {
+    if (res.status === 401 && /^\/api\/cloud\/(devices|entitlements|usage|billing|payments|feedback)(\/|$)/.test(url)) {
       dispatchCloudSessionExpired()
     } else if (res.status === 403 && isCloudAuthExpiredMessage(rawDetailString)) {
       dispatchCloudAuthExpired(toUserFacingMessage(rawDetailString, rawDetailString))
@@ -134,6 +134,8 @@ export const apiDel = <T = unknown>(url: string): Promise<T> => request<T>('DELE
 export interface CloudSession {
   configured: boolean
   authenticated: boolean
+  unavailable?: boolean
+  verified_until?: number
   offline?: boolean
   message?: string
   authorization_error?: string
@@ -143,7 +145,8 @@ export interface CloudSession {
 
 export interface CloudAuthorization {
   configured: boolean
-  expired: boolean
+  expired: boolean | null
+  message?: string
   status?: string
   valid_until?: string
   authorization_error?: string

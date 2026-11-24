@@ -86,7 +86,7 @@ export default function Listen() {
 
   return (
     <PageShell title={t("机会监听")} subtitle={t("持续监听目标内容和评论互动，把高意向评论沉淀为线索。")} icon={Radar}>
-      {error && <div className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 px-4 py-3 text-sm text-[#FCA5A5]">{error}</div>}
+      {error && <div className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 px-4 py-3 text-sm text-danger-ink">{error}</div>}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label={t("监听目标")} value={targets.length} icon={Target} />
@@ -122,17 +122,17 @@ export default function Listen() {
 
         <Panel title={t("监听目标列表")} description={t("关注最近检查时间、平台状态和异常目标。")}>
           {loading ? (
-            <div className="flex h-40 items-center justify-center text-[#64748B]"><Loader2 className="h-6 w-6 animate-spin" /></div>
+            <div className="flex h-40 items-center justify-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin" /></div>
           ) : targets.length === 0 ? (
             <EmptyState title={t("暂无监听目标")} description={t("从智能截流页选择高质量目标，或在这里手动添加目标链接。")} />
           ) : (
             <div className="space-y-3">
               {targets.map((item, index) => (
-                <div key={item.target_id || item.id || index} className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
+                <div key={item.target_id || item.id || index} className="rounded-lg border border-border bg-background p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-medium text-[#F1F5F9]">{item.video_title || item.video_url || item.video_id || t("未命名目标")}</p>
-                      <p className="mt-1 text-xs text-[#64748B]">{platformLabel(item.platform)}  {t("· 最近检查")} {formatDateTime(item.last_poll_at || item.last_checked_at)}</p>
+                      <p className="text-sm font-medium text-foreground">{item.video_title || item.video_url || item.video_id || t("未命名目标")}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{platformLabel(item.platform)}  {t("· 最近检查")} {formatDateTime(item.last_poll_at || item.last_checked_at)}</p>
                     </div>
                     <StatusPill status={item.status || 'active'} />
                   </div>
@@ -149,15 +149,15 @@ export default function Listen() {
         ) : (
           <div className="grid gap-3 lg:grid-cols-2">
             {leads.map((item, index) => (
-              <div key={item.id || item.lead_id || index} className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
+              <div key={item.id || item.lead_id || index} className="rounded-lg border border-border bg-background p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium text-[#F1F5F9]">{item.user_name || item.author_name || t("潜在线索")}</p>
-                  <span className="rounded-full border border-[#F59E0B]/25 bg-[#F59E0B]/10 px-2 py-1 text-xs text-[#FCD34D]">
+                  <p className="text-sm font-medium text-foreground">{item.user_name || item.author_name || t("潜在线索")}</p>
+                  <span className="rounded-full border border-[#F59E0B]/25 bg-[#F59E0B]/10 px-2 py-1 text-xs text-warning-ink">
                     {item.grade || item.lead_score || item.score || t("待评分")}
                   </span>
                 </div>
-                <p className="mt-2 line-clamp-2 text-sm text-[#CBD5E1]">{item.comment_text || item.content || t("暂无评论内容")}</p>
-                <p className="mt-2 text-xs text-[#64748B]"><Signal className="mr-1 inline h-3 w-3" />{platformLabel(item.platform)} · {item.status || t("待跟进")}</p>
+                <p className="mt-2 line-clamp-2 text-sm text-foreground">{item.comment_text || item.content || t("暂无评论内容")}</p>
+                <p className="mt-2 text-xs text-muted-foreground"><Signal className="mr-1 inline h-3 w-3" />{platformLabel(item.platform)} · {item.status || t("待跟进")}</p>
               </div>
             ))}
           </div>

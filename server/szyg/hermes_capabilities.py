@@ -69,6 +69,7 @@ class Capability:
     timeout: float = 60.0
     custom: str = ""
     parameters: dict[str, Any] = field(default_factory=dict)
+    required: tuple[str, ...] = ()
 
     def public_dict(self) -> dict[str, Any]:
         return {
@@ -79,6 +80,7 @@ class Capability:
             "risk": self.risk,
             "confirmation_required": self.confirmation_required,
             "parameters": self.parameters,
+            **({"required": list(self.required)} if self.required else {}),
         }
 
 
@@ -159,13 +161,18 @@ def _geo_audit_body(args: dict[str, Any]) -> dict[str, Any]:
 
 
 def _capabilities() -> list[Capability]:
+    from szyg.director_capabilities import director_capabilities
     scalar = {"type": "string"}
     return [
+        *director_capabilities(),
+        Capability("experts.search", "experts", "查找领域专家", "按关键词或领域查找本机专家，返回角色摘要和 slug，供本次任务选择方法。", custom="expert_search", path="/api/agency/agents", query_keys=("search", "division", "limit", "locale"), parameters={"search": scalar, "division": scalar, "limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 10}, "locale": scalar}),
+        Capability("experts.profile", "experts", "读取专家方案", "按 slug 读取专家提示词与工作方法，作为当前员工处理任务的参考。保留员工的身份、权限及当前会话。", path_builder=lambda args: f"/api/agency/agents/{_safe_id(args.get('slug'), '专家 slug')}", query_keys=("locale",), parameters={"slug": scalar, "locale": scalar}),
         Capability("employee.reply", "content", "数字员工文本答复", "以指定员工的岗位和职责处理文本任务，不授予桌面工具权限。", risk="generation", custom="employee_reply", parameters={"prompt": scalar, "employee_id": scalar}),
         Capability("content.copy.generate", "content", "生成营销文案", "根据需求生成一到十条可编辑营销文案。", method="POST", path="/api/content/copy/generate", risk="generation", body_builder=_body("prompt", "copy_type", "count", "min_words", "max_words"), timeout=180, parameters={"prompt": scalar, "copy_type": scalar, "count": {"type": "integer", "default": 5}, "min_words": {"type": "integer", "default": 80}, "max_words": {"type": "integer", "default": 160}}),
         Capability("content.image.generate", "content", "生成图片", "根据描述和视觉风格生成一到四张图片并保存到本机。", method="POST", path="/api/image/generate", risk="generation", body_builder=_body("prompt", "size", "count", "style"), timeout=240, parameters={"prompt": scalar, "size": scalar, "count": {"type": "integer", "default": 1}, "style": scalar}),
         Capability("content.video.create", "content", "创建视频生成任务", "根据最终提示、时长、比例和参考图片创建视频任务。", method="POST", path="/api/video/create", risk="generation", confirmation_required=True, body_builder=_body("prompt", "duration", "size", "ratio", "count", "native_audio", "prompt_optimize", "final_prompt", "model", "image_url"), timeout=180, parameters={"prompt": scalar, "duration": {"type": "integer", "default": 6}, "size": scalar, "ratio": scalar, "count": {"type": "integer", "default": 1}, "native_audio": {"type": "boolean", "default": False}, "final_prompt": scalar, "image_url": scalar}),
         Capability("content.video.status", "content", "查询视频生成进度", "查询视频任务状态，并在完成后返回本地素材信息。", path_builder=lambda args: f"/api/video/task/{quote(_safe_id(args.get('task_id'), '任务 ID'))}", query_keys=("model",), parameters={"task_id": scalar, "model": scalar}),
+        Capability("materials.inspect", "materials", "理解对话素材", "看懂本机图片、抽查视频画面或转写音轨。仅使用用户提供的 /api/media/files/ 素材链接。需要读图、给画面反馈或提取语音时先调用此能力，再根据结果回答。图片和视频视觉使用 visual，音频或视频语音使用 audio，明确要求同时理解视频画面与语音时使用 both。视频画面是抽样，语音最多转写前两分钟。", method="POST", path="/api/media/conversation-inspect", risk="analysis", body_builder=_body("source", "question", "focus"), timeout=330, parameters={"source": {"type": "string", "description": "用户提供的本机素材链接"}, "question": {"type": "string", "description": "用户要从画面确认的内容，不带其他对话信息"}, "focus": {"type": "string", "enum": ["auto", "visual", "audio", "both"]}}, required=("source",)),
 
         Capability("knowledge.search", "knowledge", "检索企业知识库", "使用 RAG 从当前企业知识库返回高相关事实和来源。", path="/api/knowledge/search", query_keys=("q", "top_k", "collection"), parameters={"q": scalar, "top_k": {"type": "integer", "default": 5}, "collection": scalar}),
         Capability("knowledge.stats", "knowledge", "知识库概览", "查看文档、分块、集合和最近更新时间。", path="/api/knowledge/stats"),
@@ -219,6 +226,7 @@ def _capabilities() -> list[Capability]:
         Capability("accounts.list", "publishing", "渠道账号列表", "读取实时渠道账号、昵称、平台和登录状态。", path="/api/platform-accounts", query_keys=("platform",), parameters={"platform": scalar}),
         Capability("accounts.sync", "publishing", "同步账号资料", "从第三方平台刷新指定账号的公开资料和登录状态。", method="POST", path_builder=lambda args: f"/api/platform-accounts/{quote(_safe_id(args.get('account_id'), '账号 ID'))}/sync-profile", query_keys=("force",), timeout=120, parameters={"account_id": scalar, "force": {"type": "boolean", "default": True}}),
         Capability("publishing_profiles.list", "publishing", "发布配置档案", "列出常用多账号发布组合。", path="/api/publishing-profiles"),
+        Capability("publishing.receipt", "publishing", "查询发布回执", "按图文或视频发布返回的任务 ID 查看执行状态和平台回执，确认结果后再决定下一步。", path_builder=lambda args: f"/api/sau/tasks/{_safe_id(args.get('task_id'), '发布任务 ID')}", parameters={"task_id": scalar}),
         Capability("publishing.note", "publishing", "多账号图文发布", "向一个账号、多个账号或发布档案提交图文发布任务。", method="POST", path="/api/sau/upload-note-async", risk="external", confirmation_required=True, body_builder=_publish_note_body, timeout=120, parameters={"platform": scalar, "image_paths": scalar, "title": scalar, "note": scalar, "tags": scalar, "account_id": scalar, "target_account_ids": scalar, "profile_id": scalar, "schedule": scalar, "headless": {"type": "boolean", "default": True}}),
         Capability("publishing.video", "publishing", "多账号视频发布", "向一个账号、多个账号或发布档案提交视频发布任务。", method="POST", path="/api/sau/upload-video-async", risk="external", confirmation_required=True, body_builder=_publish_video_body, timeout=120, parameters={"platform": scalar, "file_path": scalar, "title": scalar, "desc": scalar, "tags": scalar, "thumbnail_path": scalar, "account_id": scalar, "target_account_ids": scalar, "profile_id": scalar, "schedule": scalar, "headless": {"type": "boolean", "default": True}}),
 
@@ -306,26 +314,38 @@ class HermesCapabilityRegistry:
         return response.json()
 
     async def _execute_custom(self, item: Capability, args: dict[str, Any], auth_headers: dict[str, str] | None) -> dict[str, Any]:
+        if item.custom == "expert_search":
+            result = await self._request(item, {**args, "limit": 10 if args.get("limit") is None else args["limit"]}, auth_headers)
+            return {"experts": result} if isinstance(result, list) else result
         if item.custom == "employee_reply":
             from szyg.data_path import get_data_dir
+            from szyg.employee_models import EMPLOYEE_MODELS
             from szyg.integrations.cloud_inference_client import CloudInferenceClient
 
             employee = str(args.get("employee_id") or "xiaoyu-wechat")
-            profile = {"title": "小妤微信助理"}
+            profile = {"name": "小妤微信助理", "title": "微信助理"}
             if employee != "xiaoyu-wechat":
                 file = get_data_dir() / "openclaw" / "xiaoyu-bots.json"
                 metadata = json.loads(file.read_text(encoding="utf-8")) if file.is_file() else {}
-                profile = metadata.get("profiles", {}).get(employee)
-                if not profile or metadata.get("archived", {}).get(employee):
+                stored = metadata.get("profiles", {}).get(employee)
+                if metadata.get("archived", {}).get(employee) or (employee != "main" and not stored):
                     raise ValueError("指定数字员工不存在或已归档")
+                if employee == "main":
+                    profile = {"name": "小妤", "title": "首席数字员工", **(stored or {})}
+                else:
+                    profile = stored
             prompt = str(args.get("prompt") or "").strip()
             if not prompt or len(prompt) > 4000:
                 raise ValueError("文本任务需为 1 至 4000 个字符")
+            model = profile.get("model") or "auto"
+            if model != "auto" and model not in EMPLOYEE_MODELS:
+                raise ValueError("不支持的员工模型")
+            name = profile.get("name") or profile.get("title") or "数字员工"
             result = await CloudInferenceClient(timeout=90).chat([
-                {"role": "system", "content": f"你是小妤 AI 的{profile.get('title') or '数字员工'}。岗位职责："
+                {"role": "system", "content": f"你是{name}，在小妤 AI 中担任{profile.get('title') or '数字员工'}。岗位职责："
                  f"{profile.get('instructions') or ''}。直接返回本次文本任务的结果。当前没有工具，不声称执行任何外部操作。"},
                 {"role": "user", "content": prompt},
-            ], max_tokens=1200)
+            ], model=model, max_tokens=1200)
             reply = result.get("message") or {}
             if reply.get("tool_calls") or not isinstance(reply.get("content"), str) or not reply["content"].strip():
                 raise ValueError("未取得员工文本答复")
@@ -371,7 +391,7 @@ CAPABILITY_TOOL_SCHEMAS = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "domain": {"type": "string", "enum": ["content", "knowledge", "private_domain", "intelligence", "geo", "acquisition", "customers", "insights", "materials", "publishing", "workflows", "execution"]},
+                    "domain": {"type": "string", "enum": ["experts", "content", "knowledge", "private_domain", "intelligence", "geo", "acquisition", "customers", "insights", "materials", "publishing", "workflows", "execution"]},
                     "search": {"type": "string", "description": "能力名称或业务关键词"},
                 },
             },

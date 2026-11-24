@@ -92,7 +92,7 @@ export default function Conversion() {
 
   return (
     <PageShell title={t("客户转化工作台")} subtitle={t("把识别出的线索推进到回复、私信、确认和成交阶段。")} icon={Repeat2}>
-      {error && <div className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 px-4 py-3 text-sm text-[#FCA5A5]">{error}</div>}
+      {error && <div className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 px-4 py-3 text-sm text-danger-ink">{error}</div>}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label={t("线索总数")} value={leads.length} icon={UserCheck} />
@@ -104,7 +104,7 @@ export default function Conversion() {
       <div className="grid gap-5 xl:grid-cols-[1fr_420px]">
         <Panel title={t("待跟进线索")} description={t("按最新状态处理线索，优先跟进高意向用户。")}>
           {loading ? (
-            <div className="flex h-40 items-center justify-center text-[#64748B]"><Loader2 className="h-6 w-6 animate-spin" /></div>
+            <div className="flex h-40 items-center justify-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin" /></div>
           ) : leads.length === 0 ? (
             <EmptyState title={t("暂无线索")} description={t("智能截流和机会监听识别到线索后，会进入这里。")} />
           ) : (
@@ -118,17 +118,17 @@ export default function Conversion() {
                     setReply('')
                   }}
                   className={`w-full rounded-lg border p-4 text-left transition-colors ${
-                    selected === item ? 'border-[#6366F1] bg-[#6366F1]/10' : 'border-[#1E293B] bg-[#0B0F1A] hover:border-[#334155]'
+                    selected === item ? 'border-[#6366F1] bg-[#6366F1]/10' : 'border-border bg-background hover:border-border'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-medium text-[#F1F5F9]">{item.user_name || item.author_name || t("潜在线索")}</p>
-                      <p className="mt-1 text-xs text-[#64748B]">{platformLabel(item.platform)} · {item.grade || t("未评级")}</p>
+                      <p className="text-sm font-medium text-foreground">{item.user_name || item.author_name || t("潜在线索")}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{platformLabel(item.platform)} · {item.grade || t("未评级")}</p>
                     </div>
                     <StatusPill status={item.status || 'pending'} />
                   </div>
-                  <p className="mt-3 line-clamp-2 text-sm text-[#CBD5E1]">{item.comment_text || item.content || t("暂无上下文")}</p>
+                  <p className="mt-3 line-clamp-2 text-sm text-foreground">{item.comment_text || item.content || t("暂无上下文")}</p>
                 </button>
               ))}
             </div>
@@ -147,9 +147,9 @@ export default function Conversion() {
               {t("生成回复")}
             </button>
             {reply && (
-              <div className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
-                <p className="text-xs text-[#64748B]">{t("AI 建议回复")} {replyGrade && `· ${replyGrade}`}</p>
-                <p className="mt-2 text-sm leading-6 text-[#F1F5F9]">{reply}</p>
+              <div className="rounded-lg border border-border bg-background p-4">
+                <p className="text-xs text-muted-foreground">{t("AI 建议回复")} {replyGrade && `· ${replyGrade}`}</p>
+                <p className="mt-2 text-sm leading-6 text-foreground">{reply}</p>
                 <div className="mt-4 flex gap-2">
                   <button onClick={confirmDm} className={buttonSecondary}><Send className="h-4 w-4" />{t("预览私信确认")}</button>
                   <button className={buttonSecondary}>{t("预览跟进入口")}</button>
@@ -166,9 +166,9 @@ export default function Conversion() {
         ) : (
           <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
             {funnelStages.map((item) => (
-              <div key={item.stage} className="rounded-lg border border-[#1E293B] bg-[#0B0F1A] p-4">
-                <p className="text-xs text-[#64748B]">{item.label}</p>
-                <p className="mt-2 text-2xl font-semibold text-[#F1F5F9]">{item.count}</p>
+              <div key={item.stage} className="rounded-lg border border-border bg-background p-4">
+                <p className="text-xs text-muted-foreground">{item.label}</p>
+                <p className="mt-2 text-2xl font-semibold text-foreground">{item.count}</p>
               </div>
             ))}
           </div>

@@ -32,7 +32,7 @@ export default function UserAvatar({ className, imgClassName, onClick, alt = tra
 
   return (
     <div
-      className={cn('overflow-hidden rounded-full bg-[#1E293B]', onClick && 'cursor-pointer transition-transform hover:scale-[1.03] active:scale-95', className)}
+      className={cn('overflow-hidden rounded-full bg-muted', onClick && 'cursor-pointer transition-transform hover:scale-[1.03] active:scale-95', className)}
       role={onClick ? 'button' : undefined}
       onClick={onClick}
       title={alt}

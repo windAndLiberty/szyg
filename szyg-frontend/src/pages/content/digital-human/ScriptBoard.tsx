@@ -93,20 +93,20 @@ export default function ScriptBoard({
       <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="text-base font-semibold">{t('digitalHuman.script.title')}</h2>
-          <p className="mt-1 text-xs text-[#7F8DA5]">{t('digitalHuman.script.description')}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t('digitalHuman.script.description')}</p>
         </div>
         <div className="flex gap-2">
           <input
             value={planInstruction}
             onChange={(event) => onPlanInstructionChange(event.target.value)}
             placeholder={t('digitalHuman.script.instruction')}
-            className="h-9 w-64 border border-[#2B374B] bg-[#0D1320] px-3 text-sm outline-none"
+            className="h-9 w-64 border border-border bg-card px-3 text-sm outline-none"
           />
           <button
             type="button"
             onClick={onRequestPlan}
             disabled={busyKey === 'plan'}
-            className="inline-flex h-9 items-center gap-1.5 border border-[#535FCB] bg-[#202653] px-3 text-sm"
+            className="inline-flex h-9 items-center gap-1.5 border border-[#535FCB] bg-accent-soft px-3 text-sm"
           >
             {busyKey === 'plan' ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
             {t('digitalHuman.script.plan')}
@@ -145,7 +145,7 @@ export default function ScriptBoard({
       <button
         type="button"
         onClick={onAddScene}
-        className="mt-4 flex h-12 w-full items-center justify-center gap-2 border border-dashed border-[#34425A] text-sm text-[#AEB9CA] hover:border-[#6571EE]"
+        className="mt-4 flex h-12 w-full items-center justify-center gap-2 border border-dashed border-border text-sm text-muted-foreground hover:border-[#6571EE]"
       >
         <Plus className="h-4 w-4" />
         {t('digitalHuman.script.addScene')}

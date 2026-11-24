@@ -20,8 +20,12 @@ const read = () => JSON.parse(fs.readFileSync(file, 'utf8'))
 function employees() {
   const metadata = path.join(base, 'openclaw', 'xiaoyu-bots.json')
   const { profiles = {}, archived = {} } = fs.existsSync(metadata) ? JSON.parse(fs.readFileSync(metadata, 'utf8')) : {}
-  return new Map([['xiaoyu-wechat', '小妤微信助理'], ...Object.entries(profiles)
-    .filter(([id]) => !archived[id]).map(([id, profile]) => [id, profile.title || id])])
+  const list = new Map([['xiaoyu-wechat', '小妤微信助理']])
+  if (!archived.main) list.set('main', '小妤')
+  for (const [id, profile] of Object.entries(profiles)) {
+    if (!archived[id]) list.set(id, profile.name || profile.title || list.get(id) || id)
+  }
+  return list
 }
 
 async function bind() {

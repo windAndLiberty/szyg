@@ -9,6 +9,11 @@ export default {
   theme: {
     extend: {
       colors: {
+        ...Object.fromEntries(
+          ["accent", "info", "success", "warning", "danger"].flatMap(tone =>
+            ["ink", "soft"].map(role => [`${tone}-${role}`, `hsl(var(--${tone}-${role}) / <alpha-value>)`])
+          )
+        ),
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

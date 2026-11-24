@@ -22,7 +22,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   const [savedCollapsed, setCollapsedState] = useState(() => {
     try {
       const stored = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY)
-      return stored === null ? window.location.pathname === '/' : stored === '1'
+      return stored === '1'
     } catch { return false }
   })
   const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 760px)').matches)

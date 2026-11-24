@@ -2,6 +2,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+const backendUrl = `http://127.0.0.1:${Number(process.env.SZYG_DEV_BACKEND_PORT || 8000)}`
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -13,9 +15,9 @@ export default defineConfig({
     port: 5173,
     host: '127.0.0.1',
     proxy: {
-      '/api': 'http://127.0.0.1:8000',
-      '/v1': 'http://127.0.0.1:8000',
-      '/health': 'http://127.0.0.1:8000',
+      '/api': backendUrl,
+      '/v1': backendUrl,
+      '/health': backendUrl,
     },
   },
 })

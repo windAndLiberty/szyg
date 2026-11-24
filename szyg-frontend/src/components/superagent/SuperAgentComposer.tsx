@@ -8,7 +8,7 @@ import {
   Paperclip,
   Plus,
   Send,
-  Sparkles,
+  Compass,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -151,7 +151,7 @@ export default function SuperAgentComposer({
 
   return (
     <div ref={rootRef} className="relative w-full">
-      <div className="rounded-2xl border border-[#273449] bg-[#111827]/95 shadow-[0_16px_50px_rgba(0,0,0,0.26)] transition focus-within:border-[#46536A] focus-within:ring-1 focus-within:ring-[#6366F1]/20">
+      <div className="rounded-2xl border border-border bg-card/95 shadow-[0_16px_50px_rgba(0,0,0,0.26)] transition focus-within:border-border focus-within:ring-1 focus-within:ring-[#6366F1]/20">
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 px-3 pt-3">
             {attachments.map((item) => (
@@ -160,20 +160,20 @@ export default function SuperAgentComposer({
                 className={cn(
                   'flex min-w-0 max-w-[260px] items-center gap-2 rounded-lg border px-2.5 py-2',
                   item.status === 'error'
-                    ? 'border-[#7F1D1D] bg-[#2A1218]'
-                    : 'border-[#334155] bg-[#0B1220]',
+                    ? 'border-danger-ink/35 bg-danger-soft'
+                    : 'border-border bg-background',
                 )}
               >
                 {item.status === 'uploading' ? (
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#818CF8]" />
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-accent-ink" />
                 ) : item.status === 'error' ? (
-                  <AlertCircle className="h-4 w-4 shrink-0 text-[#F87171]" />
+                  <AlertCircle className="h-4 w-4 shrink-0 text-danger-ink" />
                 ) : (
-                  <FileText className="h-4 w-4 shrink-0 text-[#A5B4FC]" />
+                  <FileText className="h-4 w-4 shrink-0 text-accent-ink" />
                 )}
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-medium text-[#E2E8F0]">{item.name}</p>
-                  <p className={cn('truncate text-[10px]', item.status === 'error' ? 'text-[#FCA5A5]' : 'text-[#64748B]')}>
+                  <p className="truncate text-xs font-medium text-foreground">{item.name}</p>
+                  <p className={cn('truncate text-[10px]', item.status === 'error' ? 'text-danger-ink' : 'text-muted-foreground')}>
                     {item.status === 'uploading'
                       ? t("正在上传…")
                       : item.status === 'error'
@@ -184,7 +184,7 @@ export default function SuperAgentComposer({
                 <button
                   type="button"
                   onClick={() => onRemoveAttachment(item.id)}
-                  className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[#64748B] hover:bg-[#1E293B] hover:text-[#E2E8F0]"
+                  className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                   aria-label={t("移除附件 {v0}", { v0: item.name })}
                 >
                   <X className="h-3.5 w-3.5" />
@@ -206,7 +206,7 @@ export default function SuperAgentComposer({
               : t("描述任务，或通过 + 添加附件和技能")
           }
           className={cn(
-            'w-full resize-none bg-transparent px-4 pt-3.5 text-sm leading-6 text-[#F1F5F9] placeholder-[#64748B] focus:outline-none',
+            'w-full resize-none bg-transparent px-4 pt-3.5 text-sm leading-6 text-foreground placeholder-muted-foreground focus:outline-none',
             compact ? 'max-h-36 min-h-[64px]' : 'max-h-48 min-h-[82px]',
           )}
         />
@@ -219,8 +219,8 @@ export default function SuperAgentComposer({
             className={cn(
               'grid h-9 w-9 shrink-0 place-items-center rounded-full border transition',
               menuOpen
-                ? 'rotate-45 border-[#6366F1] bg-[#312E81]/60 text-[#C7D2FE]'
-                : 'border-[#334155] bg-[#0B1220] text-[#94A3B8] hover:border-[#64748B] hover:text-white',
+                ? 'rotate-45 border-[#6366F1] bg-accent-soft/60 text-accent-ink'
+                : 'border-border bg-background text-muted-foreground hover:border-border hover:text-foreground',
             )}
             aria-label={t("添加附件或技能")}
             aria-expanded={menuOpen}
@@ -232,7 +232,7 @@ export default function SuperAgentComposer({
             <button
               type="button"
               onClick={() => onSelectSkill(null)}
-              className="inline-flex h-8 min-w-0 max-w-[220px] items-center gap-1.5 rounded-full border border-[#4F46E5]/60 bg-[#312E81]/35 px-3 text-xs text-[#C7D2FE] hover:border-[#818CF8]"
+              className="inline-flex h-8 min-w-0 max-w-[220px] items-center gap-1.5 rounded-full border border-[#4F46E5]/60 bg-accent-soft/35 px-3 text-xs text-accent-ink hover:border-[#818CF8]"
               title={t("点击取消加载")}
             >
               <span className="text-sm leading-none" aria-hidden="true">{selectedSkill.emoji}</span>
@@ -241,7 +241,7 @@ export default function SuperAgentComposer({
             </button>
           )}
 
-          <span className="ml-auto hidden text-[11px] text-[#64748B] sm:inline">{t("Enter 发送 · Shift+Enter 换行")}</span>
+          <span className="ml-auto hidden text-[11px] text-muted-foreground sm:inline">{t("Enter 发送 · Shift+Enter 换行")}</span>
           <button
             type="button"
             onClick={onSend}
@@ -249,8 +249,8 @@ export default function SuperAgentComposer({
             className={cn(
               'grid h-9 w-9 shrink-0 place-items-center rounded-full transition',
               canSend
-                ? 'bg-[#E2E8F0] text-[#111827] hover:bg-white active:scale-95'
-                : 'bg-[#1E293B] text-[#64748B] cursor-not-allowed',
+                ? 'bg-foreground text-background hover:opacity-85 active:scale-95'
+                : 'bg-muted text-muted-foreground cursor-not-allowed',
             )}
             aria-label={t("发送")}
           >
@@ -262,7 +262,7 @@ export default function SuperAgentComposer({
       {menuOpen && menuPosition && createPortal(
         <div
           ref={menuRef}
-          className="fixed z-[100] flex overflow-hidden rounded-xl border border-[#334155] bg-[#111827] p-1.5 shadow-[0_22px_70px_rgba(0,0,0,0.5)]"
+          className="fixed z-[100] flex overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-[0_22px_70px_rgba(0,0,0,0.5)]"
           style={{
             left: menuPosition.left,
             width: menuPosition.width,
@@ -276,19 +276,19 @@ export default function SuperAgentComposer({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-[#E2E8F0] hover:bg-[#1E293B]"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-foreground hover:bg-muted"
           >
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#1E293B] text-[#A5B4FC]">
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-muted text-accent-ink">
               <Paperclip className="h-4 w-4" />
             </span>
             <span>
               <span className="block font-medium">{t("上传附件")}</span>
-              <span className="block text-[11px] text-[#64748B]">{t("文档、表格、图片、音视频，单个不超过 80 MB")}</span>
+              <span className="block text-[11px] text-muted-foreground">{t("文档、表格、图片、音视频，单个不超过 80 MB")}</span>
             </span>
           </button>
 
-          <div className="my-1.5 h-px bg-[#273449]" />
-          <div className="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#64748B]">{t("常用技能")}</div>
+          <div className="my-1.5 h-px bg-muted" />
+          <div className="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{t("常用技能")}</div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             {skills.map((skill) => (
               <button
@@ -299,37 +299,37 @@ export default function SuperAgentComposer({
                   setMenuOpen(false)
                 }}
                 className={cn(
-                  'flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-[#1E293B]',
-                  selectedSkill?.id === skill.id && 'bg-[#312E81]/35',
+                  'flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-muted',
+                  selectedSkill?.id === skill.id && 'bg-accent-soft/35',
                 )}
               >
-                <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#1E293B] text-base leading-none" aria-hidden="true">
+                <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-muted text-base leading-none" aria-hidden="true">
                   {skill.emoji}
                 </span>
                 <span className="min-w-0">
-                  <span className="flex items-center gap-2 text-sm font-medium text-[#E2E8F0]">
+                  <span className="flex items-center gap-2 text-sm font-medium text-foreground">
                     <span className="truncate">{skill.name}</span>
-                    {skill.installed && <span className="rounded bg-[#064E3B]/60 px-1.5 py-0.5 text-[9px] text-[#6EE7B7]">{t("已安装")}</span>}
+                    {skill.installed && <span className="rounded bg-success-soft/60 px-1.5 py-0.5 text-[9px] text-success-ink">{t("已安装")}</span>}
                   </span>
-                  <span className="mt-0.5 block line-clamp-2 text-[11px] leading-4 text-[#64748B]">{skill.description}</span>
+                  <span className="mt-0.5 block line-clamp-2 text-[11px] leading-4 text-muted-foreground">{skill.description}</span>
                 </span>
               </button>
             ))}
           </div>
-          <div className="my-1.5 h-px shrink-0 bg-[#273449]" />
+          <div className="my-1.5 h-px shrink-0 bg-muted" />
           <button
             type="button"
             onClick={() => {
               setMenuOpen(false)
               onDiscoverSkills()
             }}
-            className="flex w-full shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-[#C7D2FE] hover:bg-[#1E293B]"
+            className="flex w-full shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-accent-ink hover:bg-muted"
           >
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#312E81]/45 text-[#A5B4FC]">
-              <Sparkles className="h-4 w-4" />
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent-soft/45 text-accent-ink">
+              <Compass className="h-4 w-4" />
             </span>
             <span className="font-medium">{t("发现更多技能")}</span>
-            <ChevronRight className="ml-auto h-4 w-4 text-[#64748B]" />
+            <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground" />
           </button>
           </div>
         </div>,

@@ -62,26 +62,26 @@ export default function ProfileLibrary(props: ProfileLibraryProps) {
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold">{t('digitalHuman.profile.title')}</h2>
-          <p className="mt-1 text-xs text-[#7F8DA5]">{t('digitalHuman.profile.description')}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t('digitalHuman.profile.description')}</p>
         </div>
         <button
           type="button"
           onClick={() => setShowForm((value) => !value)}
-          className="inline-flex h-9 items-center gap-1.5 bg-[#5965E8] px-3 text-sm"
+          className="inline-flex h-9 items-center gap-1.5 bg-primary text-primary-foreground px-3 text-sm"
         >
           <Plus className="h-4 w-4" />
           {showForm ? t('digitalHuman.profile.collapse') : t('digitalHuman.profile.new')}
         </button>
       </div>
       {showForm && (
-        <div className="mb-6 grid gap-5 border-y border-[#283448] bg-[#0D1320] px-4 py-5 lg:grid-cols-[240px_1fr_1fr_auto]">
+        <div className="mb-6 grid gap-5 border-y border-border bg-card px-4 py-5 lg:grid-cols-[240px_1fr_1fr_auto]">
           <div>
-            <label className="text-xs text-[#8795AA]">{t('digitalHuman.profile.name')}</label>
+            <label className="text-xs text-muted-foreground">{t('digitalHuman.profile.name')}</label>
             <input
               value={draft.name}
               onChange={(event) => onDraftChange({ ...draft, name: event.target.value })}
               placeholder={t('digitalHuman.profile.namePlaceholder')}
-              className="mt-2 h-10 w-full border border-[#2B374B] bg-[#080D16] px-3 text-sm outline-none"
+              className="mt-2 h-10 w-full border border-border bg-background px-3 text-sm outline-none"
             />
             <div className="mt-3 flex gap-2">
               {(['virtual', 'real'] as const).map((value) => (
@@ -90,7 +90,7 @@ export default function ProfileLibrary(props: ProfileLibraryProps) {
                   type="button"
                   onClick={() => onDraftChange({ ...draft, profileType: value })}
                   className={`h-8 flex-1 border text-xs ${
-                    draft.profileType === value ? 'border-[#6974F1] bg-[#252B63]' : 'border-[#2B374B]'
+                    draft.profileType === value ? 'border-[#6974F1] bg-accent-soft' : 'border-border'
                   }`}
                 >
                   {t(value === 'virtual' ? 'digitalHuman.profile.virtual' : 'digitalHuman.profile.real')}
@@ -99,7 +99,7 @@ export default function ProfileLibrary(props: ProfileLibraryProps) {
             </div>
           </div>
           <div>
-            <label className="text-xs text-[#8795AA]">{t('digitalHuman.profile.characterReference')}</label>
+            <label className="text-xs text-muted-foreground">{t('digitalHuman.profile.characterReference')}</label>
             <div className="mt-2">
               <DropZone
                 accept={acceptForAvatar()}
@@ -120,7 +120,7 @@ export default function ProfileLibrary(props: ProfileLibraryProps) {
             </div>
           </div>
           <div>
-            <label className="text-xs text-[#8795AA]">{t('digitalHuman.profile.voiceReference')}</label>
+            <label className="text-xs text-muted-foreground">{t('digitalHuman.profile.voiceReference')}</label>
             <div className="mt-2">
               <DropZone
                 accept={acceptForVoice()}
@@ -137,9 +137,9 @@ export default function ProfileLibrary(props: ProfileLibraryProps) {
                 overlayLabel={t('digitalHuman.profile.dropVoice')}
               />
             </div>
-            <p className="mt-2 text-xs text-[#7F8DA5]">{t('digitalHuman.profile.voiceDescription')}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{t('digitalHuman.profile.voiceDescription')}</p>
             {draft.voiceId && (
-              <p className="mt-2 truncate text-xs text-[#83D9C2]">{t('digitalHuman.profile.voiceBound', { name: assetById.get(draft.voiceId)?.name || '' })}</p>
+              <p className="mt-2 truncate text-xs text-success-ink">{t('digitalHuman.profile.voiceBound', { name: assetById.get(draft.voiceId)?.name || '' })}</p>
             )}
           </div>
           <div className="flex items-end">
@@ -147,7 +147,7 @@ export default function ProfileLibrary(props: ProfileLibraryProps) {
               type="button"
               onClick={onSaveDraft}
               disabled={!canSave}
-              className="inline-flex h-10 items-center gap-2 bg-[#5965E8] px-4 text-sm disabled:opacity-40"
+              className="inline-flex h-10 items-center gap-2 bg-primary text-primary-foreground px-4 text-sm disabled:opacity-40"
             >
               {busyKey === 'profile-save' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               {t('digitalHuman.profile.save')}
@@ -156,10 +156,10 @@ export default function ProfileLibrary(props: ProfileLibraryProps) {
         </div>
       )}
       {profiles.length === 0 ? (
-        <div className="flex min-h-[200px] flex-col items-center justify-center border border-dashed border-[#2B3850] bg-[#0B101B]/40 px-6 text-center">
-          <UserRound className="mb-3 h-7 w-7 text-[#7184A3]" />
-          <p className="text-sm font-medium text-[#E7ECF5]">{t('digitalHuman.profile.empty')}</p>
-          <p className="mt-1 max-w-sm text-xs leading-5 text-[#7F8DA5]">{t('digitalHuman.profile.emptyDescription')}</p>
+        <div className="flex min-h-[200px] flex-col items-center justify-center border border-dashed border-border bg-background/40 px-6 text-center">
+          <UserRound className="mb-3 h-7 w-7 text-muted-foreground" />
+          <p className="text-sm font-medium text-foreground">{t('digitalHuman.profile.empty')}</p>
+          <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">{t('digitalHuman.profile.emptyDescription')}</p>
         </div>
       ) : (
         <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -184,12 +184,12 @@ export default function ProfileLibrary(props: ProfileLibraryProps) {
 
 function AvatarThumb({ asset }: { asset: DigitalHumanAsset }) {
   if (asset.kind === 'image') {
-    return <img src={asset.url} alt={asset.name} className="h-9 w-9 shrink-0 rounded-md border border-[#2A3448] object-cover" />
+    return <img src={asset.url} alt={asset.name} className="h-9 w-9 shrink-0 rounded-md border border-border object-cover" />
   }
   if (asset.kind === 'video') {
-    return <video src={asset.url} muted preload="metadata" className="h-9 w-9 shrink-0 rounded-md border border-[#2A3448] object-cover" />
+    return <video src={asset.url} muted preload="metadata" className="h-9 w-9 shrink-0 rounded-md border border-border object-cover" />
   }
-  return <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[#2A3448] bg-[#111827] text-[10px] text-[#65738A]">AUDIO</div>
+  return <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-card text-[10px] text-muted-foreground">AUDIO</div>
 }
 
 interface ProfileCardProps {
@@ -209,26 +209,26 @@ function ProfileCard({ profile, cover, voiceName, selected, onSelect, onRemove, 
     <article
       onClick={onSelect}
       className={`cursor-pointer border p-4 transition ${
-        selected ? 'border-[#6974F1] bg-[#171D3B]' : 'border-[#242F42] bg-[#0D121D] hover:border-[#3B4860]'
+        selected ? 'border-[#6974F1] bg-accent-soft' : 'border-border bg-card hover:border-border'
       }`}
     >
       <div className="flex items-start gap-3">
         {cover ? (
           <AvatarThumb asset={cover} />
         ) : (
-          <div className="flex h-14 w-14 items-center justify-center rounded-md border border-[#2A3448] bg-[#151D2B]">
+          <div className="flex h-14 w-14 items-center justify-center rounded-md border border-border bg-card">
             <UserRound className="h-6 w-6" />
           </div>
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="truncate text-sm font-medium">{profile.name}</p>
-            {selected && <Check className="h-4 w-4 text-[#7D87FF]" />}
+            {selected && <Check className="h-4 w-4 text-accent-ink" />}
           </div>
-          <p className="mt-1 text-xs text-[#7F8DA5]">
+          <p className="mt-1 text-xs text-muted-foreground">
             {t(profile.profile_type === 'virtual' ? 'digitalHuman.profile.virtualReady' : 'digitalHuman.profile.realUnavailable')}
           </p>
-          <p className="mt-2 truncate text-xs text-[#A7B2C3]">
+          <p className="mt-2 truncate text-xs text-muted-foreground">
             {voiceName ? t('digitalHuman.profile.voiceName', { name: voiceName }) : t('digitalHuman.profile.noVoice')}
           </p>
         </div>
@@ -239,7 +239,7 @@ function ProfileCard({ profile, cover, voiceName, selected, onSelect, onRemove, 
             onRemove()
           }}
           aria-label={t('digitalHuman.profile.delete')}
-          className="p-1 text-[#6E7D93] hover:text-[#F48A9B]"
+          className="p-1 text-muted-foreground hover:text-danger-ink"
         >
           <Trash2 className="h-4 w-4" />
         </button>
@@ -252,7 +252,7 @@ function ProfileCard({ profile, cover, voiceName, selected, onSelect, onRemove, 
               event.stopPropagation()
               onRemix()
             }}
-            className="inline-flex h-8 items-center gap-1.5 border border-[#535FCB] bg-[#202653] px-3 text-xs text-[#D6DAFF] hover:border-[#6974F1]"
+            className="inline-flex h-8 items-center gap-1.5 border border-[#535FCB] bg-accent-soft px-3 text-xs text-accent-ink hover:border-[#6974F1]"
           >
             <Copy className="h-3.5 w-3.5" />
             {t('digitalHuman.profile.remix')}

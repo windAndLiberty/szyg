@@ -3,6 +3,8 @@ const crypto = require('crypto')
 const fs = require('fs')
 const net = require('net')
 const path = require('path')
+const { employeeModels, profileChanges, creationId, managedInstructions, modelChoice, permissionChoice } = require('./employee-profile')
+const { directorRenderJobs } = require('./director-render-receipts')
 const { CredentialStore } = require('./credential-store')
 const {
   OPENCLAW_RUNTIME_VERSION,
@@ -12,6 +14,14 @@ const {
   OPENCLAW_NODE_VERSION,
 } = require('./runtime-constants')
 
+const DIRECTOR_ID = 'xiaoyu-director'
+const DIRECTOR_NAME = '视频导演'
+const LEGACY_DIRECTOR_NAME = '小妤导演'
+const BUSINESS_MCP_SERVER = 'szyg-business'
+const LOCAL_SKILL_SOURCES = new Set([
+  'openclaw-bundled', 'openclaw-extra', 'openclaw-workspace', 'openclaw-managed',
+  'agents-skills-project', 'agents-skills-personal',
+])
 const TERMINAL_STATES = new Set(['completed', 'failed', 'cancelled'])
 const XIAOYU_FAST_MODEL = 'xiaoyu-managed/text.fast'
 const XIAOYU_REASONING_MODEL = 'xiaoyu-managed/text.reasoning'
@@ -26,6 +36,37 @@ const DEFAULT_SCOPES = [
   'operator.questions',
   'operator.admin',
 ]
+
+function isDesktopSession(key) {
+  return /^agent:[a-z0-9_-]+:dashboard:(?:incognito-)?[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(key)
+}
+
+function sessionOwner(key, agentId) {
+  const owner = typeof key === 'string' && /^agent:([a-z0-9_-]+):/i.exec(key)?.[1]
+  if (!owner || (agentId !== undefined && agentId !== owner)) throw new Error('该对话不属于当前员工')
+  return owner
+}
+
+function desktopSessionOwner(key, agentId) {
+  if (!isDesktopSession(key)) throw new Error('仅本机任务对话支持此操作')
+  return sessionOwner(key, agentId)
+}
+
+function validSkillKey(value) {
+  return typeof value === 'string' && /^[a-z0-9][a-z0-9._-]{0,95}$/i.test(value)
+    && !Object.hasOwn(Object.prototype, value) && value !== 'prototype'
+}
+
+function addConversationContextDetail(context, page, key, value) {
+  const detail = { ...context?.detail, [key]: value }
+  // The Gateway accepts at most four detail fields. The expert references are
+  // also present in selection; keep those full references when slots fill up.
+  for (const name of Object.keys(detail).filter(name => /^expert\d+$/.test(name)).reverse()) {
+    if (Object.keys(detail).length <= 4) break
+    delete detail[name]
+  }
+  return { page, ...context, detail }
+}
 
 function atomicWriteJson(filePath, value) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true })
@@ -199,6 +240,8 @@ class OpenClawRuntimeManager {
     this.lastShutdown = null
     this.activeRuns = new Set()
     this.activeSessions = new Map()
+    this.finishedRunSessions = new Map()
+    this.activeRunStatuses = new Map()
     this.activeSessionStartedAt = new Map()
     this.sessionReconcileTimers = new Map()
     this.state = {
@@ -216,6 +259,8 @@ class OpenClawRuntimeManager {
     this.stateDir = path.join(this.rootDir, 'state')
     this.workspaceDir = path.join(this.rootDir, 'workspaces', 'xiaoyu')
     this.configPath = path.join(this.stateDir, 'openclaw.json')
+    this.pendingMutations = new Map()
+    this.privateSessionChoices = new Map()
     this.botStatePath = path.join(this.rootDir, 'xiaoyu-bots.json')
     this.credentials = new CredentialStore({ safeStorage: options.safeStorage, rootDir: this.rootDir })
   }
@@ -414,7 +459,7 @@ class OpenClawRuntimeManager {
     }
     const config = readJson(this.configPath, {}) || {}
     config.gateway = { ...(config.gateway || {}), mode: 'local' }
-    config.mcp = { ...(config.mcp || {}), servers: { ...(config.mcp?.servers || {}), 'szyg-business': definition } }
+    config.mcp = { ...(config.mcp || {}), servers: { ...(config.mcp?.servers || {}), [BUSINESS_MCP_SERVER]: definition } }
     config.models = {
       ...(config.models || {}),
       mode: 'replace',
@@ -441,6 +486,9 @@ class OpenClawRuntimeManager {
               contextWindow: 128000,
               maxTokens: 8192,
             },
+            ...employeeModels.map(id => ({
+              id, name: id, reasoning: true, input: ['text'], contextWindow: 128000, maxTokens: 8192,
+            })),
           ],
         },
       },
@@ -450,8 +498,13 @@ class OpenClawRuntimeManager {
       defaults: {
         ...(config.agents?.defaults || {}),
         model: { primary: XIAOYU_MANAGED_MODEL, fallbacks: [] },
-        modelPolicy: { allow: [XIAOYU_FAST_MODEL, XIAOYU_REASONING_MODEL] },
+        modelPolicy: { allow: [XIAOYU_FAST_MODEL, XIAOYU_REASONING_MODEL, ...employeeModels.map(id => 'xiaoyu-managed/' + id)] },
       },
+    }
+    // Preserve the legacy implicit main agent when the first custom employee
+    // turns the OpenClaw roster into an explicit multi-agent configuration.
+    if (!Object.hasOwn(config.agents, 'entries') && !Object.hasOwn(config.agents, 'list')) {
+      config.agents.entries = { main: { name: '小妤', workspace: this.workspaceDir } }
     }
     config.cron = {
       ...(config.cron || {}),
@@ -530,16 +583,19 @@ class OpenClawRuntimeManager {
 
   async spawnGateway(layout, env, gatewayToken) {
     const args = [layout.entry, 'gateway', '--bind', 'loopback', '--port', String(this.gatewayPort)]
-    this.child = spawn(layout.nodeExecutable, args, {
+    const child = spawn(layout.nodeExecutable, args, {
       cwd: this.rootDir,
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     })
-    this.child.stdout.on('data', (data) => this.log(`stdout ${String(data).trim()}`))
-    this.child.stderr.on('data', (data) => this.log(`stderr ${String(data).trim()}`))
-    this.child.once('error', (error) => this.fail(error))
-    this.child.once('exit', (code, signal) => this.handleExit(code, signal, layout, env, gatewayToken))
+    this.child = child
+    child.stdout.on('data', (data) => this.log(`stdout ${String(data).trim()}`))
+    child.stderr.on('data', (data) => this.log(`stderr ${String(data).trim()}`))
+    child.once('error', error => { if (this.child === child) this.fail(error) })
+    child.once('exit', (code, signal) => {
+      if (this.child === child) void this.handleExit(code, signal, layout, env, gatewayToken)
+    })
     await this.connectClient(gatewayToken, env)
   }
 
@@ -630,6 +686,8 @@ class OpenClawRuntimeManager {
       // cron authority must not make the whole employee workspace unavailable.
       this.log(`retired memory job protocol cleanup deferred: ${error.message}`)
     }
+    this.directorNeedsInstall = true
+    await this.installDirector().catch(error => this.log(`director setup deferred: ${error.message}`))
     this.doctorAttempted = false
     this.restartAttempts = 0
     this.setState({ phase: 'ready', ready: true, error: '', gatewayUrl: url })
@@ -655,29 +713,42 @@ class OpenClawRuntimeManager {
 
   handleEvent(event) {
     const normalized = normalizeGatewayEvent(event)
-    const runId = normalized.payload?.runId
-    const sessionKey = normalized.payload?.sessionKey
-    const status = normalized.payload?.runStatus
-    if (runId && status && TERMINAL_STATES.has(status)) {
-      this.activeRuns.delete(runId)
-      // Successful final chat events are not guaranteed to carry sessionKey.
-      // Reconcile by run id as well so a completed turn cannot leave the
-      // session permanently locked in Xiaoyu's fail-first queue.
-      for (const [trackedSessionKey, trackedRunId] of this.activeSessions) {
-        if (trackedRunId === runId) {
-          this.activeSessions.delete(trackedSessionKey)
-          this.activeSessionStartedAt.delete(trackedSessionKey)
-          this.clearSessionReconcileTimer(trackedSessionKey)
+    const payload = normalized.payload
+    const runId = payload?.runId || payload?.request?.runId
+    const status = payload?.runStatus
+    let sessionKey = payload?.sessionKey || payload?.request?.sessionKey || payload?.context?.sessionKey
+    if (runId && !sessionKey) {
+      sessionKey = this.finishedRunSessions.get(runId)
+      if (!sessionKey) {
+        for (const [key, tracked] of this.activeSessions) {
+          if (tracked === runId || tracked === 'pending:' + runId) { sessionKey = key; break }
         }
       }
-    } else if (runId) this.activeRuns.add(runId)
-    if (sessionKey && status && TERMINAL_STATES.has(status)) {
-      this.activeSessions.delete(sessionKey)
-      this.activeSessionStartedAt.delete(sessionKey)
-      this.clearSessionReconcileTimer(sessionKey)
-    } else if (sessionKey && runId) {
-      this.activeSessions.set(sessionKey, runId)
-      if (!this.activeSessionStartedAt.has(sessionKey)) this.activeSessionStartedAt.set(sessionKey, Date.now())
+    }
+    if (sessionKey && payload && typeof payload === 'object') {
+      payload.sessionKey = sessionKey
+      payload.agentId ||= /^agent:([^:]+):/.exec(sessionKey)?.[1]
+      if (runId) payload.runId = runId
+    }
+    if (runId && status) {
+      const tracked = this.activeSessions.get(sessionKey)
+      const matches = tracked === runId || tracked === 'pending:' + runId
+      if (TERMINAL_STATES.has(status)) {
+        this.activeRunStatuses.delete(runId)
+        this.activeRuns.delete(runId)
+        if (sessionKey) this.rememberFinishedRun(runId, sessionKey)
+        if (matches) this.clearTrackedRun(sessionKey, tracked)
+      } else {
+        if (this.finishedRunSessions.has(runId)) return
+        if (sessionKey && (!tracked || matches)) {
+          if (matches) this.activeRuns.delete(tracked)
+          this.activeSessions.set(sessionKey, runId)
+          this.activeRunStatuses.set(runId, ['waiting_approval', 'blocked'].includes(status) ? status : 'running')
+          if (!tracked) this.scheduleSessionReconciliation(sessionKey)
+          if (!this.activeSessionStartedAt.has(sessionKey)) this.activeSessionStartedAt.set(sessionKey, Date.now())
+        }
+        if (!tracked || matches) this.activeRuns.add(runId)
+      }
     }
     if (normalized.source === 'shutdown') this.lastShutdown = normalized.payload
     this.options.onEvent?.(normalized)
@@ -727,18 +798,28 @@ class OpenClawRuntimeManager {
     this.restartTimer = null
     this.readyRejecter?.(new Error('Xiaoyu runtime stopped'))
     this.readyRejecter = null
-    if (this.child) {
-      const child = this.child
-      this.child = null
-      child.kill()
-    }
+    const child = this.child
+    const childClosed = child && child.exitCode === null && child.signalCode === null
+      ? new Promise((resolve, reject) => {
+        // The previous process must release its state database before another
+        // Gateway is launched, even if its socket has already disconnected.
+        const timer = setTimeout(() => reject(new Error('工作环境尚在关闭，请稍后重试')), 30000)
+        child.once('close', () => { clearTimeout(timer); resolve() })
+        child.kill()
+      })
+      : Promise.resolve()
     if (this.client) {
       try { await this.client.stopAndWait({ timeoutMs: 1500 }) } catch (_) {}
       this.client = null
     }
+    await childClosed
+    if (this.child === child) this.child = null
     this.activeRuns.clear()
     this.activeSessions.clear()
+    this.finishedRunSessions.clear()
+    this.activeRunStatuses.clear()
     this.activeSessionStartedAt.clear()
+    this.privateSessionChoices.clear()
     for (const timer of this.sessionReconcileTimers.values()) clearTimeout(timer)
     this.sessionReconcileTimers.clear()
     this.setState({ phase: 'stopped', ready: false, error: '', gatewayUrl: '' })
@@ -754,76 +835,202 @@ class OpenClawRuntimeManager {
     return sanitizeForRenderer(await this.client.request(method, params))
   }
 
-  async sendRun(params = {}) {
+  serializeMutation(key, operation) {
+    const previous = this.pendingMutations.get(key) || Promise.resolve()
+    const next = previous.catch(() => {}).then(operation)
+    this.pendingMutations.set(key, next)
+    return next.finally(() => {
+      if (this.pendingMutations.get(key) === next) this.pendingMutations.delete(key)
+    })
+  }
+
+  sendRun(params = {}) {
+    const sessionKey = String(params.sessionKey || '').trim()
+    return this.serializeMutation('session:' + sessionKey, () => this.dispatchRun({ ...params, sessionKey }))
+  }
+
+  async dispatchRun(params) {
     const sessionKey = String(params.sessionKey || '').trim()
     const message = String(params.message || '')
-    if (!sessionKey) throw new Error('sessionKey is required')
+    const agentId = desktopSessionOwner(sessionKey, params.agentId)
     if (!message.trim()) throw new Error('消息不能为空')
-    if (await this.isTrackedSessionActive(sessionKey)) throw new Error('该会话已有任务正在执行，请等待完成后再发送')
-    const pendingId = `pending:${crypto.randomUUID()}`
+    const previous = await this.runStatus({ sessionKey, agentId })
+    if (previous.status === 'unknown' && !previous.active) throw new Error('尚未确认这个对话的运行状态，请稍后重试')
+    if (previous.active) throw new Error('该会话已有任务正在执行，请等待完成后再发送')
+    const requestId = crypto.randomUUID()
+    const pendingId = 'pending:' + requestId
     this.activeSessions.set(sessionKey, pendingId)
     this.activeSessionStartedAt.set(sessionKey, Date.now())
     this.activeRuns.add(pendingId)
     this.emitStatus()
+    let sending = false
     try {
-      const deepThinking = params.deepThinking === true
-      // Model selection is a session property in the Gateway protocol. Patch
-      // it immediately before dispatch so an existing conversation honors the
-      // current composer toggle instead of retaining an earlier costly mode.
+      await this.ensureEmployeeInstructions(agentId)
+      const settings = this.sessionSettings(params, agentId, sessionKey)
+      const runModel = params.usingAutomaticModel === true ? 'auto' : settings.model
       await this.rpc('sessions.patch', {
-        key: sessionKey,
-        model: deepThinking ? XIAOYU_REASONING_MODEL : XIAOYU_FAST_MODEL,
-        thinkingLevel: deepThinking ? 'medium' : 'off',
-        fastMode: deepThinking ? false : true,
+        key: sessionKey, ...(agentId ? { agentId } : {}),
+        ...this.gatewayModelSettings(runModel, params.deepThinking),
+        ...(params.permissionMode !== undefined ? { permissionMode: settings.permissionMode } : {}),
       })
-      const payload = { ...params, sessionKey, message, deliver: false, idempotencyKey: crypto.randomUUID() }
-      delete payload.deepThinking
-      delete payload.queueMode
+      const payload = { sessionKey, message, deliver: false, idempotencyKey: requestId }
+      if (agentId) payload.agentId = agentId
+      if (this.options.desktopToken) {
+        const response = await fetch(`http://127.0.0.1:${this.options.backendPort}/api/agency/conversation-experts/resolve`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-SZYG-Desktop-Token': this.options.desktopToken },
+          body: JSON.stringify({ session_key: sessionKey, agent_id: agentId, message: message.slice(0, 8192) }),
+          signal: AbortSignal.timeout(8000),
+        })
+        if (!response.ok) throw new Error('对话专家暂时不可用，请重试')
+        const experts = await response.json()
+        if (experts.workContext) payload.workContext = experts.workContext
+        this.options.onEvent?.({
+          id: crypto.randomUUID(), type: 'experts.changed', source: 'xiaoyu.runtime', timestamp: Date.now(),
+          payload: { sessionKey, agentId },
+        })
+      }
+      const hasAttachments = Array.isArray(params.attachments) && params.attachments.slice(0, 8).some(url =>
+        typeof url === 'string' && /^\/api\/media\/files\/(image|audio|video)\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\.[a-z0-9]{2,5}$/i.test(url)
+        && message.includes(`](${url})`))
+      if (hasAttachments) {
+        payload.workContext = addConversationContextDetail(
+          payload.workContext, '小妤 · 对话素材', '本轮附件',
+          '回答涉及附件内容时，先通过 tool_search 查找 materials.inspect。用消息里的本机地址看图、转写音频或检查视频的画面及声音。保留原地址供后续任务使用。',
+        )
+      }
+      const choices = this.sessionChoices(sessionKey, 'skillChoices')
+      if (Object.values(choices).some(Boolean)) {
+        const state = await this.sessionSkillState(agentId, sessionKey)
+        const selected = this.selectedSkills(state, choices)
+        if (selected.length) {
+          payload.workContext = addConversationContextDetail(
+            payload.workContext, '小妤 · 当前对话技能', '本轮先读取并应用所选技能的 SKILL.md', selected.join(', '),
+          )
+          payload.expectedToolOverrides = state.session.toolOverrides ?? null
+        }
+      }
+      const capabilityChoices = this.sessionChoices(sessionKey, 'capabilityChoices')
+      if (Object.values(capabilityChoices).some(Boolean)) {
+        const state = await this.sessionCapabilityState(agentId, sessionKey)
+        const { selected } = this.selectedCapabilities(state, capabilityChoices)
+        if (selected.length) {
+          payload.workContext = addConversationContextDetail(
+            payload.workContext, '小妤 · 对话能力', '优先通过 tool_search 查找适用能力', selected.join(', '),
+          )
+          payload.expectedToolOverrides = state.session.toolOverrides ?? null
+        }
+      }
+      if (params.model !== undefined || params.permissionMode !== undefined) this.saveSessionSettings(sessionKey, settings)
+      sending = true
       const result = await this.rpc('chat.send', payload)
-      const runId = String(result?.runId || pendingId)
+      const runId = String(result?.runId || requestId)
       this.activeRuns.delete(pendingId)
-      if (this.activeSessions.has(sessionKey)) {
+      const tracked = this.activeSessions.get(sessionKey)
+      if ((tracked === pendingId || tracked === runId) && !this.finishedRunSessions.has(runId)) {
         this.activeSessions.set(sessionKey, runId)
         this.activeRuns.add(runId)
         this.scheduleSessionReconciliation(sessionKey)
       }
       this.emitStatus()
-      return result
+      return { ...result, runId }
     } catch (error) {
-      this.activeRuns.delete(pendingId)
-      this.activeSessions.delete(sessionKey)
-      this.activeSessionStartedAt.delete(sessionKey)
-      this.clearSessionReconcileTimer(sessionKey)
+      // A dropped acknowledgment may follow a successful admission. Keep the
+      // original request identity while native events and the projection catch up.
+      if (sending && /timed? ?out|timeout|disconnect|connection (?:closed|lost)|socket closed/i.test(String(error?.message))) {
+        if (this.activeSessions.get(sessionKey) === pendingId) {
+          this.activeRuns.delete(pendingId)
+          this.activeSessions.set(sessionKey, requestId)
+          this.activeSessionStartedAt.set(sessionKey, Date.now())
+          this.activeRuns.add(requestId)
+          this.scheduleSessionReconciliation(sessionKey)
+        }
+        this.emitStatus()
+        return { runId: requestId, status: 'unknown' }
+      }
+      this.clearTrackedRun(sessionKey, pendingId)
       this.emitStatus()
       throw error
     }
   }
 
-  async isTrackedSessionActive(sessionKey) {
-    const trackedRunId = this.activeSessions.get(sessionKey)
-    if (!trackedRunId) return false
-    const startedAt = this.activeSessionStartedAt.get(sessionKey) || 0
-    // Never second-guess a dispatch that is still pending, and give a newly
-    // admitted run a short window to appear in the authoritative session row.
-    if (String(trackedRunId).startsWith('pending:') || Date.now() - startedAt < 5000) return true
-    try {
-      const result = await this.rpc('sessions.list', { limit: 100, ownerFirst: true })
-      const rows = Array.isArray(result?.sessions) ? result.sessions : Array.isArray(result?.items) ? result.items : []
-      const row = rows.find((item) => String(item?.key || item?.sessionKey || item?.id || '') === sessionKey)
-      const status = String(row?.status || row?.runStatus || '').toLowerCase()
-      const active = Boolean(row?.hasActiveRun || row?.activeRunId || ['queued', 'thinking', 'working', 'waiting_approval', 'blocked', 'running'].includes(status))
-      if (active) return true
-      this.activeRuns.delete(trackedRunId)
-      this.activeSessions.delete(sessionKey)
-      this.activeSessionStartedAt.delete(sessionKey)
-      this.clearSessionReconcileTimer(sessionKey)
-      this.emitStatus()
-      return false
-    } catch (error) {
-      // Fail first when the authoritative check itself is unavailable.
-      this.log(`session activity reconciliation failed: ${error.message}`)
-      return true
+  rememberFinishedRun(runId, sessionKey) {
+    this.finishedRunSessions.set(runId, sessionKey)
+    if (this.finishedRunSessions.size > 512) this.finishedRunSessions.delete(this.finishedRunSessions.keys().next().value)
+  }
+
+  clearTrackedRun(sessionKey, expected) {
+    if (!expected || this.activeSessions.get(sessionKey) !== expected) return
+    this.activeRuns.delete(expected)
+    this.activeRunStatuses.delete(expected)
+    this.activeSessions.delete(sessionKey)
+    this.activeSessionStartedAt.delete(sessionKey)
+    this.clearSessionReconcileTimer(sessionKey)
+  }
+
+  async runStatus(params) {
+    const sessionKey = String(params.sessionKey || params.key || '')
+    const agentId = sessionOwner(sessionKey, params.agentId)
+    return this.readRunStatus(sessionKey, agentId)
+  }
+
+  async readRunStatus(sessionKey, agentId) {
+    const local = () => {
+      const tracked = this.activeSessions.get(sessionKey)
+      const pending = tracked?.startsWith('pending:')
+      return { sessionKey, agentId, active: Boolean(tracked), runId: pending ? null : tracked || null,
+        status: pending ? 'queued' : tracked ? this.activeRunStatuses.get(tracked) || 'running' : 'idle' }
     }
+    const tracked = this.activeSessions.get(sessionKey)
+    if (tracked?.startsWith('pending:')) return local()
+    let row
+    try {
+      // An embedded turn can have hasActiveRun=true while the Gateway omits
+      // activeRunIds. Use only an identity already associated with this exact key.
+      const result = await this.rpc('sessions.describe', { key: sessionKey, ...(agentId ? {agentId} : {}) })
+      row = result?.session
+    } catch (error) {
+      this.log(`session status unavailable: ${error.message}`)
+      return { ...local(), status: 'unknown' }
+    }
+    if (tracked !== this.activeSessions.get(sessionKey)) return local()
+    // Missing projections are not completion receipts.
+    if (!row || (row.key && row.key !== sessionKey) || (row.agentId && agentId && row.agentId !== agentId)) {
+      return { ...local(), status: 'unknown' }
+    }
+    const ids = Array.isArray(row.activeRunIds) ? row.activeRunIds.filter(id => typeof id === 'string' && id) : []
+    const state = String(row.status || row.runStatus || '').toLowerCase()
+    const liveStates = ['queued', 'running', 'thinking', 'working', 'waiting_approval', 'blocked']
+    const active = row.hasActiveRun === true || ids.length > 0 || (row.hasActiveRun !== false && liveStates.includes(state))
+    if (active) {
+      const runId = ids.length === 1 ? ids[0] : ids.includes(tracked) ? tracked : !ids.length ? tracked || null : null
+      if (runId && this.finishedRunSessions.has(runId)) return { ...local(), status: 'unknown' }
+      if (runId && runId !== tracked) {
+        if (tracked) {
+          this.rememberFinishedRun(tracked, sessionKey)
+          this.clearTrackedRun(sessionKey, tracked)
+        }
+        this.activeSessions.set(sessionKey, runId)
+        this.activeSessionStartedAt.set(sessionKey, Date.now())
+        this.activeRuns.add(runId)
+        this.scheduleSessionReconciliation(sessionKey)
+      }
+      const status = ['queued', 'waiting_approval', 'blocked'].includes(state) ? state : this.activeRunStatuses.get(runId) || 'running'
+      return { sessionKey, agentId, active: true, runId, status }
+    }
+    // A new dispatch may not be visible in SQLite yet.
+    if (tracked && Date.now() - (this.activeSessionStartedAt.get(sessionKey) || 0) < 5000) return local()
+    if (tracked) {
+      this.rememberFinishedRun(tracked, sessionKey)
+      this.clearTrackedRun(sessionKey, tracked)
+      this.emitStatus()
+    }
+    return local()
+  }
+
+  async isTrackedSessionActive(sessionKey) {
+    const result = await this.readRunStatus(sessionKey, /^agent:([^:]+):/.exec(sessionKey)?.[1])
+    return result.active || result.status === 'unknown'
   }
 
   clearSessionReconcileTimer(sessionKey) {
@@ -848,53 +1055,391 @@ class OpenClawRuntimeManager {
 
   async interruptRun(params = {}) {
     const sessionKey = String(params.sessionKey || params.key || '').trim()
-    try {
-      return await this.rpc('sessions.abort', { ...params, clearQueued: true })
-    } finally {
-      if (sessionKey) {
-        const runId = this.activeSessions.get(sessionKey)
-        if (runId) this.activeRuns.delete(runId)
-        this.activeSessions.delete(sessionKey)
-        this.activeSessionStartedAt.delete(sessionKey)
-        this.clearSessionReconcileTimer(sessionKey)
-        this.emitStatus()
-      }
+    const agentId = desktopSessionOwner(sessionKey, params.agentId)
+    const expected = String(params.runId || '')
+    if (!expected || expected.startsWith('pending:')) return { aborted: false, stale: true }
+    const current = await this.runStatus({sessionKey, agentId})
+    if (current.status === 'unknown') return { aborted: false, status: 'unknown' }
+    if (current.runId !== expected || !current.active) return { aborted: false, stale: true }
+    // Always send the expected run, even when the session changes after the
+    // probe. Clearing an entire session's queue could cancel a later turn.
+    const result = await this.rpc('sessions.abort', {key: sessionKey, agentId, runId: expected, clearQueued: false})
+    const aborted = result?.abortedRunId === expected && result.status === 'aborted'
+    if (aborted) {
+      this.rememberFinishedRun(expected, sessionKey)
+      this.clearTrackedRun(sessionKey, expected)
+      this.emitStatus()
     }
+    return { ...result, aborted }
   }
 
   loadBotMetadata() {
-    return readJson(this.botStatePath, { archived: {}, profiles: {} }) || { archived: {}, profiles: {} }
+    const data = readJson(this.botStatePath, {}) || {}
+    return { ...data, archived: data.archived || {}, profiles: data.profiles || {}, sessions: data.sessions || {} }
   }
 
   saveBotMetadata(value) {
     atomicWriteJson(this.botStatePath, value)
   }
 
+  async installDirector() {
+    // Use the native roster mutation to migrate an implicit single-agent
+    // installation without reassigning its past conversations or routines.
+    return this.serializeMutation('install:' + DIRECTOR_ID, async () => {
+      if (!this.directorNeedsInstall) return
+      const request = this.client.request.bind(this.client)
+      const roster = await request('agents.list', {})
+      const registered = roster.agents.find(agent => (agent.id || agent.agentId) === DIRECTOR_ID)
+      const saved = this.loadBotMetadata().profiles[DIRECTOR_ID]
+      if (registered && !saved?.directorTemplate) {
+        // A manually configured Gateway agent already owns this reserved ID.
+        this.directorNeedsInstall = false
+        return
+      }
+      const instructions = fs.readFileSync(path.join(__dirname, 'director.md'), 'utf8').trim()
+      const digest = value => crypto.createHash('sha256').update(value).digest('hex')
+      const version = digest(instructions)
+      const customized = saved?.directorTemplate && digest(saved.instructions ?? '') !== saved.directorTemplate
+      // Legacy built-ins used Xiaoyu's avatar. Apply the new defaults once so
+      // choosing that avatar again, or renaming the director, survives restarts.
+      const identityChanged = !saved?.directorIdentityVersion
+      const nativeName = registered?.name
+      const nativeHasLegacyName = !nativeName || nativeName === DIRECTOR_ID || nativeName === LEGACY_DIRECTOR_NAME
+      const identity = {}
+      if (identityChanged) {
+        const defaultName = nativeHasLegacyName ? DIRECTOR_NAME : nativeName
+        identity.name = saved?.name && saved.name !== LEGACY_DIRECTOR_NAME ? saved.name : defaultName
+        identity.avatar = saved?.avatar && saved.avatar !== 'xiaoyu' ? saved.avatar : 'director'
+        identity.directorIdentityVersion = 2
+      }
+      if (registered && saved?.creationComplete) {
+        const templateChanged = saved.directorTemplate !== version
+        if (identityChanged || templateChanged) {
+          if (identityChanged && nativeHasLegacyName && nativeName !== identity.name) {
+            await request('agents.update', { agentId: DIRECTOR_ID, name: identity.name })
+          }
+          const promptChanged = (templateChanged && !customized) || (identityChanged && identity.name !== saved.name)
+          const prompt = customized ? saved.instructions : instructions
+          if (promptChanged) await this.writeEmployeeInstructions(DIRECTOR_ID, { ...saved, ...identity, instructions: prompt }, request)
+          this.storeProfile(DIRECTOR_ID, {
+            ...identity, directorTemplate: version, ...(promptChanged ? { instructions: prompt, promptApplied: true } : {}),
+          })
+        }
+        this.directorNeedsInstall = false
+        return
+      }
+      const workspace = path.join(this.rootDir, 'workspaces', 'agents', DIRECTOR_ID)
+      const profile = {
+        name: DIRECTOR_NAME, title: '', avatar: 'director', model: 'auto', toolPolicy: { permissionMode: 'guarded' },
+        browserProfile: 'persist:szyg-agent-' + DIRECTOR_ID, ...saved, ...identity,
+        workspace, instructions: customized ? saved.instructions : instructions, directorTemplate: version,
+      }
+      // Record ownership before touching the Gateway. Incomplete provisioning
+      // can be resumed after a crash without duplicating the native agent.
+      this.storeProfile(DIRECTOR_ID, { ...profile, creationComplete: false, promptApplied: false })
+      if (!registered) {
+        copyTemplateDirectory(path.join(__dirname, 'workspace-template'), workspace)
+        await request('agents.create', {
+          name: DIRECTOR_ID, workspace, model: this.gatewayModelSettings(profile.model).model,
+        })
+      }
+      if (registered?.name !== profile.name) {
+        await request('agents.update', { agentId: DIRECTOR_ID, name: profile.name })
+      }
+      await this.writeEmployeeInstructions(DIRECTOR_ID, profile, request)
+      this.storeProfile(DIRECTOR_ID, { creationComplete: true, promptApplied: true })
+      this.directorNeedsInstall = false
+    })
+  }
+
   async listBots(params = {}) {
+    if (this.directorNeedsInstall) await this.installDirector().catch(error => this.log(`director setup deferred: ${error.message}`))
     const result = await this.rpc('agents.list', params)
     const metadata = this.loadBotMetadata()
     const agents = Array.isArray(result?.agents) ? result.agents : Array.isArray(result) ? result : []
+    const defaultId = agents.find(a => (a.id || a.agentId) === result.defaultId)?.id
+      || agents.find(a => (a.id || a.agentId) === 'main')?.id || agents[0]?.id
     return {
-      ...result,
-      agents: agents.map((agent) => ({ ...agent, ...(metadata.profiles?.[agent.id || agent.agentId] || {}), archived: Boolean(metadata.archived?.[agent.id || agent.agentId]) })),
+      ...result, defaultId,
+      agents: agents.map(agent => {
+        const id = agent.id || agent.agentId
+        const profile = metadata.profiles[id] || {}
+        return {
+          ...agent, ...profile,
+          name: profile.name || agent.name || (id === defaultId ? '小妤' : agent.identity?.name || id),
+          model: profile.model || 'auto',
+          archived: Boolean(metadata.archived[id]),
+        }
+      }),
     }
+  }
+
+  sessionHistory(params) {
+    const agentId = sessionOwner(params.sessionKey, params.agentId)
+    return this.rpc('chat.history', { ...params, agentId })
+  }
+
+  async sessionDirectorRenders(params) {
+    const key = String(params.sessionKey || '')
+    const agentId = desktopSessionOwner(key, params.agentId)
+    if (agentId !== DIRECTOR_ID) return { jobs: [] }
+    const { messages } = await this.rpc('sessions.get', { key, agentId, limit: 200 })
+    return { jobs: directorRenderJobs(Array.isArray(messages) ? messages : []) }
+  }
+
+  sessionChoices(key, field) {
+    if (key.includes(':dashboard:incognito-')) return this.privateSessionChoices.get(key)?.[field] || {}
+    return this.loadBotMetadata().sessions[key]?.[field] || {}
+  }
+
+  saveSessionChoices(key, field, choices) {
+    if (key.includes(':dashboard:incognito-')) {
+      this.privateSessionChoices.set(key, { ...this.privateSessionChoices.get(key), [field]: choices })
+      return
+    }
+    const metadata = this.loadBotMetadata()
+    metadata.sessions[key] = { ...metadata.sessions[key], [field]: choices }
+    this.saveBotMetadata(metadata)
+  }
+
+  async sessionSkillState(agentId, key) {
+    if (typeof agentId !== 'string' || !/^[a-z0-9_-]+$/i.test(agentId)) throw new Error('请选择当前员工')
+    if (key !== undefined) desktopSessionOwner(key, agentId)
+    // The renderer projection redacts keys such as "1password" and truncates large
+    // lists. Native compare-and-swap requires the exact overlay, kept in this process.
+    const request = this.client ? this.client.request.bind(this.client) : this.rpc.bind(this)
+    const [status, description] = await Promise.all([
+      request('skills.status', { agentId, ...(key ? { sessionKey: key } : {}) }),
+      key ? request('sessions.describe', { key, agentId }) : null,
+    ])
+    const session = description?.session
+    if (key && (session?.key !== key || session.agentId !== agentId)) throw new Error('找不到该员工的对话')
+    const allow = this.loadBotMetadata().profiles[agentId]?.skills
+    const skills = (status?.skills || []).filter(skill =>
+      LOCAL_SKILL_SOURCES.has(skill.source) && validSkillKey(skill.name) && validSkillKey(skill.skillKey || skill.name)
+      && skill.eligible === true && skill.modelVisible === true && skill.userInvocable === true
+      && !skill.disabled && !skill.blockedByAllowlist && !skill.blockedByAgentFilter
+      && (!Array.isArray(allow) || allow.includes(skill.name)))
+    return { session, skills }
+  }
+
+  selectedSkills(state, choices) {
+    return state.skills.filter(skill => choices[skill.name] === true
+      && state.session?.toolOverrides?.skills?.[skill.skillKey || skill.name] !== false).map(skill => skill.name)
+  }
+
+  async skillCatalog({ agentId, sessionKey }) {
+    const { session, skills } = await this.sessionSkillState(agentId, sessionKey)
+    const choices = sessionKey ? this.sessionChoices(sessionKey, 'skillChoices') : {}
+    return { skills: skills.filter(skill => session?.toolOverrides?.skills?.[skill.skillKey || skill.name] !== false
+      || choices[skill.name] === false).map(({ name, description }) => ({ name, description })) }
+  }
+
+  async skillSelection({ agentId, sessionKey }) {
+    desktopSessionOwner(sessionKey, agentId)
+    const state = await this.sessionSkillState(agentId, sessionKey)
+    return { selected: this.selectedSkills(state, this.sessionChoices(sessionKey, 'skillChoices')) }
+  }
+
+  changeSkillSelection({ agentId, sessionKey, name }, attach) {
+    desktopSessionOwner(sessionKey, agentId)
+    if (!validSkillKey(name)) throw new Error('技能名称无效')
+    return this.serializeMutation('session:' + sessionKey, async () => {
+      const state = await this.sessionSkillState(agentId, sessionKey)
+      const { session, skills } = state
+      if (session.archived || session.sendDisabledReason || session.sharingRole === 'viewer') throw new Error('此对话不可修改')
+      if (session.hasActiveRun || this.activeSessions.has(sessionKey)) throw new Error('请等待当前回复完成后再更改技能')
+      const choices = this.sessionChoices(sessionKey, 'skillChoices')
+      const skill = skills.find(row => row.name === name)
+      if (!skill) throw new Error('当前员工没有可用的这个技能')
+      const skillKey = skill.skillKey || name
+      const before = session.toolOverrides ?? null
+      const overrides = { ...before?.skills }
+      if (attach && overrides[skillKey] === false && choices[name] !== false) throw new Error('当前对话已限制此技能')
+      if (choices[name] === attach || (!attach && choices[name] !== true)) return { selected: this.selectedSkills(state, choices) }
+      const next = { ...choices, [name]: attach }
+      // A positive native override grants a skill even outside the agent policy. Restore base policy on attach.
+      if (attach) delete overrides[skillKey]
+      else overrides[skillKey] = false
+      const updated = { ...before, skills: overrides }
+      const changed = { ...state, session: { ...session, toolOverrides: updated } }
+      const selected = this.selectedSkills(changed, next)
+      if (JSON.stringify(selected.join(', ')).length > 128) throw new Error('所选技能名称超出本轮可传递的长度，请先移除一个技能')
+      await this.rpc('sessions.patch', {
+        key: sessionKey, agentId, expectedSessionId: session.sessionId, expectedToolOverrides: before, toolOverrides: updated,
+      })
+      this.saveSessionChoices(sessionKey, 'skillChoices', next)
+      return { selected }
+    })
+  }
+
+  async businessCapabilityCatalog() {
+    const { backendPort, businessMcpToken } = this.options
+    if (!backendPort || !businessMcpToken) throw new Error('应用能力暂时不可用')
+    const response = await fetch(`http://127.0.0.1:${backendPort}/api/mcp/szyg-business`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${businessMcpToken}` },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 'xiaoyu-capabilities', method: 'tools/list' }),
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!response.ok) throw new Error('应用能力暂时不可用')
+    const { result } = await response.json()
+    if (!Array.isArray(result?.tools)) throw new Error('应用能力暂时不可用')
+    return result.tools.filter(tool => validSkillKey(tool?.name)).map(tool => ({
+      name: tool.name,
+      title: String(tool.title || tool.name),
+      description: String(tool.description || ''),
+      domain: String(tool._meta?.['szyg/domain'] || ''),
+    }))
+  }
+
+  async sessionCapabilityState(agentId, key) {
+    if (typeof agentId !== 'string' || !/^[a-z0-9_-]+$/i.test(agentId)) throw new Error('请选择当前员工')
+    if (key !== undefined) desktopSessionOwner(key, agentId)
+    const request = this.client ? this.client.request.bind(this.client) : this.rpc.bind(this)
+    const [catalog, description] = await Promise.all([
+      this.businessCapabilityCatalog(),
+      key ? request('sessions.describe', { key, agentId }) : null,
+    ])
+    const session = description?.session
+    if (key && (session?.key !== key || session.agentId !== agentId)) throw new Error('找不到该员工的对话')
+    const policy = this.loadBotMetadata().profiles[agentId]?.toolPolicy
+    const native = session?.toolOverrides
+    const blocked = native?.mcpServers?.[BUSINESS_MCP_SERVER] === false || policy?.mcpServers?.[BUSINESS_MCP_SERVER] === false
+    const excluded = policy?.mcpToolsDeny?.[BUSINESS_MCP_SERVER]
+    const capabilities = blocked ? [] : catalog.filter(({ name }) => !Array.isArray(excluded) || !excluded.includes(name))
+    const deny = native?.mcpToolsDeny?.[BUSINESS_MCP_SERVER] ?? []
+    return { session, capabilities, deny }
+  }
+
+  selectedCapabilities({ capabilities, deny }, choices) {
+    const rows = capabilities.filter(({ name }) => choices[name] === true && !deny.includes(name))
+    return {
+      selected: rows.map(({ name }) => name),
+      titles: Object.fromEntries(rows.map(({ name, title }) => [name, title])),
+    }
+  }
+
+  async capabilityCatalog({ agentId, sessionKey }) {
+    const { capabilities, deny } = await this.sessionCapabilityState(agentId, sessionKey)
+    const choices = sessionKey ? this.sessionChoices(sessionKey, 'capabilityChoices') : {}
+    return { capabilities: capabilities.filter(({ name }) => !deny.includes(name) || choices[name] === false) }
+  }
+
+  async capabilitySelection({ agentId, sessionKey }) {
+    desktopSessionOwner(sessionKey, agentId)
+    const choices = this.sessionChoices(sessionKey, 'capabilityChoices')
+    if (!Object.values(choices).some(Boolean)) return { selected: [], titles: {} }
+    const state = await this.sessionCapabilityState(agentId, sessionKey)
+    return this.selectedCapabilities(state, choices)
+  }
+
+  changeCapabilitySelection({ agentId, sessionKey, name }, attach) {
+    desktopSessionOwner(sessionKey, agentId)
+    if (!validSkillKey(name)) throw new Error('应用能力名称无效')
+    return this.serializeMutation('session:' + sessionKey, async () => {
+      const state = await this.sessionCapabilityState(agentId, sessionKey)
+      const { session, capabilities, deny } = state
+      if (session.archived || session.sendDisabledReason || session.sharingRole === 'viewer') throw new Error('此对话不可修改')
+      if (session.hasActiveRun || this.activeSessions.has(sessionKey)) throw new Error('请等待当前回复完成后再更改应用能力')
+      if (!capabilities.some(capability => capability.name === name)) throw new Error('当前员工没有可用的这个应用能力')
+      const choices = this.sessionChoices(sessionKey, 'capabilityChoices')
+      const wasDenied = deny.includes(name)
+      if (attach && wasDenied && choices[name] !== false) throw new Error('当前对话已限制此应用能力')
+      if (choices[name] === attach || (!attach && choices[name] !== true)) return this.selectedCapabilities(state, choices)
+      const next = { ...choices, [name]: attach }
+      const nextDeny = attach ? deny.filter(tool => tool !== name) : [...new Set([...deny, name])]
+      const selection = this.selectedCapabilities({ capabilities, deny: nextDeny }, next)
+      if (JSON.stringify(selection.selected.join(', ')).length > 128) throw new Error('本轮加载的应用能力超出长度限制，请先移除一项')
+      // Adding an application tool only restores this chat's own previous
+      // exclusion. It must never grant additional native tool access.
+      if (wasDenied !== nextDeny.includes(name)) {
+        const before = session.toolOverrides ?? null
+        const mcpToolsDeny = { ...before?.mcpToolsDeny, [BUSINESS_MCP_SERVER]: nextDeny }
+        if (!nextDeny.length) delete mcpToolsDeny[BUSINESS_MCP_SERVER]
+        await this.rpc('sessions.patch', {
+          key: sessionKey, agentId, expectedSessionId: session.sessionId, expectedToolOverrides: before,
+          toolOverrides: { ...before, mcpToolsDeny },
+        })
+      }
+      this.saveSessionChoices(sessionKey, 'capabilityChoices', next)
+      return selection
+    })
+  }
+
+  async listSessions(params) {
+    const result = await this.rpc('sessions.list', params)
+    const { sessions } = this.loadBotMetadata()
+    const key = Array.isArray(result.sessions) ? 'sessions' : 'items'
+    if (!Array.isArray(result[key])) return result
+    return { ...result, [key]: result[key].map(row => {
+      const sessionKey = row.key || row.sessionKey
+      const canConfigure = isDesktopSession(sessionKey)
+      const agentId = /^agent:([a-z0-9_-]+):/i.exec(sessionKey)?.[1] || row.agentId
+      const pref = sessions[sessionKey]
+      const id = String(row.model || '').replace(/^xiaoyu-managed\//, '')
+      return {
+        ...row, agentId, canConfigure,
+        model: pref?.model || (employeeModels.includes(id) ? id : 'auto'),
+        permissionMode: row.permissionMode || pref?.permissionMode || 'guarded',
+      }
+    }) }
+  }
+
+  gatewayModelSettings(model, deepThinking) {
+    const reasoning = deepThinking === true || model === 'kimi-k3-1-pro-261024'
+    return {
+      model: model && model !== 'auto' ? 'xiaoyu-managed/' + model : reasoning ? XIAOYU_REASONING_MODEL : XIAOYU_FAST_MODEL,
+      thinkingLevel: reasoning ? 'medium' : 'off', fastMode: !reasoning,
+    }
+  }
+
+  sessionSettings(params, agentId, sessionKey) {
+    const metadata = this.loadBotMetadata()
+    const profile = metadata.profiles[agentId] || {}
+    const saved = metadata.sessions[sessionKey] || {}
+    const mode = params.permissionMode ?? saved.permissionMode ?? profile.toolPolicy?.permissionMode ?? 'guarded'
+    return {
+      model: modelChoice(params.model ?? saved.model ?? profile.model ?? 'auto'),
+      permissionMode: permissionChoice(mode),
+    }
+  }
+
+  saveSessionSettings(key, next) {
+    if (!key) return
+    const metadata = this.loadBotMetadata()
+    const previous = metadata.sessions[key]
+    if (previous?.model === next.model && previous?.permissionMode === next.permissionMode) return
+    metadata.sessions[key] = { ...previous, ...next }
+    this.saveBotMetadata(metadata)
+  }
+
+  configureSession(params) {
+    const key = String(params.key || '')
+    const agentId = desktopSessionOwner(key, params.agentId)
+    return this.serializeMutation('session:' + key, async () => {
+      const settings = this.sessionSettings(params, agentId, key)
+      const patch = { key, ...(agentId ? { agentId } : {}) }
+      if (params.model !== undefined || params.deepThinking !== undefined) Object.assign(patch, this.gatewayModelSettings(settings.model, params.deepThinking))
+      if (params.permissionMode !== undefined) patch.permissionMode = settings.permissionMode
+      const result = await this.rpc('sessions.patch', patch)
+      this.saveSessionSettings(key, settings)
+      return { ...result, ...settings }
+    })
   }
 
   async createSession(params = {}) {
     const agentId = String(params.agentId || '').trim()
     if (!agentId) throw new Error('agentId is required')
-    const metadata = this.loadBotMetadata()
-    const profile = metadata.profiles?.[agentId] || {}
-    const allowedModes = new Set(['read-only', 'guarded', 'workspace'])
-    const requestedMode = String(profile.toolPolicy?.permissionMode || 'guarded')
-    const deepThinking = params.deepThinking === true
+    if (params.key) desktopSessionOwner(params.key, agentId)
+    await this.ensureEmployeeInstructions(agentId)
+    const profile = this.loadBotMetadata().profiles[agentId] || {}
+    const settings = this.sessionSettings(params, agentId, params.key)
     const payload = {
       agentId,
-      model: deepThinking ? XIAOYU_REASONING_MODEL : XIAOYU_FAST_MODEL,
-      thinkingLevel: deepThinking ? 'medium' : 'off',
-      fastMode: deepThinking ? false : true,
-      permissionMode: allowedModes.has(requestedMode) ? requestedMode : 'guarded',
-      toolOverrides: { mcpServers: { 'szyg-business': true } },
+      ...this.gatewayModelSettings(settings.model, params.deepThinking),
+      permissionMode: settings.permissionMode,
+      toolOverrides: { mcpServers: { [BUSINESS_MCP_SERVER]: true } },
     }
     for (const key of ['key', 'idempotencyKey', 'label', 'displayName', 'titleSource', 'category', 'incognito', 'visibility']) {
       if (Object.prototype.hasOwnProperty.call(params, key)) payload[key] = params[key]
@@ -907,13 +1452,16 @@ class OpenClawRuntimeManager {
       for (const row of rows) {
         const record = row && typeof row === 'object' ? row : {}
         const name = String(record.name || record.slug || record.id || '')
-        if (name) payload.toolOverrides.skills[name] = allow.has(name)
+        const skillKey = record.skillKey || name
+        if (validSkillKey(skillKey) && !allow.has(name)) payload.toolOverrides.skills[skillKey] = false
       }
     }
     if (profile.toolPolicy?.mcpToolsDeny && typeof profile.toolPolicy.mcpToolsDeny === 'object') {
       payload.toolOverrides.mcpToolsDeny = sanitizeForRenderer(profile.toolPolicy.mcpToolsDeny)
     }
-    return this.rpc('sessions.create', payload)
+    const result = await this.rpc('sessions.create', payload)
+    this.saveSessionSettings(result.key || result.sessionKey, settings)
+    return result
   }
 
   async saveRoutine(params = {}) {
@@ -923,73 +1471,129 @@ class OpenClawRuntimeManager {
     delete payload.id
     delete payload.deepThinking
     if (payload.payload?.kind === 'agentTurn') {
+      const profile = this.loadBotMetadata().profiles[payload.agentId]
+      if (payload.agentId) await this.ensureEmployeeInstructions(payload.agentId)
+      const selected = this.gatewayModelSettings(profile?.model, deepThinking)
+      const model = payload.payload.model || selected.model
+      const kimi = model === 'xiaoyu-managed/kimi-k3-1-pro-261024' || model === 'kimi-k3-1-pro-261024'
       payload.payload = {
-        ...payload.payload,
-        model: deepThinking ? XIAOYU_REASONING_MODEL : (payload.payload.model || XIAOYU_FAST_MODEL),
-        thinking: deepThinking ? (payload.payload.thinking || 'medium') : (payload.payload.thinking || 'off'),
+        ...payload.payload, model,
+        thinking: kimi && (!payload.payload.thinking || payload.payload.thinking === 'off')
+          ? 'medium' : payload.payload.thinking || selected.thinkingLevel,
       }
     }
     return this.rpc(id ? 'cron.update' : 'cron.add', id ? { id, patch: payload } : payload)
   }
 
-  async createBot(params) {
-    const safe = { name: String(params?.name || '').trim() }
-    if (!safe.name) throw new Error('员工名称不能为空')
-    safe.workspace = path.join(this.rootDir, 'workspaces', 'agents', crypto.randomUUID())
-    fs.mkdirSync(safe.workspace, { recursive: true })
-    copyTemplateDirectory(path.join(__dirname, 'workspace-template'), safe.workspace)
-    safe.model = XIAOYU_MANAGED_MODEL
-    if (params?.emoji) safe.emoji = String(params.emoji)
-    if (params?.avatar) safe.avatar = String(params.avatar)
-    const result = await this.rpc('agents.create', safe)
-    const agentId = result.agentId
-    if (agentId) {
-      const metadata = this.loadBotMetadata()
-      metadata.profiles[agentId] = {
-        title: String(params?.title || '数字员工'),
-        instructions: String(params?.instructions || ''),
-        skills: Array.isArray(params?.skills) ? params.skills.map(String) : null,
-        toolPolicy: params?.toolPolicy || { permissionMode: 'guarded' },
-        workspace: safe.workspace,
-        browserProfile: `persist:szyg-agent-${agentId}`,
-      }
-      this.saveBotMetadata(metadata)
+  async writeEmployeeInstructions(agentId, profile, request = this.client
+    ? this.client.request.bind(this.client) : this.rpc.bind(this)) {
+    const params = { agentId, name: 'AGENTS.md' }
+    // Preserve the full document even when it exceeds renderer string limits.
+    const result = await request('agents.files.get', params)
+    const file = result.file
+    const previous = file?.content || fs.readFileSync(path.join(__dirname, 'workspace-template', 'AGENTS.md'), 'utf8')
+    const content = managedInstructions(previous, profile)
+    if (content !== file?.content) {
+      await request('agents.files.set', { ...params, content, ...(file?.hash ? {expectedHash: file.hash} : {expectedMissing: true}) })
     }
-    return result
   }
 
-  async updateBot(params) {
-    const agentId = String(params?.agentId || '')
-    if (!agentId) throw new Error('agentId is required')
-    const gatewayParams = { agentId }
-    for (const key of ['name', 'agentRuntime', 'emoji', 'avatar']) {
-      if (Object.prototype.hasOwnProperty.call(params, key)) gatewayParams[key] = params[key]
-    }
-    gatewayParams.model = XIAOYU_MANAGED_MODEL
-    const result = await this.rpc('agents.update', gatewayParams)
+  async ensureEmployeeInstructions(agentId) {
+    const profile = this.loadBotMetadata().profiles[agentId]
+    if (!profile || profile.promptApplied || (!profile.instructions && !profile.creationPending)) return
+    await this.serializeMutation('bot:' + agentId, async () => {
+      const current = this.loadBotMetadata().profiles[agentId]
+      if (!current || current.promptApplied) return
+      const roster = await this.listBots()
+      const bot = roster.agents.find(row => row.id === agentId)
+      if (!bot || roster.defaultId === agentId) return
+      if (current.creationPending) await this.rpc('agents.update', { agentId, name: current.name })
+      await this.writeEmployeeInstructions(agentId, { ...current, name: bot.name })
+      this.storeProfile(agentId, { promptApplied: true, creationComplete: true, creationPending: false })
+    })
+  }
+
+  storeProfile(agentId, patch) {
     const metadata = this.loadBotMetadata()
+    const previous = metadata.profiles[agentId] || {}
     metadata.profiles[agentId] = {
-      ...(metadata.profiles[agentId] || {}),
-      ...sanitizeForRenderer({
-        title: params.title,
-        instructions: params.instructions,
-        skills: params.skills,
-        toolPolicy: params.toolPolicy,
-      }),
-    }
-    for (const key of Object.keys(metadata.profiles[agentId])) {
-      if (metadata.profiles[agentId][key] === undefined) delete metadata.profiles[agentId][key]
+      ...previous, ...patch,
+      ...(patch.toolPolicy ? { toolPolicy: { ...previous.toolPolicy, ...patch.toolPolicy } } : {}),
     }
     this.saveBotMetadata(metadata)
-    return result
   }
 
-  archiveBot(agentId, archived = true) {
-    const metadata = this.loadBotMetadata()
-    if (archived) metadata.archived[agentId] = Date.now()
-    else delete metadata.archived[agentId]
-    this.saveBotMetadata(metadata)
-    return { ok: true, agentId, archived }
+  createBot(params = {}) {
+    const fields = profileChanges(params)
+    if (!fields.name) throw new Error('请填写员工姓名')
+    const agentId = creationId(params.requestId)
+    return this.serializeMutation('bot:' + agentId, async () => {
+      const roster = await this.listBots()
+      const alreadyCreated = roster.agents.find(a => (a.id || a.agentId) === agentId)
+      const saved = this.loadBotMetadata().profiles[agentId]
+      if (alreadyCreated && saved?.creationComplete) return { ok: true, agentId }
+      const workspace = path.join(this.rootDir, 'workspaces', 'agents', agentId)
+      const profile = {
+        title: '', instructions: '', skills: null, toolPolicy: { permissionMode: 'guarded' },
+        model: 'auto', avatar: 'xiaoyu', ...fields, workspace, browserProfile: 'persist:szyg-agent-' + agentId,
+      }
+      this.storeProfile(agentId, { ...profile, creationPending: true })
+      if (!alreadyCreated) {
+        copyTemplateDirectory(path.join(__dirname, 'workspace-template'), workspace)
+        // The Gateway derives the ID from name and rejects names made solely of
+        // CJK characters. Reserve an opaque ID, then set its display name.
+        await this.rpc('agents.create', {
+          name: agentId, workspace, model: this.gatewayModelSettings(profile.model).model,
+          ...(params.emoji ? { emoji: String(params.emoji) } : {}),
+        })
+      }
+      // The stable request ID also allows retries after a Gateway timeout or
+      // crash between creation, renaming, and updating the bootstrap document.
+      await this.rpc('agents.update', { agentId, name: fields.name })
+      await this.writeEmployeeInstructions(agentId, profile)
+      this.storeProfile(agentId, { ...profile, promptApplied: true, creationComplete: true, creationPending: false })
+      return { ok: true, agentId }
+    })
+  }
+
+  updateBot(params = {}) {
+    const agentId = String(params.agentId || '')
+    if (!agentId) throw new Error('请选择员工')
+    return this.serializeMutation('bot:' + agentId, async () => {
+      const roster = await this.listBots()
+      const agent = roster.agents.find(a => (a.id || a.agentId) === agentId)
+      if (!agent) throw new Error('员工不存在')
+      if (agentId === roster.defaultId && Object.keys(params).some(key => key !== 'agentId' && key !== 'avatar')) {
+        throw new Error('默认员工仅支持更改头像')
+      }
+      const patch = profileChanges(params)
+      if (patch.name !== undefined || patch.model !== undefined || params.emoji !== undefined) {
+        await this.rpc('agents.update', {
+          agentId, ...(patch.name !== undefined ? { name: patch.name } : {}),
+          ...(params.emoji !== undefined ? { emoji: String(params.emoji) } : {}),
+          ...(patch.model !== undefined ? { model: this.gatewayModelSettings(patch.model).model } : {}),
+        })
+      }
+      if (patch.name !== undefined || patch.title !== undefined || patch.instructions !== undefined) {
+        await this.writeEmployeeInstructions(agentId, {...agent, ...patch})
+        patch.promptApplied = true
+      }
+      this.storeProfile(agentId, patch)
+      return { ok: true, agentId }
+    })
+  }
+
+  async archiveBot(agentId, archived = true) {
+    return this.serializeMutation('bot:' + agentId, async () => {
+      const roster = await this.listBots()
+      if (agentId === roster.defaultId) throw new Error('默认员工无法归档')
+      if (!roster.agents.some(a => (a.id || a.agentId) === agentId)) throw new Error('员工不存在')
+      const metadata = this.loadBotMetadata()
+      if (archived) metadata.archived[agentId] = Date.now()
+      else delete metadata.archived[agentId]
+      this.saveBotMetadata(metadata)
+      return { ok: true, agentId, archived }
+    })
   }
 }
 

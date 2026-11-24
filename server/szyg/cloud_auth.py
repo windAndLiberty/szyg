@@ -16,13 +16,18 @@ import platform
 import socket
 import stat
 import threading
+import time
 import uuid
+from collections import deque
+from collections.abc import Callable
 from ctypes import wintypes
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import httpx
-from jose import JWTError, jwt
+from jose import jwt
+from jose.exceptions import JOSEError
 
 from szyg.config.loader import load_config
 
@@ -61,6 +66,9 @@ class CloudAuthManager:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._access_token = ""
+        self._access_expires_at = 0.0
+        # Late 401s can reuse a replacement only within the same login.
+        self._rotated_tokens: deque[str] = deque(maxlen=4)
         self._profile: dict[str, Any] = {}
         self._auth_error = ""
         self._root = Path(os.environ.get("SZYG_DATA_DIR", "data")) / "cloud"
@@ -207,14 +215,6 @@ class CloudAuthManager:
         except Exception:
             return ""
 
-    def _cached_profile(self) -> dict[str, Any] | None:
-        """设备绑定策略:登录过即视为本机已认证,离线/云端抖动时沿用本地档案。"""
-        try:
-            profile = json.loads(self._session_file.read_text(encoding="utf-8")).get("profile")
-            return profile if isinstance(profile, dict) else None
-        except Exception:
-            return None
-
     def _request(self, method: str, path: str, *, json_body: dict | None = None, token: str = "") -> dict:
         cfg = self.config
         if not cfg["enabled"]:
@@ -250,11 +250,24 @@ class CloudAuthManager:
             raise error
         return response.json() if response.content else {}
 
-    def _accept_session(self, data: dict) -> dict:
+    def _accept_session(self, data: dict, *, renewing: bool = False) -> dict:
+        if not data.get("access_token") or not data.get("refresh_token"):
+            raise CloudAuthError("云账户服务返回的登录信息不完整")
+        if renewing and self._access_token:
+            self._rotated_tokens.append(self._access_token)
+        elif not renewing:
+            self._rotated_tokens.clear()
+        try:
+            expires_at = datetime.fromisoformat(str(data.get("access_expires_at")).replace("Z", "+00:00"))
+            self._access_expires_at = expires_at.replace(tzinfo=expires_at.tzinfo or timezone.utc).timestamp()
+        except (ValueError, OverflowError):
+            # Older servers omit the timestamp. Use their default access lifetime for scheduling.
+            self._access_expires_at = time.time() + 15 * 60
         self._access_token = str(data.get("access_token", ""))
         self._profile = {"user": data.get("user", {}), "device": data.get("device", {})}
-        # 重新登录/续期成功 → 清掉上一次的授权到期标记
-        self.clear_auth_error()
+        # Explicit sign-in resets the last entitlement error; token renewal alone does not.
+        if not renewing:
+            self.clear_auth_error()
         refresh_token = str(data.get("refresh_token", ""))
         license_data = data.get("license") if isinstance(data.get("license"), dict) else None
 
@@ -265,11 +278,12 @@ class CloudAuthManager:
             refresh_token,
             license_data,
         )
-        try:
-            key_data = self._request("GET", "/api/v1/auth/license-key")
-            self._save_refresh(refresh_token, license_data, str(key_data.get("public_key", "")))
-        except CloudAuthError:
-            pass
+        if license_data and not self._offline_session():
+            try:
+                key_data = self._request("GET", "/api/v1/auth/license-key")
+                self._save_refresh(refresh_token, license_data, str(key_data.get("public_key", "")))
+            except CloudAuthError:
+                pass
         return {"configured": True, "authenticated": True, **self._profile}
 
     def _offline_session(self) -> dict | None:
@@ -278,16 +292,18 @@ class CloudAuthManager:
             license_data = cached.get("license") or {}
             token = str(license_data.get("license_token") or "")
             public_key = str(cached.get("public_key") or "")
-            claims = jwt.decode(token, public_key, algorithms=["RS256"])
+            claims = jwt.decode(token, public_key, algorithms=["RS256"], options={"require_exp": True, "require_sub": True})
             profile = cached.get("profile") or {}
             if (
                 claims.get("type") != "offline_license"
+                or claims.get("sub") != (profile.get("user") or {}).get("id")
+                or not claims.get("device")
                 or claims.get("device") != (profile.get("device") or {}).get("id")
                 or claims.get("product") != self.config["product_id"]
             ):
                 return None
-            return {"configured": True, "authenticated": True, "offline": True, **profile}
-        except (OSError, ValueError, JWTError, KeyError):
+            return {"configured": True, "authenticated": True, "offline": True, "verified_until": claims["exp"], **profile}
+        except (OSError, ValueError, JOSEError, KeyError, TypeError, AttributeError):
             return None
 
     def login(self, email: str, password: str) -> dict:
@@ -403,79 +419,83 @@ class CloudAuthManager:
                 return self._accept_session(data)
             return self._bind_with_rotation(attempt)
 
-    def access_token(self, *, force_refresh: bool = False) -> str:
+    def _clear_session(self) -> None:
+        self._session_file.unlink(missing_ok=True)
+        self._access_token = ""
+        self._access_expires_at = 0
+        self._rotated_tokens.clear()
+        self._profile = {}
+        self._auth_error = ""
+
+    def access_token(self, *, force_refresh: bool = False, rejected_token: str | None = None) -> str:
         with self._lock:
-            if self._access_token and not force_refresh:
+            if rejected_token is not None and rejected_token != self._access_token:
+                if rejected_token not in self._rotated_tokens:
+                    # An in-flight operation from a previous account must never be replayed as the new account.
+                    raise CloudAuthError("登录状态已变更，请重试")
+                force_refresh = False
+            if self._access_token and not force_refresh and time.time() + 90 < self._access_expires_at:
                 return self._access_token
-            if force_refresh:
-                self._access_token = ""
             refresh_token = self._load_refresh()
             if not refresh_token:
                 raise CloudAuthError("请先登录")
-
-            def refresh_once() -> dict:
-                return self._request("POST", "/api/v1/auth/refresh", json_body={"refresh_token": refresh_token})
-
-            data = self._bind_with_rotation(refresh_once)
-            self._accept_session(data)
+            try:
+                data = self._request("POST", "/api/v1/auth/refresh", json_body={"refresh_token": refresh_token})
+            except CloudAuthError as exc:
+                if getattr(exc, "status_code", None) in {401, 403, 423}:
+                    self._clear_session()
+                elif not force_refresh and self._access_token and time.time() < self._access_expires_at:
+                    # Proactive renewal may fail while the current access token still works.
+                    return self._access_token
+                raise
+            self._accept_session(data, renewing=True)
             return self._access_token
 
     def session(self) -> dict:
-        if not self.config["enabled"]:
-            return self._with_auth_error({"configured": False, "authenticated": False})
-        try:
-            token = self.access_token()
-            profile = self._request("GET", "/api/v1/auth/me", token=token)
-            self._profile = profile
-            return self._with_auth_error({"configured": True, "authenticated": True, **profile})
-        except CloudAuthError as exc:
-            self._access_token = ""
-            # 任何授权类错误必须显式记录,避免"账号不存在/被禁用"被静默吞成离线可用
-            self.note_auth_error(str(exc))
-            # 设备绑定策略:一旦本机登录过,云端校验失败(换 IP/超时/网络抖动)
-            # 一律视为离线可用,不因云端状态变化要求用户重新登录。
-            if str(exc) == "请先登录":
-                return self._with_auth_error({"configured": True, "authenticated": False})
-            offline = self._offline_session()
-            if offline:
-                return self._with_auth_error(offline)
-            cached = self._cached_profile()
-            if cached:
-                return self._with_auth_error({"configured": True, "authenticated": True, "offline": True, **cached})
-            return self._with_auth_error({"configured": True, "authenticated": False, "message": str(exc)})
+        with self._lock:
+            if not self.config["enabled"]:
+                return self._with_auth_error({"configured": False, "authenticated": False})
+            try:
+                profile = self.proxy("GET", "/api/v1/auth/me")
+                self._profile = profile
+                return self._with_auth_error({
+                    "configured": True, "authenticated": True, "verified_until": self._access_expires_at, **profile,
+                })
+            except CloudAuthError as exc:
+                if getattr(exc, "status_code", None) in {401, 403, 423}:
+                    # The identity endpoint (after one renewal) or refresh explicitly denied this session.
+                    self._clear_session()
+                    return {"configured": True, "authenticated": False, "message": str(exc)}
+                if str(exc) == "请先登录":
+                    return {"configured": True, "authenticated": False}
+                self.note_auth_error(str(exc))
+                offline = self._offline_session()
+                if offline:
+                    return self._with_auth_error(offline)
+                return self._with_auth_error({
+                    "configured": True, "authenticated": False, "unavailable": True, "message": str(exc),
+                })
 
     def refresh_status(self) -> dict:
-        """强制刷新 access token 并探测授权状态。用于前端「刷新授权状态」按钮:
-        若授权已被续期则清掉授权到期标记,否则返回过期信息。"""
+        """Refresh entitlement information without confusing an outage with expiration."""
         if not self.config["enabled"]:
-            return {"configured": False, "expired": True, "message": "云账户服务尚未配置"}
+            return {"configured": False, "expired": None, "message": "云账户服务尚未配置"}
         try:
             self.access_token(force_refresh=True)
-        except CloudAuthError as exc:
-            self.note_auth_error(str(exc))
-            return {
-                "configured": True,
-                "expired": True,
-                "authorization_error": self._auth_error or str(exc),
-            }
-        try:
             ent = self.proxy("GET", "/api/v1/entitlements")
         except CloudAuthError as exc:
             self.note_auth_error(str(exc))
-            return {
-                "configured": True,
-                "expired": True,
-                "authorization_error": self._auth_error or str(exc),
-            }
-        from datetime import datetime, timezone as _tz
+            if any(marker in str(exc) for marker in self._AUTH_ERROR_MARKERS):
+                return {"configured": True, "expired": True, "authorization_error": str(exc)}
+            return {"configured": True, "expired": None, "message": str(exc)}
         valid_until_raw = str(ent.get("valid_until") or "")
         expired = (str(ent.get("status") or "").strip().lower() != "active")
         if not expired and valid_until_raw:
             try:
                 dt = datetime.fromisoformat(valid_until_raw.replace("Z", "+00:00"))
                 if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=_tz.utc)
-                if dt <= datetime.now(_tz.utc):
+                    dt = dt.replace(tzinfo=timezone.utc)
+                if dt <= datetime.now(timezone.utc):
                     expired = True
             except ValueError:
                 expired = True
@@ -506,26 +526,38 @@ class CloudAuthManager:
                 method,
                 path,
                 json_body=body,
-                token=self.access_token(force_refresh=True),
+                token=self.access_token(force_refresh=True, rejected_token=token),
             )
 
     @property
     def active_user_id(self) -> str:
         """Account established by desktop sign-in or session refresh in this process."""
-        user = self._profile.get("user") or {}
-        return str(user.get("id") or "") if self._access_token else ""
+        with self._lock:
+            if not self._access_token:
+                return ""
+            if time.time() >= self._access_expires_at:
+                try:
+                    self.access_token()
+                except CloudAuthError:
+                    offline = self._offline_session() or {}
+                    return str((offline.get("user") or {}).get("id") or "")
+            return str((self._profile.get("user") or {}).get("id") or "")
 
-    def logout(self) -> None:
+    def _revoke_refresh(self, refresh: str) -> None:
+        try:
+            self._request("POST", "/api/v1/auth/logout", json_body={"refresh_token": refresh})
+        except CloudAuthError:
+            pass
+
+    def logout(self, *, defer: Callable | None = None) -> None:
         with self._lock:
             refresh = self._load_refresh()
-            if refresh:
-                try:
-                    self._request("POST", "/api/v1/auth/logout", json_body={"refresh_token": refresh})
-                except CloudAuthError:
-                    pass
-            self._access_token = ""
-            self._profile = {}
-            self._session_file.unlink(missing_ok=True)
+            self._clear_session()
+        if refresh:
+            if defer:
+                defer(self._revoke_refresh, refresh)
+            else:
+                self._revoke_refresh(refresh)
 
 
 cloud_auth = CloudAuthManager()

@@ -14,9 +14,10 @@ import {
   Target,
   SearchCheck,
   ContactRound,
-  Users,
   Send,
   KeyRound,
+  PanelsTopLeft,
+  LibraryBig,
   Workflow,
   ListChecks,
   ShieldCheck,
@@ -37,6 +38,7 @@ import {
 export interface NavChild {
   path: string
   label: string
+  keywords?: string
   icon: LucideIcon
   /** 对应的后端模块标识，便于后续填充时定位 API */
   module?: string
@@ -64,7 +66,7 @@ export const navGroups: NavGroup[] = [
     defaultChild: '/',
     children: [
       { path: '/', label: 'nav.superAgent', icon: BrainCircuit, module: 'hermes', implemented: true },
-      { path: '/ai-staff/market', label: 'nav.aiTalent', icon: Bot, module: 'agents' },
+      { path: '/ai-staff/market', label: 'nav.aiTalent', keywords: 'AI人才市场 专家系统 expert talent', icon: Bot, module: 'agency', implemented: true },
       { path: '/ai-staff/tools', label: 'nav.aiTools', icon: Compass, module: 'external-tools', implemented: true },
     ],
   },
@@ -77,9 +79,10 @@ export const navGroups: NavGroup[] = [
     children: [
       { path: '/content/production', label: 'nav.contentStudio', icon: PenLine, module: 'content-generation', implemented: true },
       { path: '/content/digital-human', label: 'nav.digitalHuman', icon: UserRound, module: 'digital-human', implemented: true },
-      { path: '/content/assets', label: 'nav.assets', icon: ImageIcon, module: 'materials' },
+      { path: '/content/assets', label: 'nav.assets', keywords: '发帖 草稿 图文 视频 publish post', icon: ImageIcon, module: 'materials' },
       { path: '/publish/accounts', label: 'nav.channelAccounts', icon: KeyRound, module: 'platforms' },
-      { path: '/publish/center', label: 'nav.publishBoard', icon: Send, module: 'publisher' },
+      { path: '/publish/center', label: 'nav.publishBoard', keywords: '回执 发布记录 receipts', icon: Send, module: 'publisher' },
+      { path: '/publish/workspace', label: 'nav.platformWorkspace', icon: PanelsTopLeft, module: 'executions', implemented: true },
     ],
   },
   {
@@ -114,6 +117,7 @@ export const navGroups: NavGroup[] = [
     defaultChild: '/automation/tasks',
     children: [
       { path: '/automation/tasks', label: 'nav.automationTasks', icon: ListChecks, module: 'automation-tasks', implemented: true },
+      { path: '/automation/plans', label: 'nav.workflowLibrary', keywords: '标准流程 自动化方案 SOP workflow templates', icon: LibraryBig, module: 'workflows', implemented: true },
       { path: '/automation/approvals', label: 'nav.approvals', icon: ShieldCheck, module: 'automation-approvals', implemented: true },
       { path: '/automation/runs', label: 'nav.runs', icon: Clock, module: 'automation-runs', implemented: true },
     ],
@@ -173,8 +177,8 @@ export const legacyRedirects: { from: string; to: string }[] = [
   { from: '/publisher', to: '/publish/center' },
   { from: '/publish', to: '/publish/center' },
   { from: '/scheduler', to: '/automation/runs' },
-  { from: '/sop', to: '/automation/tasks' },
-  { from: '/pipeline', to: '/automation/tasks' },
+  { from: '/sop', to: '/automation/plans?view=standards' },
+  { from: '/pipeline', to: '/automation/plans' },
   { from: '/tools', to: '/knowledge/skills' },
   { from: '/hub', to: '/knowledge/skills' },
   { from: '/skills', to: '/knowledge/skills' },

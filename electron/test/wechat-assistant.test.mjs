@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { TaskQueue, parseTask } from '../wechat/tasks.mjs'
@@ -119,4 +121,21 @@ test('parses explicit tools and bounds relative scheduling', () => {
   assert.equal(parseTask('25小时后 查询', now).tool, 'help')
   assert.equal(parseTask('0分钟后 查询', now).tool, 'help')
   assert.equal(parseTask('写文案 夏季', now).tool, 'content_copy_generate')
+})
+
+
+test('bindable employees include Main before it has a profile and show saved employee names', t => {
+  const base = mkdtempSync(path.join(tmpdir(), 'xiaoyu-wechat-roster-'))
+  t.after(() => rmSync(base, { recursive: true, force: true }))
+  const script = fileURLToPath(new URL('../wechat/assistant.mjs', import.meta.url))
+  const list = () => execFileSync(process.execPath, [script, 'employees'], {
+    env: { ...process.env, SZYG_DATA_DIR: base }, encoding: 'utf8',
+  }).trim().split('\n')
+  assert.deepEqual(list(), ['xiaoyu-wechat 小妤微信助理', 'main 小妤'])
+  mkdirSync(path.join(base, 'openclaw'))
+  writeFileSync(path.join(base, 'openclaw', 'xiaoyu-bots.json'), JSON.stringify({
+    profiles: { main: { avatar: 'robot:2' }, editor: { name: '阿巧', title: '内容编辑' }, old: { title: '旧员工' } },
+    archived: { old: 1 },
+  }))
+  assert.deepEqual(list(), ['xiaoyu-wechat 小妤微信助理', 'main 小妤', 'editor 阿巧'])
 })

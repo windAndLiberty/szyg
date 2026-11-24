@@ -429,25 +429,25 @@ export default function DigitalHumanStudio() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[520px] items-center justify-center text-[#93A3BB]">
+      <div className="flex min-h-[520px] items-center justify-center text-muted-foreground">
         <Loader2 className="mr-2 h-5 w-5 animate-spin" />{t('digitalHuman.loading')}
       </div>
     )
   }
 
   return (
-    <div className="min-h-full bg-[#080C14] text-[#F5F7FB]">
-      <div className="border-b border-[#1D2636] px-5 py-5 lg:px-8">
+    <div className="min-h-full bg-background text-foreground">
+      <div className="border-b border-border px-5 py-5 lg:px-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold">{t('digitalHuman.title')}</h1>
-            <p className="mt-1 text-sm text-[#8492A8]">{t('digitalHuman.subtitle')}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t('digitalHuman.subtitle')}</p>
           </div>
           <div className="flex items-center gap-2">
             <select
               value={project?.id || ''}
               onChange={(event) => setProject(projects.find((item) => item.id === event.target.value) || null)}
-              className="h-9 border border-[#2A3548] bg-[#101624] px-3 text-sm outline-none"
+              className="h-9 border border-border bg-card px-3 text-sm outline-none"
             >
               {projects.map((item) => (
                 <option key={item.id} value={item.id}>{item.name}</option>
@@ -456,7 +456,7 @@ export default function DigitalHumanStudio() {
             <button
               type="button"
               onClick={() => void createNewProject()}
-              className="inline-flex h-9 items-center gap-1.5 bg-[#5965E8] px-3 text-sm hover:bg-[#6873EE]"
+              className="inline-flex h-9 items-center gap-1.5 bg-primary text-primary-foreground px-3 text-sm hover:brightness-90"
             >
               <Plus className="h-4 w-4" />{t('digitalHuman.newProject')}
             </button>
@@ -469,7 +469,7 @@ export default function DigitalHumanStudio() {
       {(error || notice) && (
         <div
           className={`mx-5 mt-4 flex items-center justify-between border px-4 py-3 text-sm lg:mx-8 ${
-            error ? 'border-[#703748] bg-[#2B131C] text-[#FFB4C1]' : 'border-[#28534B] bg-[#10241F] text-[#82E7CC]'
+            error ? 'border-danger-ink/35 bg-danger-soft text-danger-ink' : 'border-success-ink/35 bg-success-soft text-success-ink'
           }`}
         >
           <span className="flex items-center gap-2">
@@ -560,21 +560,21 @@ export default function DigitalHumanStudio() {
           />
         )}
 
-        <div className="mt-8 flex items-center justify-between border-t border-[#1D2636] pt-5">
+        <div className="mt-8 flex items-center justify-between border-t border-border pt-5">
           <button
             type="button"
             onClick={() => setStep((value) => Math.max(1, value - 1))}
             disabled={step === 1}
-            className="inline-flex h-9 items-center gap-2 border border-[#2F3A4E] px-3 text-sm disabled:opacity-30"
+            className="inline-flex h-9 items-center gap-2 border border-border px-3 text-sm disabled:opacity-30"
           >
             <ArrowLeft className="h-4 w-4" />{t('digitalHuman.previous')}
           </button>
-          <div className="text-xs text-[#687790]">{t('digitalHuman.autoSave')}</div>
+          <div className="text-xs text-muted-foreground">{t('digitalHuman.autoSave')}</div>
           <button
             type="button"
             onClick={() => setStep((value) => Math.min(4, value + 1))}
             disabled={step === 4}
-            className="inline-flex h-9 items-center gap-2 bg-[#202842] px-3 text-sm disabled:opacity-30"
+            className="inline-flex h-9 items-center gap-2 bg-accent-soft px-3 text-sm disabled:opacity-30"
           >
             {t('digitalHuman.next')}<ArrowRight className="h-4 w-4" />
           </button>

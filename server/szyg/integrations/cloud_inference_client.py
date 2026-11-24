@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import logging
 import mimetypes
@@ -13,6 +14,7 @@ from typing import AsyncGenerator
 import httpx
 
 from szyg.cloud_auth import CloudAuthError, cloud_auth
+from szyg.employee_models import EMPLOYEE_MODELS, EMPLOYEE_PREFIX
 from szyg.models.common import IntegrationError
 
 
@@ -60,14 +62,14 @@ class CloudInferenceClient:
                 )
 
         try:
-            token = cloud_auth.access_token()
+            token = await asyncio.to_thread(cloud_auth.access_token)
             response = await send(token)
             if response.status_code == 401:
-                token = cloud_auth.access_token(force_refresh=True)
+                token = await asyncio.to_thread(cloud_auth.access_token, force_refresh=True, rejected_token=token)
                 response = await send(token)
         except CloudAuthError as exc:
             message = str(exc)
-            if any(marker in message for marker in ("请先登录", "登录状态", "令牌", "设备已被移除", "设备不存在")):
+            if getattr(exc, "status_code", None) in {401, 403, 423} or any(marker in message for marker in ("请先登录", "登录状态", "令牌", "设备已被移除", "设备不存在")):
                 raise CloudInferenceError("登录状态已失效，请重新登录", status_code=401) from None
             raise CloudInferenceError("账户服务暂时不可用，请稍后重试", status_code=503) from None
         except httpx.HTTPError as exc:
@@ -93,11 +95,21 @@ class CloudInferenceClient:
                 raise CloudInferenceError("登录状态已失效，请重新登录", status_code=401, request_id=request_id)
             if response.status_code == 403:
                 message = "服务授权已到期，请联系管理员" if "到期" in detail_message else "当前账户暂时无法使用此能力，请联系管理员"
-                cloud_auth.note_auth_error(message)
+                if not str((payload or {}).get("capability", "")).startswith(EMPLOYEE_PREFIX):
+                    cloud_auth.note_auth_error(message)
                 raise CloudInferenceError(message, status_code=403, request_id=request_id)
             if response.status_code == 429:
                 message = "Credits 余额不足，请联系管理员" if any(word in detail_message.lower() for word in ("credit", "余额", "额度")) else "请求较多，请稍后重试"
                 raise CloudInferenceError(message, status_code=429, request_id=request_id)
+            if str((payload or {}).get("capability", "")).startswith(EMPLOYEE_PREFIX):
+                if response.status_code == 400 and "能力类型与接口" in detail_message:
+                    message = "云端尚未启用指定模型，请在对话中选择自动模型后重试"
+                    raise CloudInferenceError(message + suffix, status_code=400, request_id=request_id)
+                if response.status_code in (502, 503):
+                    message = "所选模型暂不可用，请稍后重试或选择其他模型"
+                else:
+                    message = "指定模型未完成此次请求"
+                raise CloudInferenceError(message + suffix, status_code=503, request_id=request_id)
             raise CloudInferenceError(f"智能服务暂时不可用{suffix}", status_code=503, request_id=request_id)
         return response.json()
 
@@ -109,15 +121,31 @@ class CloudInferenceClient:
             "app_version": cloud_auth.config["app_version"],
         }
 
+    async def employee_chat(self, model: str, payload: dict) -> dict:
+        if model not in EMPLOYEE_MODELS:
+            raise CloudInferenceError("不支持的员工模型", status_code=400)
+        # The gateway owns the allowlist, exact model route, and charging. Older
+        # gateways reject this capability before reserving or dispatching work.
+        payload = dict(payload)
+        payload.pop("temperature", None)
+        capability = EMPLOYEE_PREFIX + model
+        result = await self._request("POST", "/api/v1/inference/chat", self._body(capability, payload))
+        if result.get("routed_model") != model or not isinstance(result.get("data"), dict):
+            raise CloudInferenceError("云端未确认所选模型的响应", status_code=502)
+        return result["data"]
+
     async def chat(self, messages: list[dict], model: str = "", stream: bool = False, tools: list | None = None, max_tokens: int = 4096, temperature: float = 0.7) -> dict:
-        del model, stream
+        del stream
         payload = {"messages": messages, "stream": False, "max_tokens": max_tokens, "temperature": temperature}
         if tools:
             payload["tools"] = tools
-        result = await self._request("POST", "/api/v1/inference/chat", self._body("text.fast", payload))
-        data = result.get("data") or {}
+        if model in EMPLOYEE_MODELS:
+            data = await self.employee_chat(model, payload)
+        else:
+            result = await self._request("POST", "/api/v1/inference/chat", self._body("text.fast", payload))
+            data = result.get("data") or {}
         choice = (data.get("choices") or [{}])[0]
-        return {"message": choice.get("message") or {"role": "assistant", "content": ""}, "model": "text.fast", "usage": data.get("usage")}
+        return {"message": choice.get("message") or {"role": "assistant", "content": ""}, "model": model if model in EMPLOYEE_MODELS else "text.fast", "usage": data.get("usage")}
 
     async def responses_text(self, input_items: list[dict], model: str = "", max_output_tokens: int = 4096, reasoning_effort: str | None = None) -> dict:
         del model
@@ -280,9 +308,11 @@ class CloudInferenceClient:
                     )
 
         try:
-            response = await send(cloud_auth.access_token())
+            token = await asyncio.to_thread(cloud_auth.access_token)
+            response = await send(token)
             if response.status_code == 401:
-                response = await send(cloud_auth.access_token(force_refresh=True))
+                token = await asyncio.to_thread(cloud_auth.access_token, force_refresh=True, rejected_token=token)
+                response = await send(token)
         except (CloudAuthError, httpx.HTTPError) as exc:
             raise CloudInferenceError("参考素材上传失败，请稍后重试") from exc
         if response.is_error:

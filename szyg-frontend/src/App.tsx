@@ -12,6 +12,7 @@ import CloudAuthExpiredBanner from './components/CloudAuthExpiredBanner'
 // 已实现的真实页面
 import EmployeeWorkspace from './pages/EmployeeWorkspace'
 import Settings from './pages/Settings'
+import AutomationPlans from './pages/workflow/AutomationPlans'
 
 // 占位页面 — AI员工
 import AIMarket from './pages/ai-staff/AIMarket'
@@ -48,7 +49,7 @@ import Billing from './pages/settings/Billing'
 function FullBleedLayout({ children }: { children: ReactNode }) {
   const { sidebarWidth } = useLayout()
   return (
-    <div className="min-h-[100dvh] bg-[#0B0F1A]">
+    <div className="min-h-[100dvh] bg-background">
       <main className="pt-16 min-h-[100dvh] transition-[margin-left] duration-150 ease-out" style={{ marginLeft: sidebarWidth }}>{children}</main>
     </div>
   )
@@ -59,12 +60,12 @@ function NotFound() {
   const { t } = useI18n()
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-6">
-      <div className="text-display-xl text-[#1E293B] font-bold mb-4">404</div>
-      <h1 className="text-heading-lg text-[#F1F5F9] mb-2">{t('errors.pageNotFound')}</h1>
-      <p className="text-body-md text-[#64748B] mb-6">{t('errors.pageNotFoundDescription')}</p>
+      <div className="text-display-xl text-muted-foreground font-bold mb-4">404</div>
+      <h1 className="text-heading-lg text-foreground mb-2">{t('errors.pageNotFound')}</h1>
+      <p className="text-body-md text-muted-foreground mb-6">{t('errors.pageNotFoundDescription')}</p>
       <a
         href="/"
-        className="px-4 py-2 rounded-button bg-[#6366F1] text-white text-sm font-medium hover:bg-[#818CF8] transition-colors"
+        className="px-4 py-2 rounded-button bg-primary text-primary-foreground text-sm font-medium hover:brightness-90 transition-colors"
       >
         {t('errors.backToSuperAgent')}
       </a>
@@ -126,10 +127,10 @@ function AppRoutes({ location }: { location: Location }) {
         <Route path="/automation/tasks" element={<AutomationTasks />} />
         <Route path="/automation/approvals" element={<AutomationApprovals />} />
         <Route path="/automation/runs" element={<AutomationHistory />} />
-        <Route path="/automation/plans" element={<Navigate to="/automation/tasks" replace />} />
-        <Route path="/workflow/pipeline" element={<Navigate to="/automation/tasks" replace />} />
+        <Route path="/automation/plans" element={<AutomationPlans />} />
+        <Route path="/workflow/pipeline" element={<Navigate to="/automation/plans" replace />} />
         <Route path="/workflow/scheduler" element={<Navigate to="/automation/runs" replace />} />
-        <Route path="/workflow/sop" element={<Navigate to="/automation/tasks" replace />} />
+        <Route path="/workflow/sop" element={<Navigate to="/automation/plans?view=standards" replace />} />
 
         {/* 数据洞察 */}
         <Route path="/insights/dashboard" element={<Navigate to="/marketing/workbench" replace />} />

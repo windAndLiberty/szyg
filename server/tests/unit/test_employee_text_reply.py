@@ -9,7 +9,8 @@ def test_employee_text_runs_with_job_instructions_and_no_tools(tmp_path, monkeyp
     monkeypatch.setenv("SZYG_DATA_DIR", str(tmp_path))
     directory = tmp_path / "openclaw"
     directory.mkdir()
-    profile = {"title": "编辑", "instructions": "负责本周选题"}
+    profile = {"name": "阿巧", "title": "编辑", "instructions": "负责本周选题",
+               "model": "kimi-k3-1-pro-261024", "toolPolicy": {"permissionMode": "full"}}
     (directory / "xiaoyu-bots.json").write_text(json.dumps({
         "profiles": {"editor": profile, "former": profile}, "archived": {"former": 100},
     }))
@@ -31,10 +32,16 @@ def test_employee_text_runs_with_job_instructions_and_no_tools(tmp_path, monkeyp
     assert not calls
     assert run("editor") == {"ok": True, "text": "选题清单"}
     messages, params = calls[0]
-    assert "负责本周选题" in messages[0]["content"]
+    assert all(value in messages[0]["content"] for value in ["阿巧", "编辑", "负责本周选题"])
+    assert params["model"] == profile["model"]
     assert messages[1] == {"role": "user", "content": "列选题"}
     assert "tools" not in params
+    assert run("main")["ok"] is True
+    assert "小妤" in calls[-1][0][0]["content"]
+    assert "首席数字员工" in calls[-1][0][0]["content"]
+    assert not calls[-1][1].get("tools")
     assert run("xiaoyu-wechat")["ok"] is True
+    assert "微信助理" in calls[-1][0][0]["content"]
 
     async def tool_call(self, *args, **kwargs):
         return {"message": {"content": "已发送", "tool_calls": [{"name": "send"}]}}

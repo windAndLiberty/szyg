@@ -26,9 +26,12 @@ interface OpenClawAPI {
   sessions: {
     list: (params?: OpenClawParams) => Promise<OpenClawResult>
     create: (params?: OpenClawParams) => Promise<OpenClawResult>
+    directorRenders: (params: OpenClawParams) => Promise<{jobs: string[]}>
     history: (params: OpenClawParams) => Promise<OpenClawResult>
+    configure: (params: OpenClawParams) => Promise<OpenClawResult>
   }
   runs: {
+    status: (params: OpenClawParams) => Promise<{sessionKey: string; agentId: string; active: boolean; runId: string | null; status: string}>
     send: (params: OpenClawParams) => Promise<OpenClawResult>
     interrupt: (params: OpenClawParams) => Promise<OpenClawResult>
     subscribe: (callback: (event: OpenClawEvent) => void) => (() => void)
@@ -36,8 +39,18 @@ interface OpenClawAPI {
   approvals: { resolve: (params: OpenClawParams) => Promise<OpenClawResult> }
   questions: { answer: (params: OpenClawParams) => Promise<OpenClawResult> }
   skills: {
+    catalog: (params: { agentId: string; sessionKey?: string }) => Promise<{ skills: Array<{ name: string; description: string }> }>
+    selection: (params: { agentId: string; sessionKey: string }) => Promise<{ selected: string[] }>
+    attach: (params: { agentId: string; sessionKey: string; name: string }) => Promise<{ selected: string[] }>
+    detach: (params: { agentId: string; sessionKey: string; name: string }) => Promise<{ selected: string[] }>
     list: (params?: OpenClawParams) => Promise<OpenClawResult>
     readStatus: (params: OpenClawParams) => Promise<OpenClawResult>
+  }
+  capabilities: {
+    catalog: (params: { agentId: string; sessionKey?: string }) => Promise<{ capabilities: Array<{ name: string; title: string; description: string; domain: string }> }>
+    selection: (params: { agentId: string; sessionKey: string }) => Promise<{ selected: string[]; titles: Record<string, string> }>
+    attach: (params: { agentId: string; sessionKey: string; name: string }) => Promise<{ selected: string[]; titles: Record<string, string> }>
+    detach: (params: { agentId: string; sessionKey: string; name: string }) => Promise<{ selected: string[]; titles: Record<string, string> }>
   }
   routines: {
     list: (params?: OpenClawParams) => Promise<OpenClawResult>

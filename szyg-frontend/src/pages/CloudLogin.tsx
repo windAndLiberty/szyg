@@ -111,8 +111,9 @@ export default function CloudLogin({ initialMessage = '', onSuccess }: { initial
 
   return (
     <main className="auth-shell">
-      <LanguageSwitcher className="absolute right-5 top-5" />
+      <div aria-hidden="true" className="auth-art" style={{ backgroundImage: `url("${product.loginBackgroundUrl}")` }} />
       <section className="auth-panel">
+        <LanguageSwitcher className="absolute right-6 top-6" />
         <img src={product.logoUrl} alt="" className="mb-5 h-12 w-12 rounded-xl object-cover" />
         <h1 className="text-2xl font-semibold tracking-tight">{t(product.name)}</h1>
         <p className="mb-7 mt-2 text-sm text-muted-foreground">{t(mode === 'login' ? 'auth.loginSubtitle' : mode === 'register' ? 'auth.registerSubtitle' : 'auth.changePasswordSubtitle')}</p>
@@ -151,7 +152,7 @@ export default function CloudLogin({ initialMessage = '', onSuccess }: { initial
                 <Input value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={t('auth.newPasswordHint')} type="password" autoComplete="new-password" className="border-border bg-background text-foreground" />
                 <Input value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder={t('auth.confirmPassword')} type="password" autoComplete="new-password" className="border-border bg-background text-foreground" />
               </>}
-              {message && <p className={`rounded-md border px-3 py-2 text-sm ${codeSent ? 'border-[#065F46] bg-[#064E3B]/35 text-[#A7F3D0]' : 'border-[#7F1D1D] bg-[#450A0A]/40 text-[#FCA5A5]'}`}>{message}</p>}
+              {message && <p className={`rounded-md border px-3 py-2 text-sm ${codeSent ? 'border-success-ink/35 bg-success-soft/35 text-success-ink' : 'border-danger-ink/35 bg-danger-soft/40 text-danger-ink'}`}>{message}</p>}
               <Button type="submit" className="w-full bg-foreground text-background hover:bg-foreground/90" disabled={loading || !account.trim() || (!isPasswordReset && !password) || (isRegistering && (!displayName.trim() || !verificationId || verificationCode.length !== 6 || !acceptedTerms)) || (isPasswordReset && (!verificationId || verificationCode.length !== 6 || !newPassword || !confirmPassword))}>
                 {loading ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}{t(mode === 'login' ? 'auth.signIn' : mode === 'register' ? 'auth.createAndSignIn' : 'auth.confirmChange')}
               </Button>
